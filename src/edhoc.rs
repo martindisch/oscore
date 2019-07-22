@@ -4,7 +4,7 @@ use serde_cbor::de::from_mut_slice;
 use serde_cbor::ser::SliceWrite;
 use serde_cbor::Serializer;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Message1 {
     pub r#type: i32,
     pub suite: i32,
@@ -64,4 +64,51 @@ pub fn deserialize_message_1(
         x_u: raw_msg.2,
         c_u: raw_msg.3,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serialize() {
+        let original = Message1 {
+            r#type: 1,
+            suite: 0,
+            x_u: vec![
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+            ],
+            c_u: vec![195],
+        };
+        let bytes = vec![
+            0x01, 0x00, 0x58, 0x20, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+            0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11,
+            0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C,
+            0x1D, 0x1E, 0x1F, 0x41, 0xC3,
+        ];
+
+        assert_eq!(serialize_message_1(original).unwrap(), bytes);
+    }
+
+    #[test]
+    fn deserialize() {
+        let original = Message1 {
+            r#type: 1,
+            suite: 0,
+            x_u: vec![
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+                18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+            ],
+            c_u: vec![195],
+        };
+        let mut bytes = vec![
+            0x01, 0x00, 0x58, 0x20, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+            0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11,
+            0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C,
+            0x1D, 0x1E, 0x1F, 0x41, 0xC3,
+        ];
+
+        assert_eq!(deserialize_message_1(&mut bytes).unwrap(), original);
+    }
 }
