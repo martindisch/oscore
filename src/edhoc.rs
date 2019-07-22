@@ -13,17 +13,17 @@ pub struct Message1 {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct RawMessage1(
+struct RawMessage1<'a>(
     i32,
     i32,
-    #[serde(with = "serde_bytes")] Vec<u8>,
-    #[serde(with = "serde_bytes")] Vec<u8>,
+    #[serde(with = "serde_bytes")] &'a [u8],
+    #[serde(with = "serde_bytes")] &'a [u8],
 );
 
-pub fn serialize_message_1(msg: Message1) -> Result<Vec<u8>, &'static str> {
+pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>, &'static str> {
     // Pack the data into a structure that nicely serializes almost into
     // what we want to have as the actual bytes for the EDHOC message
-    let raw_msg = RawMessage1(msg.r#type, msg.suite, msg.x_u, msg.c_u);
+    let raw_msg = RawMessage1(msg.r#type, msg.suite, &msg.x_u, &msg.c_u);
 
     // Initialize a buffer, as well as a writer and serializer relying on it
     let mut buf = [0u8; 128];
@@ -42,14 +42,12 @@ pub fn serialize_message_1(msg: Message1) -> Result<Vec<u8>, &'static str> {
     Ok(buf[1..size].to_vec())
 }
 
-pub fn deserialize_message_1(
-    msg: &mut [u8],
-) -> Result<Message1, &'static str> {
+pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1, &'static str> {
     // We receive a sequence of 4 CBOR items. For parsing we need an array, so
     // start a CBOR array of length 4.
     let mut cbor_arr = vec![0x84];
     // After the start byte, insert the message (sequence of CBOR items)
-    cbor_arr.extend(&msg[..]);
+    cbor_arr.extend(msg);
 
     // Now we can try to deserialize that into our raw message format
     let raw_msg: RawMessage1 = match from_mut_slice(&mut cbor_arr) {
@@ -61,8 +59,8 @@ pub fn deserialize_message_1(
     Ok(Message1 {
         r#type: raw_msg.0,
         suite: raw_msg.1,
-        x_u: raw_msg.2,
-        c_u: raw_msg.3,
+        x_u: raw_msg.2.to_vec(),
+        c_u: raw_msg.3.to_vec(),
     })
 }
 
@@ -88,7 +86,7 @@ mod tests {
             0x1D, 0x1E, 0x1F, 0x41, 0xC3,
         ];
 
-        assert_eq!(serialize_message_1(original).unwrap(), bytes);
+        assert_eq!(serialize_message_1(&original).unwrap(), bytes);
     }
 
     #[test]

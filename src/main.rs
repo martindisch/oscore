@@ -7,7 +7,7 @@ fn main() {
         x_u: vec![0, 1, 2, 3],
         c_u: vec![195],
     };
-    let mut bytes = oscore::edhoc::serialize_message_1(msg).unwrap();
+    let mut bytes = oscore::edhoc::serialize_message_1(&msg).unwrap();
     println!("{}", hexstring(&bytes));
     println!(
         "{:#?}",
