@@ -5,6 +5,9 @@ authors = ["Martin Disch <martindisch@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
+[lib]
+doctest = false
+
 [dependencies]
 serde = { version = "1.0.97", default-features = false, features = ["derive", "alloc"] }
 serde_cbor = { version = "0.10.1", default-features = false }
