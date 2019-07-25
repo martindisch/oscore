@@ -1,8 +1,8 @@
+use crate::cbor::encode;
 use alloc::vec::Vec;
 use ed25519_dalek::{Keypair, Signature};
 use serde::{Deserialize, Serialize};
-use serde_cbor::ser::SliceWrite;
-use serde_cbor::{Error, Serializer};
+use serde_cbor::Error;
 use sha2::Sha512;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -71,16 +71,7 @@ fn build_to_be_signed(
     // Create the Sig_structure
     let sig_struct = SigStructure("Signature1", id_cred_x, th_i, cred_x);
 
-    // Initialize a buffer, as well as a writer and serializer relying on it
-    let mut buf = [0u8; 128];
-    let writer = SliceWrite::new(&mut buf);
-    let mut serializer = Serializer::new(writer);
-    // Attempt serialization and determine the length
-    sig_struct.serialize(&mut serializer)?;
-    let writer = serializer.into_inner();
-    let size = writer.bytes_written();
-
-    Ok(buf[..size].to_vec())
+    encode(&sig_struct)
 }
 
 #[cfg(test)]

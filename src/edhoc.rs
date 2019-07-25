@@ -1,8 +1,7 @@
+use crate::cbor::{decode, encode_sequence};
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
-use serde_cbor::de::from_mut_slice;
-use serde_cbor::ser::SliceWrite;
-use serde_cbor::{Error, Serializer};
+use serde_cbor::Error;
 
 #[derive(Debug, PartialEq)]
 pub struct Message1 {
@@ -25,30 +24,13 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>, Error> {
     // what we want to have as the actual bytes for the EDHOC message
     let raw_msg = RawMessage1(msg.r#type, msg.suite, &msg.x_u, &msg.c_u);
 
-    // Initialize a buffer, as well as a writer and serializer relying on it
-    let mut buf = [0u8; 128];
-    let writer = SliceWrite::new(&mut buf);
-    let mut serializer = Serializer::new(writer);
-    // Attempt serialization and determine the length
-    raw_msg.serialize(&mut serializer)?;
-    let writer = serializer.into_inner();
-    let size = writer.bytes_written();
-
-    // What we have now is a fixed-length CBOR array with 4 items.
-    // What we want is just the sequence of items, so we can simply omit the
-    // first byte (indicating array type and length), and get the items.
-    Ok(buf[1..size].to_vec())
+    encode_sequence(raw_msg)
 }
 
 pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1, Error> {
-    // We receive a sequence of 4 CBOR items. For parsing we need an array, so
-    // start a CBOR array of length 4.
-    let mut cbor_arr = vec![0x84];
-    // After the start byte, insert the message (sequence of CBOR items)
-    cbor_arr.extend(msg);
-
-    // Now we can try to deserialize that into our raw message format
-    let raw_msg: RawMessage1 = from_mut_slice(&mut cbor_arr)?;
+    // Try to deserialize into our raw message format
+    let mut temp = vec![];
+    let raw_msg: RawMessage1 = decode(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
     Ok(Message1 {
@@ -80,30 +62,13 @@ pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>, Error> {
     // what we want to have as the actual bytes for the EDHOC message
     let raw_msg = RawMessage2(&msg.c_u, &msg.x_v, &msg.c_v, &msg.ciphertext);
 
-    // Initialize a buffer, as well as a writer and serializer relying on it
-    let mut buf = [0u8; 128];
-    let writer = SliceWrite::new(&mut buf);
-    let mut serializer = Serializer::new(writer);
-    // Attempt serialization and determine the length
-    raw_msg.serialize(&mut serializer)?;
-    let writer = serializer.into_inner();
-    let size = writer.bytes_written();
-
-    // What we have now is a fixed-length CBOR array with 4 items.
-    // What we want is just the sequence of items, so we can simply omit the
-    // first byte (indicating array type and length), and get the items.
-    Ok(buf[1..size].to_vec())
+    encode_sequence(raw_msg)
 }
 
 pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2, Error> {
-    // We receive a sequence of 4 CBOR items. For parsing we need an array, so
-    // start a CBOR array of length 4.
-    let mut cbor_arr = vec![0x84];
-    // After the start byte, insert the message (sequence of CBOR items)
-    cbor_arr.extend(msg);
-
-    // Now we can try to deserialize that into our raw message format
-    let raw_msg: RawMessage2 = from_mut_slice(&mut cbor_arr)?;
+    // Try to deserialize into our raw message format
+    let mut temp = vec![];
+    let raw_msg: RawMessage2 = decode(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
     Ok(Message2 {
