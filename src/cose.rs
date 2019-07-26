@@ -1,8 +1,8 @@
 use crate::cbor::encode;
+use crate::error::Error;
 use alloc::vec::Vec;
 use ed25519_dalek::{Keypair, Signature};
 use serde::{Deserialize, Serialize};
-use serde_cbor::Error;
 use sha2::Sha512;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -29,8 +29,7 @@ pub fn sign(
     keypair_bytes: &[u8],
 ) -> Result<[u8; 64], Error> {
     let to_be_signed = build_to_be_signed(id_cred_x, th_i, cred_x)?;
-    // TODO: Proper error propagation
-    let keypair = Keypair::from_bytes(&keypair_bytes).unwrap();
+    let keypair = Keypair::from_bytes(&keypair_bytes)?;
     let signature = keypair.sign::<Sha512>(&to_be_signed);
 
     Ok(signature.to_bytes())
@@ -52,15 +51,12 @@ pub fn verify(
     cred_x: &[u8],
     public_key: &[u8],
     signature: &[u8],
-) -> Result<bool, Error> {
+) -> Result<(), Error> {
     let to_be_signed = build_to_be_signed(id_cred_x, th_i, cred_x)?;
-    // TODO: Proper error propagation
-    let public_key = ed25519_dalek::PublicKey::from_bytes(public_key).unwrap();
-    let signature = Signature::from_bytes(signature).unwrap();
+    let public_key = ed25519_dalek::PublicKey::from_bytes(public_key)?;
+    let signature = Signature::from_bytes(signature)?;
 
-    Ok(public_key
-        .verify::<Sha512>(&to_be_signed, &signature)
-        .is_ok())
+    Ok(public_key.verify::<Sha512>(&to_be_signed, &signature)?)
 }
 
 fn build_to_be_signed(
@@ -127,18 +123,18 @@ mod tests {
             &KEYPAIR[32..],
             &signature
         )
-        .unwrap());
+        .is_ok());
 
         let mut cred_x_changed = CRED_X.to_vec();
         cred_x_changed[1] = 0x44;
-        assert!(!verify(
+        assert!(verify(
             &ID_CRED_X,
             &TH_I,
             &cred_x_changed,
             &KEYPAIR[32..],
             &signature
         )
-        .unwrap());
+        .is_err());
     }
 
 }

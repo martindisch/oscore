@@ -1,8 +1,9 @@
+use crate::error::Error;
 use alloc::vec::Vec;
 use serde::Serialize;
 use serde_cbor::de::from_mut_slice;
 use serde_cbor::ser::SliceWrite;
-use serde_cbor::{Error, Serializer};
+use serde_cbor::Serializer;
 
 /// Serializes an object into CBOR.
 pub fn encode(object: impl Serialize) -> Result<Vec<u8>, Error> {
@@ -59,7 +60,7 @@ where
     tmp_vec.extend(bytes);
 
     // Now we can try to deserialize that
-    from_mut_slice(tmp_vec)
+    Ok(from_mut_slice(tmp_vec)?)
 }
 
 fn array_byte(n: u8) -> u8 {

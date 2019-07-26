@@ -1,7 +1,7 @@
 use crate::cbor::{decode, encode_sequence};
+use crate::error::Error;
 use alloc::vec::Vec;
 use serde::{Deserialize, Serialize};
-use serde_cbor::Error;
 
 #[derive(Debug, PartialEq)]
 pub struct Message1 {
@@ -24,7 +24,7 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>, Error> {
     // what we want to have as the actual bytes for the EDHOC message
     let raw_msg = RawMessage1(msg.r#type, msg.suite, &msg.x_u, &msg.c_u);
 
-    encode_sequence(raw_msg)
+    Ok(encode_sequence(raw_msg)?)
 }
 
 pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1, Error> {
@@ -62,7 +62,7 @@ pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>, Error> {
     // what we want to have as the actual bytes for the EDHOC message
     let raw_msg = RawMessage2(&msg.c_u, &msg.x_v, &msg.c_v, &msg.ciphertext);
 
-    encode_sequence(raw_msg)
+    Ok(encode_sequence(raw_msg)?)
 }
 
 pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2, Error> {
