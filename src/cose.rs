@@ -1,5 +1,5 @@
 use crate::cbor::encode;
-use crate::error::Error;
+use crate::Result;
 use alloc::vec::Vec;
 use ed25519_dalek::{Keypair, Signature};
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,7 @@ pub fn sign(
     th_i: &[u8],
     cred_x: &[u8],
     keypair_bytes: &[u8],
-) -> Result<[u8; 64], Error> {
+) -> Result<[u8; 64]> {
     let to_be_signed = build_to_be_signed(id_cred_x, th_i, cred_x)?;
     let keypair = Keypair::from_bytes(&keypair_bytes)?;
     let signature = keypair.sign::<Sha512>(&to_be_signed);
@@ -51,7 +51,7 @@ pub fn verify(
     cred_x: &[u8],
     public_key: &[u8],
     signature: &[u8],
-) -> Result<(), Error> {
+) -> Result<()> {
     let to_be_signed = build_to_be_signed(id_cred_x, th_i, cred_x)?;
     let public_key = ed25519_dalek::PublicKey::from_bytes(public_key)?;
     let signature = Signature::from_bytes(signature)?;
@@ -63,7 +63,7 @@ fn build_to_be_signed(
     id_cred_x: &[u8],
     th_i: &[u8],
     cred_x: &[u8],
-) -> Result<Vec<u8>, Error> {
+) -> Result<Vec<u8>> {
     // Create the Sig_structure
     let sig_struct = SigStructure("Signature1", id_cred_x, th_i, cred_x);
 

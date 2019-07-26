@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::Result;
 use alloc::vec::Vec;
 use serde::Serialize;
 use serde_cbor::de::from_mut_slice;
@@ -6,14 +7,14 @@ use serde_cbor::ser::SliceWrite;
 use serde_cbor::Serializer;
 
 /// Serializes an object into CBOR.
-pub fn encode(object: impl Serialize) -> Result<Vec<u8>, Error> {
+pub fn encode(object: impl Serialize) -> Result<Vec<u8>> {
     serialize(object, 0)
 }
 
 /// Serializes an object into a sequence of CBOR encoded data items.
 ///
 /// Only works for objects that serialize to a CBOR array of at most 23 items.
-pub fn encode_sequence(object: impl Serialize) -> Result<Vec<u8>, Error> {
+pub fn encode_sequence(object: impl Serialize) -> Result<Vec<u8>> {
     // We serialize something that encodes as a CBOR array.
     // What we want is just the sequence of items, so we can omit the
     // first byte (indicating array type and length), and get the items.
@@ -22,7 +23,7 @@ pub fn encode_sequence(object: impl Serialize) -> Result<Vec<u8>, Error> {
     serialize(object, 1)
 }
 
-fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>, Error> {
+fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>> {
     // Initialize a buffer, as well as a writer and serializer relying on it
     let mut buf = [0u8; 128];
     let writer = SliceWrite::new(&mut buf);
@@ -49,7 +50,7 @@ pub fn decode<'a, T>(
     bytes: &[u8],
     n_items: u8,
     tmp_vec: &'a mut Vec<u8>,
-) -> Result<T, Error>
+) -> Result<T>
 where
     T: serde::Deserialize<'a>,
 {
@@ -63,7 +64,7 @@ where
     Ok(from_mut_slice(tmp_vec)?)
 }
 
-fn array_byte(n: u8) -> Result<u8, Error> {
+fn array_byte(n: u8) -> Result<u8> {
     match n {
         _ if n > 23 => Err(Error::TooManyItems),
         // The major type for arrays is indicated by the three leftmost bits.
