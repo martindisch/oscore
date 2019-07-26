@@ -55,7 +55,7 @@ where
 {
     // We receive a sequence of CBOR items. For parsing we need an array, so
     // start a CBOR array of the given length.
-    tmp_vec.push(array_byte(n_items));
+    tmp_vec.push(array_byte(n_items)?);
     // After the start byte, insert the message (sequence of CBOR items)
     tmp_vec.extend(bytes);
 
@@ -63,12 +63,14 @@ where
     Ok(from_mut_slice(tmp_vec)?)
 }
 
-fn array_byte(n: u8) -> u8 {
-    // The major type for arrays is indicated by the three leftmost bits.
-    // By doing bitwise OR with the number of items, we assign the remaining
-    // bits for the number of elements.
-    // TODO: Error handling for more than 23 items
-    0b100_00000 | n
+fn array_byte(n: u8) -> Result<u8, Error> {
+    match n {
+        _ if n > 23 => Err(Error::TooManyItems),
+        // The major type for arrays is indicated by the three leftmost bits.
+        // By doing bitwise OR with the number of items, we assign the remaining
+        // bits for the number of elements.
+        n => Ok(0b100_00000 | n),
+    }
 }
 
 #[cfg(test)]
@@ -77,9 +79,10 @@ mod tests {
 
     #[test]
     fn array_length() {
-        assert_eq!(0x80, array_byte(0));
-        assert_eq!(0x81, array_byte(1));
-        assert_eq!(0x94, array_byte(20));
-        assert_eq!(0x97, array_byte(23));
+        assert_eq!(0x80, array_byte(0).unwrap());
+        assert_eq!(0x81, array_byte(1).unwrap());
+        assert_eq!(0x94, array_byte(20).unwrap());
+        assert_eq!(0x97, array_byte(23).unwrap());
+        assert!(array_byte(24).is_err());
     }
 }

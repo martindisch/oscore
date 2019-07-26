@@ -3,6 +3,7 @@ use core::fmt;
 #[derive(Debug)]
 pub enum Error {
     Cbor(serde_cbor::Error),
+    TooManyItems,
     Ed25519(ed25519_dalek::SignatureError),
 }
 
@@ -22,6 +23,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Cbor(e) => write!(f, "CBOR error: {}", e),
+            Error::TooManyItems => {
+                write!(f, "Can't decode CBOR sequence of more than 23 items")
+            }
             Error::Ed25519(e) => write!(f, "Signature error: {}", e),
         }
     }
