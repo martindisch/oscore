@@ -32,7 +32,7 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
 
 pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     // Try to deserialize into our raw message format
-    let mut temp = vec![];
+    let mut temp = Vec::with_capacity(msg.len() + 1);
     let raw_msg: RawMessage1 = decode(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
@@ -70,7 +70,7 @@ pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
 
 pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
     // Try to deserialize into our raw message format
-    let mut temp = vec![];
+    let mut temp = Vec::with_capacity(msg.len() + 1);
     let raw_msg: RawMessage2 = decode(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
