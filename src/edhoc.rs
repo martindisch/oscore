@@ -178,9 +178,11 @@ mod tests {
             x_u: MSG1_X_U.to_vec(),
             c_u: C_U.to_vec(),
         };
-        let bytes = MSG1_BYTES.to_vec();
 
-        assert_eq!(serialize_message_1(&original).unwrap(), bytes);
+        assert_eq!(
+            &MSG1_BYTES[..],
+            &serialize_message_1(&original).unwrap()[..]
+        );
     }
 
     #[test]
@@ -191,9 +193,8 @@ mod tests {
             x_u: MSG1_X_U.to_vec(),
             c_u: C_U.to_vec(),
         };
-        let mut bytes = MSG1_BYTES.to_vec();
 
-        assert_eq!(deserialize_message_1(&mut bytes).unwrap(), original);
+        assert_eq!(original, deserialize_message_1(&MSG1_BYTES).unwrap());
     }
 
     #[test]
@@ -211,9 +212,11 @@ mod tests {
             c_v: C_V.to_vec(),
             ciphertext: MSG2_CIPHERTEXT.to_vec(),
         };
-        let bytes = MSG2_BYTES.to_vec();
 
-        assert_eq!(serialize_message_2(&original).unwrap(), bytes);
+        assert_eq!(
+            &MSG2_BYTES[..],
+            &serialize_message_2(&original).unwrap()[..]
+        );
     }
 
     #[test]
@@ -224,24 +227,23 @@ mod tests {
             c_v: C_V.to_vec(),
             ciphertext: MSG2_CIPHERTEXT.to_vec(),
         };
-        let mut bytes = MSG2_BYTES.to_vec();
 
-        assert_eq!(deserialize_message_2(&mut bytes).unwrap(), original);
+        assert_eq!(original, deserialize_message_2(&MSG2_BYTES).unwrap());
     }
 
     #[test]
     fn key_derivation() {
         let okm = edhoc_key_derivation(ALG, LENGTH, &OTHER, &SECRET).unwrap();
-        assert_eq!(&okm, &OKM);
+        assert_eq!(&OKM[..], &okm[..]);
 
         let mut other = OTHER.to_vec();
         other[1] = 0x42;
         let okm = edhoc_key_derivation(ALG, LENGTH, &other, &SECRET).unwrap();
-        assert_ne!(&okm, &OKM);
+        assert_ne!(&OKM[..], &okm[..]);
 
         let mut secret = SECRET.to_vec();
         secret[1] = 0x42;
         let okm = edhoc_key_derivation(ALG, LENGTH, &OTHER, &secret).unwrap();
-        assert_ne!(&okm, &OKM);
+        assert_ne!(&OKM[..], &okm[..]);
     }
 }

@@ -160,7 +160,7 @@ mod tests {
     fn to_be_signed() {
         let to_be_signed =
             build_to_be_signed(&ID_CRED_X, &TH_I, &CRED_X).unwrap();
-        assert_eq!(&to_be_signed, &M);
+        assert_eq!(&M[..], &to_be_signed[..]);
     }
 
     #[test]
