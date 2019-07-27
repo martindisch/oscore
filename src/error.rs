@@ -5,6 +5,7 @@ pub enum Error {
     Cbor(serde_cbor::Error),
     TooManyItems,
     Ed25519(ed25519_dalek::SignatureError),
+    Hkdf(hkdf::InvalidLength),
 }
 
 impl From<serde_cbor::Error> for Error {
@@ -19,6 +20,12 @@ impl From<ed25519_dalek::SignatureError> for Error {
     }
 }
 
+impl From<hkdf::InvalidLength> for Error {
+    fn from(e: hkdf::InvalidLength) -> Error {
+        Error::Hkdf(e)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -27,6 +34,7 @@ impl fmt::Display for Error {
                 write!(f, "Can't decode CBOR sequence of more than 23 items")
             }
             Error::Ed25519(e) => write!(f, "Signature error: {}", e),
+            Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
         }
     }
 }
