@@ -70,6 +70,45 @@ fn build_to_be_signed(
     encode(&sig_struct)
 }
 
+#[derive(Debug, Serialize)]
+struct CoseKdfContext<'a>(
+    /// AlgorithmID
+    &'a str,
+    /// PartyUInfo
+    [(); 3],
+    /// PartyVInfo
+    [(); 3],
+    /// SuppPubInfo
+    SuppPubInfo<'a>,
+);
+
+#[derive(Debug, Serialize)]
+struct SuppPubInfo<'a>(
+    /// keyDataLength
+    usize,
+    /// protected
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+    /// other
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+);
+
+/// Returns a CBOR encoded COSE_KDF_Context.
+///
+/// This is used as the info input for the HKDF-Expand step.
+pub fn build_kdf_context(
+    algorithm_id: &str,
+    key_data_length: usize,
+    other: &[u8],
+) -> Result<Vec<u8>> {
+    let supp_pub_info = SuppPubInfo(key_data_length, &[], other);
+    let cose_kdf_context =
+        CoseKdfContext(algorithm_id, [(); 3], [(); 3], supp_pub_info);
+
+    encode(cose_kdf_context)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -98,6 +137,23 @@ mod tests {
         0x71, 0xD1, 0xFE, 0xB3, 0xD7, 0xD7, 0x8C, 0x14, 0x7F, 0xBD, 0xCA,
         0xAD, 0x34, 0x67, 0x88, 0xC2, 0x44, 0x32, 0x3E, 0xC6, 0x4D, 0x9A,
         0x85, 0x68, 0x6D, 0x4D, 0x06, 0xA9, 0x58, 0x6F, 0x20,
+    ];
+
+    static ALG1: &str = "IV-GENERATION";
+    static ALG2: &str = "AES-CCM-64-64-128";
+    static LEN1: usize = 104;
+    static LEN2: usize = 128;
+    static OTHER: [u8; 2] = [0xAA, 0xAA];
+    static CONTEXT1: [u8; 30] = [
+        0x84, 0x6D, 0x49, 0x56, 0x2D, 0x47, 0x45, 0x4E, 0x45, 0x52, 0x41,
+        0x54, 0x49, 0x4F, 0x4E, 0x83, 0xF6, 0xF6, 0xF6, 0x83, 0xF6, 0xF6,
+        0xF6, 0x83, 0x18, 0x68, 0x40, 0x42, 0xAA, 0xAA,
+    ];
+    static CONTEXT2: [u8; 34] = [
+        0x84, 0x71, 0x41, 0x45, 0x53, 0x2D, 0x43, 0x43, 0x4D, 0x2D, 0x36,
+        0x34, 0x2D, 0x36, 0x34, 0x2D, 0x31, 0x32, 0x38, 0x83, 0xF6, 0xF6,
+        0xF6, 0x83, 0xF6, 0xF6, 0xF6, 0x83, 0x18, 0x80, 0x40, 0x42, 0xAA,
+        0xAA,
     ];
 
     #[test]
@@ -135,6 +191,15 @@ mod tests {
             &signature
         )
         .is_err());
+    }
+
+    #[test]
+    fn context_generation() {
+        let context_bytes = build_kdf_context(ALG1, LEN1, &OTHER).unwrap();
+        assert_eq!(&CONTEXT1[..], &context_bytes[..]);
+
+        let context_bytes = build_kdf_context(ALG2, LEN2, &OTHER).unwrap();
+        assert_eq!(&CONTEXT2[..], &context_bytes[..]);
     }
 
 }
