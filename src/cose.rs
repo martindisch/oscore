@@ -7,10 +7,17 @@ use sha2::Sha512;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct SigStructure<'a>(
+    /// "Signature1"
     &'a str,
-    #[serde(with = "serde_bytes")] &'a [u8],
-    #[serde(with = "serde_bytes")] &'a [u8],
-    #[serde(with = "serde_bytes")] &'a [u8],
+    /// protected (ID_CRED_x as a bstr)
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+    /// external_aad (TH_i as a bstr)
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+    /// payload (CRED_x as a bstr)
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
 );
 
 /// Returns the signature from signing the `Sig_structure` of the given data.
@@ -94,7 +101,7 @@ struct SuppPubInfo<'a>(
     &'a [u8],
 );
 
-/// Returns a CBOR encoded COSE_KDF_Context.
+/// Returns a CBOR encoded `COSE_KDF_Context`.
 ///
 /// This is used as the info input for the HKDF-Expand step.
 pub fn build_kdf_context(
@@ -109,6 +116,7 @@ pub fn build_kdf_context(
     encode(cose_kdf_context)
 }
 
+/// An Octet Key Pair (OKP) `COSE_Key`.
 #[derive(Debug, PartialEq)]
 pub struct CoseKey {
     crv: u32,
@@ -146,6 +154,11 @@ struct RawKey<'a>(
     &'a [u8],
 );
 
+/// Returns the CBOR encoded `COSE_Key` for the given data.
+///
+/// This is specific to our use case where we only have X25519 public keys,
+/// which are Octet Key Pairs (OKP) in COSE and represented as a single
+/// x-coordinate.
 pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
     // what we want to have as the actual bytes for the COSE_Key
@@ -159,6 +172,7 @@ pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+/// Returns the `COSE_Key` structure deserialized from the given bytes.
 pub fn deserialize_cose_key(bytes: &[u8]) -> Result<CoseKey> {
     // First we need to modify the byte sequence and replace the first byte to
     // indicate an array of 8 instead of a map of 4.

@@ -6,6 +6,7 @@ use hkdf::Hkdf;
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 
+/// EDHOC message_1.
 #[derive(Debug, PartialEq)]
 pub struct Message1 {
     pub r#type: i32,
@@ -16,12 +17,19 @@ pub struct Message1 {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct RawMessage1<'a>(
+    /// type
     i32,
+    /// suite
     i32,
-    #[serde(with = "serde_bytes")] &'a [u8],
-    #[serde(with = "serde_bytes")] &'a [u8],
+    /// x_u
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+    /// c_u
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
 );
 
+/// Serializes EDHOC message_1.
 pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
     // what we want to have as the actual bytes for the EDHOC message
@@ -30,6 +38,7 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
     Ok(encode_sequence(raw_msg)?)
 }
 
+/// Deserializes EDHOC message_1.
 pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
@@ -44,6 +53,7 @@ pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     })
 }
 
+/// EDHOC message_2.
 #[derive(Debug, PartialEq)]
 pub struct Message2 {
     c_u: Vec<u8>,
@@ -54,12 +64,21 @@ pub struct Message2 {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct RawMessage2<'a>(
-    #[serde(with = "serde_bytes")] &'a [u8],
-    #[serde(with = "serde_bytes")] &'a [u8],
-    #[serde(with = "serde_bytes")] &'a [u8],
-    #[serde(with = "serde_bytes")] &'a [u8],
+    /// c_u
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+    /// x_v
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+    /// c_v
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+    /// ciphertext
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
 );
 
+/// Serializes EDHOC message_2.
 pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
     // what we want to have as the actual bytes for the EDHOC message
@@ -68,6 +87,7 @@ pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
     Ok(encode_sequence(raw_msg)?)
 }
 
+/// Deserializes EDHOC message_2.
 pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
@@ -82,6 +102,7 @@ pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
     })
 }
 
+/// The `EDHOC-Key-Derivation` function.
 pub fn edhoc_key_derivation(
     algorithm_id: &str,
     key_data_length: usize,

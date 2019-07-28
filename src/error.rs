@@ -1,5 +1,6 @@
 use core::fmt;
 
+/// The error type for this crate, wrapping errors from various libraries.
 #[derive(Debug)]
 pub enum Error {
     Cbor(serde_cbor::Error),
