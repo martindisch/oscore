@@ -1,4 +1,4 @@
-use crate::cbor::encode;
+use crate::cbor::{decode, encode};
 use crate::Result;
 use alloc::vec::Vec;
 use ed25519_dalek::{Keypair, Signature};
@@ -109,6 +109,73 @@ pub fn build_kdf_context(
     encode(cose_kdf_context)
 }
 
+#[derive(Debug, PartialEq)]
+pub struct CoseKey {
+    crv: u32,
+    x: Vec<u8>,
+    kty: u32,
+    kid: Vec<u8>,
+}
+
+/// Structure that (almost) serializes into the CBOR encoding of our COSE_Key.
+///
+/// A COSE_Key is a map, but this will serialize into an array. Why?
+/// Because we can't use serde_cbor to serialize/deserialize arbitrary maps
+/// in #![no_std]. So this is a dirty trick exploiting the fact that the only
+/// difference between a CBOR map of 4 elements and a CBOR array of 8 elements
+/// is the first byte indicating the major type and element count.
+#[derive(Debug, Serialize, Deserialize)]
+struct RawKey<'a>(
+    /// crv key (-1)
+    i32,
+    /// crv value (4 = X25519)
+    u32,
+    /// x-coordinate key (-2)
+    i32,
+    /// x-coordinate value
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+    /// kty key (1)
+    i32,
+    /// kty value (1 = OKP)
+    u32,
+    /// kid key (2)
+    i32,
+    /// kid value
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+);
+
+pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
+    // Pack the data into a structure that nicely serializes almost into
+    // what we want to have as the actual bytes for the COSE_Key
+    let raw_key = RawKey(-1, 4, -2, x, 1, 1, 2, kid);
+    // Get the byte representation of it
+    let mut bytes = encode(raw_key)?;
+    // Now we just replace the first byte (0x88 = array of 8 elements)
+    // with 0xA4 (map of 4 elements) to get the correct COSE_Key encoding
+    bytes[0] = 0xA4;
+
+    Ok(bytes)
+}
+
+pub fn deserialize_cose_key(bytes: &[u8]) -> Result<CoseKey> {
+    // First we need to modify the byte sequence and replace the first byte to
+    // indicate an array of 8 instead of a map of 4.
+    let mut owned_bytes = bytes.to_vec();
+    owned_bytes[0] = 0x88;
+    // Try to deserialize into our raw format
+    let raw_key: RawKey = decode(&mut owned_bytes)?;
+
+    // On success, just move the items into the "nice" key structure
+    Ok(CoseKey {
+        crv: raw_key.1,
+        x: raw_key.3.to_vec(),
+        kty: raw_key.5,
+        kid: raw_key.7.to_vec(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,6 +267,33 @@ mod tests {
 
         let context_bytes = build_kdf_context(ALG2, LEN2, &OTHER).unwrap();
         assert_eq!(&CONTEXT2[..], &context_bytes[..]);
+    }
+
+    static CURVE: u32 = 4;
+    static X: [u8; 4] = [0x00, 0x01, 0x02, 0x03];
+    static KTY: u32 = 1;
+    static KID: [u8; 4] = [0x04, 0x05, 0x06, 0x07];
+    static KEY_BYTES: [u8; 17] = [
+        0xA4, 0x20, 0x04, 0x21, 0x44, 0x00, 0x01, 0x02, 0x03, 0x01, 0x01,
+        0x02, 0x44, 0x04, 0x05, 0x06, 0x07,
+    ];
+
+    #[test]
+    fn key_encode() {
+        assert_eq!(&KEY_BYTES[..], &serialize_cose_key(&X, &KID).unwrap()[..]);
+    }
+
+    #[test]
+    fn key_decode() {
+        let key = CoseKey {
+            crv: CURVE,
+            x: X.to_vec(),
+            kty: KTY,
+            kid: KID.to_vec(),
+        };
+        let mut bytes = KEY_BYTES.to_vec();
+
+        assert_eq!(key, deserialize_cose_key(&mut bytes).unwrap());
     }
 
 }
