@@ -1,4 +1,4 @@
-use crate::cbor::{decode, encode_sequence};
+use crate::cbor::{decode_sequence, encode_sequence};
 use crate::cose::build_kdf_context;
 use crate::Result;
 use alloc::vec::Vec;
@@ -33,7 +33,7 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
 pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
-    let raw_msg: RawMessage1 = decode(msg, 4, &mut temp)?;
+    let raw_msg: RawMessage1 = decode_sequence(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
     Ok(Message1 {
@@ -71,7 +71,7 @@ pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
 pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
-    let raw_msg: RawMessage2 = decode(msg, 4, &mut temp)?;
+    let raw_msg: RawMessage2 = decode_sequence(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
     Ok(Message2 {

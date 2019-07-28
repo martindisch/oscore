@@ -37,6 +37,14 @@ fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>> {
     Ok(buf[offset..size].to_vec())
 }
 
+/// Deserializes a CBOR encoded object.
+pub fn decode<'a, T>(bytes: &'a mut [u8]) -> Result<T>
+where
+    T: serde::Deserialize<'a>,
+{
+    Ok(from_mut_slice(bytes)?)
+}
+
 /// Deserializes a sequence of CBOR encoded data items into an object.
 ///
 /// Requires a Vec<u8> of length `bytes` + 1 to use as a buffer and only works
@@ -46,7 +54,7 @@ fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>> {
 /// * `bytes` - The sequence of CBOR items
 /// * `n_items` - The number of items
 /// * `tmp_vec` - Buffer used for deserialization
-pub fn decode<'a, T>(
+pub fn decode_sequence<'a, T>(
     bytes: &[u8],
     n_items: u8,
     tmp_vec: &'a mut Vec<u8>,
