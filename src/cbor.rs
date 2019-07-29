@@ -76,8 +76,8 @@ fn array_byte(n: u8) -> Result<u8> {
     match n {
         _ if n > 23 => Err(Error::TooManyItems),
         // The major type for arrays is indicated by the three leftmost bits.
-        // By doing bitwise OR with the number of items, we assign the remaining
-        // bits for the number of elements.
+        // By doing bitwise OR with the number of items, we assign the
+        // remaining bits for the number of elements.
         n => Ok(0b100_00000 | n),
     }
 }
