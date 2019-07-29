@@ -190,6 +190,44 @@ pub fn deserialize_cose_key(bytes: &[u8]) -> Result<CoseKey> {
     })
 }
 
+/// Structure that (almost) serializes into a COSE header map.
+///
+/// This is another instance of the dirty hack to serialize/deserialize maps.
+#[derive(Debug, Serialize, Deserialize)]
+struct RawIdCredX<'a>(
+    /// kid key (4)
+    u32,
+    /// kid value
+    #[serde(with = "serde_bytes")]
+    &'a [u8],
+);
+
+/// Returns the COSE header map for the given `kid`.
+pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
+    // Pack the data into a structure that nicely serializes almost into
+    // what we want to have as the actual bytes for the COSE header map
+    let id_cred_x = RawIdCredX(4, kid);
+    // Get the byte representation of it
+    let mut bytes = encode(id_cred_x)?;
+    // Now we just replace the first byte (0x82 = array of 2 elements)
+    // with 0xA1 (map of 1 element) to get the correct header map encoding
+    bytes[0] = 0xA1;
+
+    Ok(bytes)
+}
+
+/// Returns the `kid` from the COSE header map.
+pub fn get_kid(id_cred_x: &[u8]) -> Result<Vec<u8>> {
+    // First we need to modify the byte sequence and replace the first byte to
+    // indicate an array of 2 instead of a map of 1.
+    let mut owned_bytes = id_cred_x.to_vec();
+    owned_bytes[0] = 0x82;
+    // Try to deserialize into our raw format
+    let id_cred_x: RawIdCredX = decode(&mut owned_bytes)?;
+
+    Ok(id_cred_x.1.to_vec())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,6 +346,21 @@ mod tests {
         let mut bytes = KEY_BYTES.to_vec();
 
         assert_eq!(key, deserialize_cose_key(&mut bytes).unwrap());
+    }
+
+    static KID_2: [u8; 2] = [0x00, 0x01];
+    static ID_CRED_X_2: [u8; 5] = [0xA1, 0x04, 0x42, 0x00, 0x01];
+
+    #[test]
+    fn encode_id_cred_x() {
+        let bytes = build_id_cred_x(&KID_2).unwrap();
+        assert_eq!(&ID_CRED_X_2[..], &bytes[..]);
+    }
+
+    #[test]
+    fn decode_id_cred_x() {
+        let kid = get_kid(&ID_CRED_X_2).unwrap();
+        assert_eq!(&KID_2[..], &kid[..]);
     }
 
 }
