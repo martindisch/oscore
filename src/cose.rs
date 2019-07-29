@@ -2,23 +2,8 @@ use crate::cbor::{decode, encode};
 use crate::Result;
 use alloc::vec::Vec;
 use ed25519_dalek::{Keypair, Signature};
-use serde::{Deserialize, Serialize};
+use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha512;
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SigStructure<'a>(
-    /// "Signature1"
-    &'a str,
-    /// protected (ID_CRED_x as a bstr)
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-    /// external_aad (TH_i as a bstr)
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-    /// payload (CRED_x as a bstr)
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-);
 
 /// Returns the signature from signing the `Sig_structure` of the given data.
 ///
@@ -72,34 +57,15 @@ fn build_to_be_signed(
     cred_x: &[u8],
 ) -> Result<Vec<u8>> {
     // Create the Sig_structure
-    let sig_struct = SigStructure("Signature1", id_cred_x, th_i, cred_x);
+    let sig_struct = (
+        "Signature1",
+        Bytes::new(id_cred_x), // protected
+        Bytes::new(th_i),      // external_aad
+        Bytes::new(cred_x),    // payload
+    );
 
     encode(&sig_struct)
 }
-
-#[derive(Debug, Serialize)]
-struct CoseKdfContext<'a>(
-    /// AlgorithmID
-    &'a str,
-    /// PartyUInfo
-    [(); 3],
-    /// PartyVInfo
-    [(); 3],
-    /// SuppPubInfo
-    SuppPubInfo<'a>,
-);
-
-#[derive(Debug, Serialize)]
-struct SuppPubInfo<'a>(
-    /// keyDataLength
-    usize,
-    /// protected
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-    /// other
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-);
 
 /// Returns a CBOR encoded `COSE_KDF_Context`.
 ///
@@ -109,9 +75,10 @@ pub fn build_kdf_context(
     key_data_length: usize,
     other: &[u8],
 ) -> Result<Vec<u8>> {
-    let supp_pub_info = SuppPubInfo(key_data_length, &[], other);
-    let cose_kdf_context =
-        CoseKdfContext(algorithm_id, [(); 3], [(); 3], supp_pub_info);
+    // (keyDataLength, protected, other)
+    let supp_pub_info = (key_data_length, Bytes::new(&[]), Bytes::new(other));
+    // (AlgorithmID, PartyUInfo, PartyVInfo, SuppPubInfo)
+    let cose_kdf_context = (algorithm_id, [(); 3], [(); 3], supp_pub_info);
 
     encode(cose_kdf_context)
 }
@@ -125,35 +92,6 @@ pub struct CoseKey {
     kid: Vec<u8>,
 }
 
-/// Structure that (almost) serializes into the CBOR encoding of our COSE_Key.
-///
-/// A COSE_Key is a map, but this will serialize into an array. Why?
-/// Because we can't use serde_cbor to serialize/deserialize arbitrary maps
-/// in #![no_std]. So this is a dirty trick exploiting the fact that the only
-/// difference between a CBOR map of 4 elements and a CBOR array of 8 elements
-/// is the first byte indicating the major type and element count.
-#[derive(Debug, Serialize, Deserialize)]
-struct RawKey<'a>(
-    /// crv key (-1)
-    i32,
-    /// crv value (4 = X25519)
-    u32,
-    /// x-coordinate key (-2)
-    i32,
-    /// x-coordinate value
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-    /// kty key (1)
-    i32,
-    /// kty value (1 = OKP)
-    u32,
-    /// kid key (2)
-    i32,
-    /// kid value
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-);
-
 /// Returns the CBOR encoded `COSE_Key` for the given data.
 ///
 /// This is specific to our use case where we only have X25519 public keys,
@@ -161,8 +99,10 @@ struct RawKey<'a>(
 /// x-coordinate.
 pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
-    // what we want to have as the actual bytes for the COSE_Key
-    let raw_key = RawKey(-1, 4, -2, x, 1, 1, 2, kid);
+    // what we want to have as the actual bytes for the COSE_Key.
+    // (crv key, crv value, x-coordinate key, x-coordinate value,
+    //  kty key, kty value, kid key, kid value)
+    let raw_key = (-1, 4, -2, Bytes::new(x), 1, 1, 2, Bytes::new(kid));
     // Get the byte representation of it
     let mut bytes = encode(raw_key)?;
     // Now we just replace the first byte (0x88 = array of 8 elements)
@@ -179,34 +119,24 @@ pub fn deserialize_cose_key(bytes: &[u8]) -> Result<CoseKey> {
     let mut owned_bytes = bytes.to_vec();
     owned_bytes[0] = 0x88;
     // Try to deserialize into our raw format
-    let raw_key: RawKey = decode(&mut owned_bytes)?;
+    let raw_key: (i32, u32, i32, ByteBuf, i32, u32, i32, ByteBuf) =
+        decode(&mut owned_bytes)?;
 
     // On success, just move the items into the "nice" key structure
     Ok(CoseKey {
         crv: raw_key.1,
-        x: raw_key.3.to_vec(),
+        x: raw_key.3.into_vec(),
         kty: raw_key.5,
-        kid: raw_key.7.to_vec(),
+        kid: raw_key.7.into_vec(),
     })
 }
-
-/// Structure that (almost) serializes into a COSE header map.
-///
-/// This is another instance of the dirty hack to serialize/deserialize maps.
-#[derive(Debug, Serialize, Deserialize)]
-struct RawIdCredX<'a>(
-    /// kid key (4)
-    u32,
-    /// kid value
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-);
 
 /// Returns the COSE header map for the given `kid`.
 pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
-    // what we want to have as the actual bytes for the COSE header map
-    let id_cred_x = RawIdCredX(4, kid);
+    // what we want to have as the actual bytes for the COSE header map.
+    // (kid key, kid value)
+    let id_cred_x = (4, Bytes::new(kid));
     // Get the byte representation of it
     let mut bytes = encode(id_cred_x)?;
     // Now we just replace the first byte (0x82 = array of 2 elements)
@@ -223,9 +153,9 @@ pub fn get_kid(id_cred_x: &[u8]) -> Result<Vec<u8>> {
     let mut owned_bytes = id_cred_x.to_vec();
     owned_bytes[0] = 0x82;
     // Try to deserialize into our raw format
-    let id_cred_x: RawIdCredX = decode(&mut owned_bytes)?;
+    let id_cred_x: (u32, ByteBuf) = decode(&mut owned_bytes)?;
 
-    Ok(id_cred_x.1.to_vec())
+    Ok(id_cred_x.1.into_vec())
 }
 
 #[cfg(test)]

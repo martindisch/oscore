@@ -3,7 +3,7 @@ use crate::cose::build_kdf_context;
 use crate::Result;
 use alloc::vec::Vec;
 use hkdf::Hkdf;
-use serde::{Deserialize, Serialize};
+use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha256;
 
 /// EDHOC message_1.
@@ -15,25 +15,16 @@ pub struct Message1 {
     pub c_u: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct RawMessage1<'a>(
-    /// type
-    i32,
-    /// suite
-    i32,
-    /// x_u
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-    /// c_u
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-);
-
 /// Serializes EDHOC message_1.
 pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
     // what we want to have as the actual bytes for the EDHOC message
-    let raw_msg = RawMessage1(msg.r#type, msg.suite, &msg.x_u, &msg.c_u);
+    let raw_msg = (
+        msg.r#type,
+        msg.suite,
+        Bytes::new(&msg.x_u),
+        Bytes::new(&msg.c_u),
+    );
 
     Ok(encode_sequence(raw_msg)?)
 }
@@ -42,14 +33,15 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
 pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
-    let raw_msg: RawMessage1 = decode_sequence(msg, 4, &mut temp)?;
+    let raw_msg: (i32, i32, ByteBuf, ByteBuf) =
+        decode_sequence(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
     Ok(Message1 {
         r#type: raw_msg.0,
         suite: raw_msg.1,
-        x_u: raw_msg.2.to_vec(),
-        c_u: raw_msg.3.to_vec(),
+        x_u: raw_msg.2.into_vec(),
+        c_u: raw_msg.3.into_vec(),
     })
 }
 
@@ -62,27 +54,16 @@ pub struct Message2 {
     ciphertext: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct RawMessage2<'a>(
-    /// c_u
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-    /// x_v
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-    /// c_v
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-    /// ciphertext
-    #[serde(with = "serde_bytes")]
-    &'a [u8],
-);
-
 /// Serializes EDHOC message_2.
 pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
     // what we want to have as the actual bytes for the EDHOC message
-    let raw_msg = RawMessage2(&msg.c_u, &msg.x_v, &msg.c_v, &msg.ciphertext);
+    let raw_msg = (
+        Bytes::new(&msg.c_u),
+        Bytes::new(&msg.x_v),
+        Bytes::new(&msg.c_v),
+        Bytes::new(&msg.ciphertext),
+    );
 
     Ok(encode_sequence(raw_msg)?)
 }
@@ -91,14 +72,15 @@ pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
 pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
-    let raw_msg: RawMessage2 = decode_sequence(msg, 4, &mut temp)?;
+    let raw_msg: (ByteBuf, ByteBuf, ByteBuf, ByteBuf) =
+        decode_sequence(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
     Ok(Message2 {
-        c_u: raw_msg.0.to_vec(),
-        x_v: raw_msg.1.to_vec(),
-        c_v: raw_msg.2.to_vec(),
-        ciphertext: raw_msg.3.to_vec(),
+        c_u: raw_msg.0.into_vec(),
+        x_v: raw_msg.1.into_vec(),
+        c_v: raw_msg.2.into_vec(),
+        ciphertext: raw_msg.3.into_vec(),
     })
 }
 
