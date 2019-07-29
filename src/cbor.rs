@@ -72,6 +72,40 @@ where
     Ok(from_mut_slice(tmp_vec)?)
 }
 
+/// Changes the given CBOR bytes from an array of n elements to a map of n / 2
+/// key/value pairs.
+///
+/// Only works for arrays with at most 23 items.
+pub fn array_to_map(bytes: &mut [u8]) -> Result<()> {
+    // The 5 least significant bits are the number of elements in the array
+    let n = 0b000_11111 & bytes[0];
+    match n {
+        _ if n > 23 => Err(Error::TooManyItems),
+        n => {
+            // Change the major type and number of elements accordingly
+            bytes[0] = 0b101_00000 | (n / 2);
+            Ok(())
+        }
+    }
+}
+
+/// Changes the given CBOR bytes from a map of n key/value pairs to an array
+/// of n * 2 items.
+///
+/// Only works for arrays with at most 23 items.
+pub fn map_to_array(bytes: &mut [u8]) -> Result<()> {
+    // The 5 least significant bits are the number of key/value pairs
+    let n = 0b000_11111 & bytes[0];
+    match n {
+        _ if n * 2 > 23 => Err(Error::TooManyItems),
+        n => {
+            // Change the major type and number of elements accordingly
+            bytes[0] = 0b100_00000 | (n * 2);
+            Ok(())
+        }
+    }
+}
+
 fn array_byte(n: u8) -> Result<u8> {
     match n {
         _ if n > 23 => Err(Error::TooManyItems),
@@ -93,5 +127,59 @@ mod tests {
         assert_eq!(0x94, array_byte(20).unwrap());
         assert_eq!(0x97, array_byte(23).unwrap());
         assert!(array_byte(24).is_err());
+    }
+
+    static MAP_0: [u8; 1] = [0xA0];
+    static ARR_0: [u8; 1] = [0x80];
+    static MAP_1: [u8; 4] = [0xA1, 0x01, 0x18, 0x2A];
+    static ARR_2: [u8; 4] = [0x82, 0x01, 0x18, 0x2a];
+    static MAP_11: [u8; 23] = [
+        0xAB, 0x01, 0x01, 0x02, 0x01, 0x03, 0x01, 0x04, 0x01, 0x05, 0x01,
+        0x06, 0x01, 0x07, 0x01, 0x08, 0x01, 0x09, 0x01, 0x0A, 0x01, 0x0B,
+        0x01,
+    ];
+    static ARR_22: [u8; 23] = [
+        0x96, 0x01, 0x01, 0x02, 0x01, 0x03, 0x01, 0x04, 0x01, 0x05, 0x01,
+        0x06, 0x01, 0x07, 0x01, 0x08, 0x01, 0x09, 0x01, 0x0A, 0x01, 0x0B,
+        0x01,
+    ];
+    static MAP_12: [u8; 25] = [
+        0xAC, 0x01, 0x01, 0x02, 0x01, 0x03, 0x01, 0x04, 0x01, 0x05, 0x01,
+        0x06, 0x01, 0x07, 0x01, 0x08, 0x01, 0x09, 0x01, 0x0A, 0x01, 0x0B,
+        0x01, 0x0C, 0x01,
+    ];
+    static ARR_24: [u8; 26] = [
+        0x98, 0x18, 0x01, 0x01, 0x02, 0x01, 0x03, 0x01, 0x04, 0x01, 0x05,
+        0x01, 0x06, 0x01, 0x07, 0x01, 0x08, 0x01, 0x09, 0x01, 0x0A, 0x01,
+        0x0B, 0x01, 0x0C, 0x01,
+    ];
+
+    #[test]
+    fn transformations() {
+        let mut map_0 = MAP_0.to_vec();
+        let mut arr_0 = ARR_0.to_vec();
+        map_to_array(&mut map_0).unwrap();
+        array_to_map(&mut arr_0).unwrap();
+        assert_eq!(&ARR_0[..], &map_0[..]);
+        assert_eq!(&MAP_0[..], &arr_0[..]);
+
+        let mut map_1 = MAP_1.to_vec();
+        let mut arr_2 = ARR_2.to_vec();
+        map_to_array(&mut map_1).unwrap();
+        array_to_map(&mut arr_2).unwrap();
+        assert_eq!(&ARR_2[..], &map_1[..]);
+        assert_eq!(&MAP_1[..], &arr_2[..]);
+
+        let mut map_11 = MAP_11.to_vec();
+        let mut arr_22 = ARR_22.to_vec();
+        map_to_array(&mut map_11).unwrap();
+        array_to_map(&mut arr_22).unwrap();
+        assert_eq!(&ARR_22[..], &map_11[..]);
+        assert_eq!(&MAP_11[..], &arr_22[..]);
+
+        let mut map_12 = MAP_12.to_vec();
+        let mut arr_24 = ARR_24.to_vec();
+        assert!(map_to_array(&mut map_12).is_err());
+        assert!(array_to_map(&mut arr_24).is_err());
     }
 }

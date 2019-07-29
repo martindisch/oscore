@@ -1,4 +1,4 @@
-use crate::cbor::{decode, encode};
+use crate::cbor::{array_to_map, decode, encode, map_to_array};
 use crate::Result;
 use alloc::vec::Vec;
 use ed25519_dalek::{Keypair, Signature};
@@ -105,19 +105,17 @@ pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
     let raw_key = (-1, 4, -2, Bytes::new(x), 1, 1, 2, Bytes::new(kid));
     // Get the byte representation of it
     let mut bytes = encode(raw_key)?;
-    // Now we just replace the first byte (0x88 = array of 8 elements)
-    // with 0xA4 (map of 4 elements) to get the correct COSE_Key encoding
-    bytes[0] = 0xA4;
+    // This is a CBOR array, but we want a map
+    array_to_map(&mut bytes)?;
 
     Ok(bytes)
 }
 
 /// Returns the `COSE_Key` structure deserialized from the given bytes.
 pub fn deserialize_cose_key(bytes: &[u8]) -> Result<CoseKey> {
-    // First we need to modify the byte sequence and replace the first byte to
-    // indicate an array of 8 instead of a map of 4.
+    // Turn the CBOR map into an array that we can deserialize
     let mut owned_bytes = bytes.to_vec();
-    owned_bytes[0] = 0x88;
+    map_to_array(&mut owned_bytes)?;
     // Try to deserialize into our raw format
     let raw_key: (i32, u32, i32, ByteBuf, i32, u32, i32, ByteBuf) =
         decode(&mut owned_bytes)?;
@@ -139,19 +137,17 @@ pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
     let id_cred_x = (4, Bytes::new(kid));
     // Get the byte representation of it
     let mut bytes = encode(id_cred_x)?;
-    // Now we just replace the first byte (0x82 = array of 2 elements)
-    // with 0xA1 (map of 1 element) to get the correct header map encoding
-    bytes[0] = 0xA1;
+    // This is a CBOR array, but we want a map
+    array_to_map(&mut bytes)?;
 
     Ok(bytes)
 }
 
 /// Returns the `kid` from the COSE header map.
 pub fn get_kid(id_cred_x: &[u8]) -> Result<Vec<u8>> {
-    // First we need to modify the byte sequence and replace the first byte to
-    // indicate an array of 2 instead of a map of 1.
+    // Turn the CBOR map into an array that we can deserialize
     let mut owned_bytes = id_cred_x.to_vec();
-    owned_bytes[0] = 0x82;
+    map_to_array(&mut owned_bytes)?;
     // Try to deserialize into our raw format
     let id_cred_x: (u32, ByteBuf) = decode(&mut owned_bytes)?;
 
