@@ -108,8 +108,30 @@ pub fn edhoc_key_derivation(
     Ok(okm)
 }
 
+/// Calculates the transcript hash of the second message.
+pub fn compute_th_2(
+    message_1: &[u8],
+    c_u: &[u8],
+    x_v: &[u8],
+    c_v: &[u8],
+) -> Result<Vec<u8>> {
+    // Create a sequence of CBOR items from the data
+    let data_2 =
+        encode_sequence((Bytes::new(c_u), Bytes::new(x_v), Bytes::new(c_v)))?;
+    // Start the sequence we'll use from message_1, which is already a sequence
+    // of CBOR items
+    let mut seq = message_1.to_vec();
+    // Concatenate it with the sequence we just created
+    seq.extend(data_2);
+    // Wrap the new sequence in a bstr to get the input to h()
+    let bstr = encode(Bytes::new(&seq))?;
+
+    // Return the hash of this
+    h(&bstr)
+}
+
 /// Returns a CBOR bstr containing the hash of the input CBOR bstr.
-pub fn h(bstr: &[u8]) -> Result<Vec<u8>> {
+fn h(bstr: &[u8]) -> Result<Vec<u8>> {
     let mut sha256 = Sha256::default();
     sha256.input(bstr);
     let hash: [u8; 32] = sha256.fixed_result().into();
@@ -279,5 +301,19 @@ mod tests {
     fn hash() {
         let bstr = h(&H_INPUT).unwrap();
         assert_eq!(&H_BSTR[..], &bstr[..]);
+    }
+
+    static TH_2_MSG1: [u8; 2] = [0x01, 0x02];
+    static TH_2_C_U: [u8; 1] = [0x00];
+    static TH_2_X_V: [u8; 1] = [0x01];
+    static TH_2_C_V: [u8; 1] = [0x02];
+    static TH_2_INPUT: [u8; 9] =
+        [0x48, 0x01, 0x02, 0x41, 0x00, 0x41, 0x01, 0x41, 0x02];
+
+    #[test]
+    fn th_2() {
+        let t_h =
+            compute_th_2(&TH_2_MSG1, &TH_2_C_U, &TH_2_X_V, &TH_2_C_V).unwrap();
+        assert_eq!(h(&TH_2_INPUT).unwrap(), t_h);
     }
 }
