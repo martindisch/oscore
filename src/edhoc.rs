@@ -140,6 +140,17 @@ fn h(bstr: &[u8]) -> Result<Vec<u8>> {
     encode(Bytes::new(&hash))
 }
 
+/// Returns the CBOR bstr making up the plaintext of message_2.
+pub fn build_plaintext_2(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
+    // Create a sequence of CBOR items
+    // Since ID_CRED_V contains a single kid parameter, take only the bstr of
+    // it. Since the signature is raw bytes, wrap it in a bstr.
+    let seq = encode_sequence((Bytes::new(kid), Bytes::new(signature)))?;
+
+    // Return the sequence wrapped in a bstr
+    encode(Bytes::new(&seq))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -315,5 +326,19 @@ mod tests {
         let t_h =
             compute_th_2(&TH_2_MSG1, &TH_2_C_U, &TH_2_X_V, &TH_2_C_V).unwrap();
         assert_eq!(h(&TH_2_INPUT).unwrap(), t_h);
+    }
+
+    static PLAINTEXT_KID: [u8; 15] = *b"bob@example.org";
+    static PLAINTEXT_SIG: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
+    static PLAINTEXT_2: [u8; 22] = [
+        0x55, 0x4F, 0x62, 0x6F, 0x62, 0x40, 0x65, 0x78, 0x61, 0x6D, 0x70,
+        0x6C, 0x65, 0x2E, 0x6F, 0x72, 0x67, 0x44, 0x01, 0x02, 0x03, 0x04,
+    ];
+
+    #[test]
+    fn plaintext_2() {
+        let plaintext =
+            build_plaintext_2(&PLAINTEXT_KID, &PLAINTEXT_SIG).unwrap();
+        assert_eq!(&PLAINTEXT_2[..], &plaintext[..]);
     }
 }
