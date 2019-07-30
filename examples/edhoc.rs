@@ -44,4 +44,68 @@ fn main() {
     let v_secret = StaticSecret::from(v_priv);
     // The corresponding public key
     let v_x_v = PublicKey::from(&v_secret);
+    // Use U's public key to generate the ephemeral shared secret
+    let mut v_x_u_bytes = [0; 32];
+    v_x_u_bytes.copy_from_slice(&v_msg_1.x_u[..32]);
+    let v_u_public = x25519_dalek::PublicKey::from(v_x_u_bytes);
+    let v_shared_secret = v_secret.diffie_hellman(&v_u_public);
+
+    // This is the keypair used to authenticate. U must have the public key.
+    let v_auth = [
+        0xBB, 0x5A, 0x16, 0x81, 0xBB, 0x9B, 0xC3, 0x12, 0x67, 0x8F, 0x53,
+        0xD3, 0x14, 0x7F, 0xFF, 0x83, 0xF9, 0x56, 0xDB, 0x1F, 0xC6, 0xF4,
+        0x35, 0xA8, 0xDF, 0xB6, 0xB1, 0x0A, 0xA7, 0x1E, 0xFA, 0x1C, 0x88,
+        0x3D, 0x9F, 0x20, 0xAF, 0x73, 0xF7, 0x8E, 0xD2, 0x94, 0x78, 0xE4,
+        0x16, 0x51, 0x4B, 0x88, 0x57, 0x19, 0x64, 0x3B, 0x63, 0xC5, 0x81,
+        0xFD, 0x8B, 0x57, 0xDD, 0x3A, 0xC8, 0x01, 0x1A, 0xC6,
+    ];
+
+    // Some general information for this party
+    let v_kid = b"bob@example.org";
+    let v_c_v = b"Party V";
+
+    // Build the COSE header map identifying the public authentication key
+    let v_id_cred_v = oscore::cose::build_id_cred_x(v_kid).unwrap();
+    // Build the COSE_Key containing our ECDH public key
+    let v_cred_v =
+        oscore::cose::serialize_cose_key(v_x_v.as_bytes(), v_kid).unwrap();
+    // Compute TH_2
+    let v_th_2 = oscore::edhoc::compute_th_2(
+        &msg_1_bytes,
+        &v_msg_1.c_u,
+        v_x_v.as_bytes(),
+        v_c_v,
+    )
+    .unwrap();
+    // Sign it
+    let v_sig =
+        oscore::cose::sign(&v_id_cred_v, &v_th_2, &v_cred_v, &v_auth).unwrap();
+
+    // Put together the plaintext for the encryption
+    let plaintext = oscore::edhoc::build_plaintext_2(v_kid, &v_sig).unwrap();
+    // Derive K_2
+    let v_k_2 = oscore::edhoc::edhoc_key_derivation(
+        &"AES-CCM-64-64-128",
+        128,
+        &v_th_2,
+        v_shared_secret.as_bytes(),
+    )
+    .unwrap();
+    // Derive IV_2
+    let v_iv_2 = oscore::edhoc::edhoc_key_derivation(
+        &"IV-GENERATION",
+        104,
+        &v_th_2,
+        v_shared_secret.as_bytes(),
+    )
+    .unwrap();
+}
+
+fn hexstring(slice: &[u8]) -> String {
+    String::from("0x")
+        + &slice
+            .iter()
+            .map(|n| format!("{:02X}", n))
+            .collect::<Vec<String>>()
+            .join(", 0x")
 }
