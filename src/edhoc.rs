@@ -1,7 +1,8 @@
-use crate::cbor::{decode_sequence, encode_sequence};
+use crate::cbor::{decode_sequence, encode, encode_sequence};
 use crate::cose::build_kdf_context;
 use crate::Result;
 use alloc::vec::Vec;
+use digest::{FixedOutput, Input};
 use hkdf::Hkdf;
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha256;
@@ -105,6 +106,16 @@ pub fn edhoc_key_derivation(
     h.expand(&info, &mut okm)?;
 
     Ok(okm)
+}
+
+/// Returns a CBOR bstr containing the hash of the input CBOR bstr.
+pub fn h(bstr: &[u8]) -> Result<Vec<u8>> {
+    let mut sha256 = Sha256::default();
+    sha256.input(bstr);
+    let hash: [u8; 32] = sha256.fixed_result().into();
+
+    // Return the bstr encoding
+    encode(Bytes::new(&hash))
 }
 
 #[cfg(test)]
@@ -248,5 +259,25 @@ mod tests {
         secret[1] = 0x42;
         let okm = edhoc_key_derivation(ALG, LENGTH, &OTHER, &secret).unwrap();
         assert_ne!(&OKM[..], &okm[..]);
+    }
+
+    static H_INPUT: [u8; 46] = [
+        0x58, 0x2C, 0x54, 0x68, 0x65, 0x20, 0x71, 0x75, 0x69, 0x63, 0x6B,
+        0x20, 0x62, 0x72, 0x6F, 0x77, 0x6E, 0x20, 0x66, 0x6F, 0x78, 0x20,
+        0x6A, 0x75, 0x6D, 0x70, 0x73, 0x20, 0x6F, 0x76, 0x65, 0x72, 0x20,
+        0x74, 0x68, 0x65, 0x20, 0x6C, 0x61, 0x7A, 0x79, 0x20, 0x64, 0x6F,
+        0x67, 0x2E,
+    ];
+    static H_BSTR: [u8; 34] = [
+        0x58, 0x20, 0x86, 0x9F, 0xFE, 0x82, 0xD4, 0xEA, 0x1F, 0x34, 0xB8,
+        0x79, 0x73, 0xD4, 0x5D, 0x72, 0xED, 0xC1, 0x52, 0x52, 0xB1, 0xD2,
+        0xB4, 0x5D, 0x1B, 0x0B, 0xC5, 0x59, 0x46, 0x3C, 0x4D, 0xF3, 0x06,
+        0xEF,
+    ];
+
+    #[test]
+    fn hash() {
+        let bstr = h(&H_INPUT).unwrap();
+        assert_eq!(&H_BSTR[..], &bstr[..]);
     }
 }
