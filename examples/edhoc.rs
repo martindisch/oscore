@@ -1,4 +1,5 @@
 use oscore::edhoc::Message1;
+use serde_bytes::{ByteBuf, Bytes};
 use x25519_dalek::{PublicKey, StaticSecret};
 
 fn main() {
@@ -22,12 +23,18 @@ fn main() {
         x_u: u_x_u.as_bytes().to_vec(),
         c_u: b"Party U".to_vec(),
     };
-    let msg_1_bytes = oscore::edhoc::serialize_message_1(&u_msg_1).unwrap();
+    // Get CBOR sequence for message
+    let u_msg_1_seq = oscore::edhoc::serialize_message_1(&u_msg_1).unwrap();
+    // Wrap it in a bstr for transmission
+    let mut msg_1_bytes =
+        oscore::cbor::encode(Bytes::new(&u_msg_1_seq)).unwrap();
 
     // Party V ----------------------------------------------------------------
 
+    // Unwrap sequence from bstr
+    let v_msg_1_seq: ByteBuf = oscore::cbor::decode(&mut msg_1_bytes).unwrap();
     // Decode the first message
-    let v_msg_1 = oscore::edhoc::deserialize_message_1(&msg_1_bytes).unwrap();
+    let v_msg_1 = oscore::edhoc::deserialize_message_1(&v_msg_1_seq).unwrap();
     // Verify that the selected suite is supported
     if v_msg_1.suite != 0 {
         unimplemented!("Other cipher suites");
@@ -71,7 +78,7 @@ fn main() {
         oscore::cose::serialize_cose_key(v_x_v.as_bytes(), v_kid).unwrap();
     // Compute TH_2
     let v_th_2 = oscore::edhoc::compute_th_2(
-        &msg_1_bytes,
+        &v_msg_1_seq,
         &v_msg_1.c_u,
         v_x_v.as_bytes(),
         v_c_v,
