@@ -7,6 +7,7 @@ pub enum Error {
     TooManyItems,
     Ed25519(ed25519_dalek::SignatureError),
     Hkdf(hkdf::InvalidLength),
+    Aead(orion::errors::UnknownCryptoError),
 }
 
 impl From<serde_cbor::Error> for Error {
@@ -27,6 +28,12 @@ impl From<hkdf::InvalidLength> for Error {
     }
 }
 
+impl From<orion::errors::UnknownCryptoError> for Error {
+    fn from(e: orion::errors::UnknownCryptoError) -> Error {
+        Error::Aead(e)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -36,6 +43,7 @@ impl fmt::Display for Error {
             }
             Error::Ed25519(e) => write!(f, "Signature error: {}", e),
             Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
+            Error::Aead(e) => write!(f, "AEAD error: {}", e),
         }
     }
 }

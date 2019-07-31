@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 use digest::{FixedOutput, Input};
 use hkdf::Hkdf;
+use orion::hazardous::aead;
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha256;
 
@@ -150,6 +151,58 @@ pub fn build_plaintext_2(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
 
     // Return the sequence wrapped in a bstr
     encode(Bytes::new(&seq))
+}
+
+/// Encrypts and authenticates with ChaCha20-Poly1305.
+///
+/// DO NOT reuse the nonce with the same key.
+fn aead_seal(
+    secret_key: &[u8],
+    nonce: &[u8],
+    plaintext: &[u8],
+    ad: &[u8],
+) -> Result<Vec<u8>> {
+    // Build secret key & nonce structs
+    let secret_key =
+        aead::chacha20poly1305::SecretKey::from_slice(secret_key)?;
+    let nonce = aead::chacha20poly1305::Nonce::from_slice(nonce)?;
+    // Allocate space for ciphertext & Poly1305 tag
+    let mut dst_out_ct = vec![0; plaintext.len() + 16];
+    // Encrypt and place ciphertext & tag in dst_out_ct
+    aead::chacha20poly1305::seal(
+        &secret_key,
+        &nonce,
+        plaintext,
+        Some(ad),
+        &mut dst_out_ct,
+    )?;
+
+    Ok(dst_out_ct)
+}
+
+/// Decrypts and verifies with ChaCha20Poly1305.
+fn aead_open(
+    secret_key: &[u8],
+    nonce: &[u8],
+    ciphertext: &[u8],
+    ad: &[u8],
+) -> Result<Vec<u8>> {
+    // Build secret key & nonce structs
+    let secret_key =
+        aead::chacha20poly1305::SecretKey::from_slice(secret_key)?;
+    let nonce = aead::chacha20poly1305::Nonce::from_slice(nonce)?;
+    // Allocate space for the plaintext
+    let mut dst_out_pt = vec![0; ciphertext.len() - 16];
+    // Verify tag, if correct then decrypt and place plaintext in dst_out_pt
+    aead::chacha20poly1305::open(
+        &secret_key,
+        &nonce,
+        ciphertext,
+        Some(ad),
+        &mut dst_out_pt,
+    )?;
+
+    Ok(dst_out_pt)
 }
 
 #[cfg(test)]
@@ -341,5 +394,60 @@ mod tests {
         let plaintext =
             build_plaintext_2(&PLAINTEXT_KID, &PLAINTEXT_SIG).unwrap();
         assert_eq!(&PLAINTEXT_2[..], &plaintext[..]);
+    }
+
+    static AEAD_SECRET_KEY: [u8; 32] = [
+        0x11, 0x20, 0xB1, 0xC9, 0x90, 0x7B, 0xD8, 0xEA, 0xBC, 0x7C, 0x0F,
+        0x91, 0x4D, 0x47, 0x4C, 0xA2, 0xB8, 0x0B, 0x32, 0x67, 0xD9, 0x97,
+        0xE6, 0x73, 0xF4, 0x39, 0x21, 0xA3, 0x31, 0x81, 0x02, 0x1D,
+    ];
+    static AEAD_NONCE: [u8; 12] = [
+        0x07, 0x00, 0x00, 0x00, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+    ];
+    static AEAD_PT: [u8; 13] = [
+        0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x2C, 0x20, 0x77, 0x6F, 0x72, 0x6C,
+        0x64, 0x21,
+    ];
+    static AEAD_AD: [u8; 23] = [
+        0x41, 0x75, 0x74, 0x68, 0x65, 0x6E, 0x74, 0x69, 0x63, 0x61, 0x74,
+        0x65, 0x20, 0x6D, 0x65, 0x2C, 0x20, 0x70, 0x6C, 0x65, 0x61, 0x73,
+        0x65,
+    ];
+
+    #[test]
+    fn aead() {
+        // Check for plaintext equality
+        let ct = aead_seal(&AEAD_SECRET_KEY, &AEAD_NONCE, &AEAD_PT, &AEAD_AD)
+            .unwrap();
+        let pt =
+            aead_open(&AEAD_SECRET_KEY, &AEAD_NONCE, &ct, &AEAD_AD).unwrap();
+        assert_eq!(&AEAD_PT[..], &pt[..]);
+
+        // Check verification fail on manipulated ciphertext
+        let mut ct_manip = ct.clone();
+        ct_manip[2] = 0x00;
+        assert!(
+            aead_open(&AEAD_SECRET_KEY, &AEAD_NONCE, &ct_manip, &AEAD_AD)
+                .is_err()
+        );
+
+        // Check verification fail on manipulated tag
+        let mut ct_manip = ct.clone();
+        ct_manip[AEAD_PT.len() + 4] = 0x00;
+        assert!(
+            aead_open(&AEAD_SECRET_KEY, &AEAD_NONCE, &ct_manip, &AEAD_AD)
+                .is_err()
+        );
+
+        // Check verification fail on wrong AD
+        let mut ad_manip = AEAD_AD.to_vec();
+        ad_manip[16] = 0x00;
+        assert!(aead_open(
+            &AEAD_SECRET_KEY,
+            &AEAD_NONCE,
+            &ct,
+            &ad_manip
+        )
+        .is_err());
     }
 }
