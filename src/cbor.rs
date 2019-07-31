@@ -1,10 +1,11 @@
-use crate::error::Error;
-use crate::Result;
 use alloc::vec::Vec;
 use serde::Serialize;
 use serde_cbor::de::from_mut_slice;
 use serde_cbor::ser::SliceWrite;
 use serde_cbor::Serializer;
+
+use crate::error::Error;
+use crate::Result;
 
 /// Serializes an object into CBOR.
 pub fn encode(object: impl Serialize) -> Result<Vec<u8>> {

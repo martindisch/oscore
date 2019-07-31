@@ -1,11 +1,12 @@
-use crate::cbor::{decode_sequence, encode, encode_sequence};
-use crate::cose::build_kdf_context;
-use crate::Result;
 use alloc::vec::Vec;
 use digest::{FixedOutput, Input};
 use hkdf::Hkdf;
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha256;
+
+use crate::cbor::{decode_sequence, encode, encode_sequence};
+use crate::cose::build_kdf_context;
+use crate::Result;
 
 /// EDHOC message_1.
 #[derive(Debug, PartialEq)]

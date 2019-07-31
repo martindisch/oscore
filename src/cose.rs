@@ -1,9 +1,10 @@
-use crate::cbor::{array_to_map, decode, encode, map_to_array};
-use crate::Result;
 use alloc::vec::Vec;
 use ed25519_dalek::{Keypair, Signature};
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha512;
+
+use crate::cbor::{array_to_map, decode, encode, map_to_array};
+use crate::Result;
 
 /// Returns the signature from signing the `Sig_structure` of the given data.
 ///

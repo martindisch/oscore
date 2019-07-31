@@ -1,6 +1,7 @@
-use oscore::edhoc::Message1;
 use serde_bytes::{ByteBuf, Bytes};
 use x25519_dalek::{PublicKey, StaticSecret};
+
+use oscore::edhoc::Message1;
 
 fn main() {
     // Party U ----------------------------------------------------------------
