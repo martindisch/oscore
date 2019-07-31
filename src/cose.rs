@@ -9,9 +9,9 @@ use sha2::Sha512;
 ///
 /// # Arguments
 /// * `id_cred_x` - The CBOR encoded header map identifying a public
-///   authentication key, e.g. `{ 4 : h'1111' }`
-/// * `th_i` - The transcript hash
-/// * `cred_x` - Encoded `COSE_Key`
+///   authentication key, e.g. `{ 4 : h'1111' }`.
+/// * `th_i` - The transcript hash.
+/// * `cred_x` - Encoded `COSE_Key`.
 /// * `keypair_bytes` - The ed25519 authentication key pair. First 32 bytes are
 ///   the secret key, the other 32 bytes the public key.
 pub fn sign(
@@ -32,11 +32,11 @@ pub fn sign(
 ///
 /// # Arguments
 /// * `id_cred_x` - The CBOR encoded header map identifying a public
-///   authentication key, e.g. `{ 4 : h'1111' }`
-/// * `th_i` - The transcript hash
-/// * `cred_x` - Encoded `COSE_Key`
-/// * `public_key` - The ed25519 public key of the pair used for the signature
-/// * `signature` - The ed25519 signature
+///   authentication key, e.g. `{ 4 : h'1111' }`.
+/// * `th_i` - The transcript hash.
+/// * `cred_x` - Encoded `COSE_Key`.
+/// * `public_key` - The ed25519 public key of the pair used for the signature.
+/// * `signature` - The ed25519 signature.
 pub fn verify(
     id_cred_x: &[u8],
     th_i: &[u8],

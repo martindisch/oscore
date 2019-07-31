@@ -51,9 +51,9 @@ where
 /// for sequences of at most 23 items.
 ///
 /// # Arguments
-/// * `bytes` - The sequence of CBOR items
-/// * `n_items` - The number of items
-/// * `tmp_vec` - Buffer used for deserialization
+/// * `bytes` - The sequence of CBOR items.
+/// * `n_items` - The number of items.
+/// * `tmp_vec` - Buffer used for deserialization.
 pub fn decode_sequence<'a, T>(
     bytes: &[u8],
     n_items: u8,
