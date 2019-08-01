@@ -155,6 +155,11 @@ pub fn get_kid(id_cred_x: &[u8]) -> Result<Vec<u8>> {
     Ok(id_cred_x.1.into_vec())
 }
 
+/// Returns the COSE_Encrypt0 structure used as associated data in the AEAD.
+pub fn build_ad(th_i: &[u8]) -> Result<Vec<u8>> {
+    encode(("Encrypt0", Bytes::new(&[]), Bytes::new(th_i)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -288,6 +293,17 @@ mod tests {
     fn decode_id_cred_x() {
         let kid = get_kid(&ID_CRED_X_2).unwrap();
         assert_eq!(&KID_2[..], &kid[..]);
+    }
+
+    static ENCRYPT_0_TH: [u8; 3] = [0x01, 0x02, 0x03];
+    static ENCRYPT_0: [u8; 15] = [
+        0x83, 0x68, 0x45, 0x6e, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
+        0x43, 0x01, 0x02, 0x03,
+    ];
+
+    #[test]
+    fn encrypt_0() {
+        assert_eq!(&ENCRYPT_0[..], &build_ad(&ENCRYPT_0_TH).unwrap()[..]);
     }
 
 }

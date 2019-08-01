@@ -1,7 +1,7 @@
 use serde_bytes::{ByteBuf, Bytes};
 use x25519_dalek::{PublicKey, StaticSecret};
 
-use oscore::edhoc::Message1;
+use oscore::edhoc::{Message1, Message2};
 
 fn main() {
     // Party U ----------------------------------------------------------------
@@ -89,12 +89,10 @@ fn main() {
     let v_sig =
         oscore::cose::sign(&v_id_cred_v, &v_th_2, &v_cred_v, &v_auth).unwrap();
 
-    // Put together the plaintext for the encryption
-    let plaintext = oscore::edhoc::build_plaintext_2(v_kid, &v_sig).unwrap();
     // Derive K_2
     let v_k_2 = oscore::edhoc::edhoc_key_derivation(
-        &"AES-CCM-64-64-128",
-        128,
+        &"ChaCha20/Poly1305",
+        256,
         &v_th_2,
         v_shared_secret.as_bytes(),
     )
@@ -102,11 +100,33 @@ fn main() {
     // Derive IV_2
     let v_iv_2 = oscore::edhoc::edhoc_key_derivation(
         &"IV-GENERATION",
-        104,
+        96,
         &v_th_2,
         v_shared_secret.as_bytes(),
     )
     .unwrap();
+
+    // Put together the plaintext for the encryption
+    let v_plaintext = oscore::edhoc::build_plaintext_2(v_kid, &v_sig).unwrap();
+    // Compute the associated data
+    let v_ad = oscore::cose::build_ad(&v_th_2).unwrap();
+    // Get the ciphertext
+    let v_ciphertext =
+        oscore::edhoc::aead_seal(&v_k_2, &v_iv_2, &v_plaintext, &v_ad)
+            .unwrap();
+
+    // Produce message_2
+    let v_msg_2 = Message2 {
+        c_u: v_msg_1.c_u.clone(),
+        x_v: v_x_v.as_bytes().to_vec(),
+        c_v: v_c_v.to_vec(),
+        ciphertext: v_ciphertext,
+    };
+    // Get CBOR sequence for message
+    let v_msg_2_seq = oscore::edhoc::serialize_message_2(&v_msg_2).unwrap();
+    // Wrap it in a bstr for transmission
+    let mut msg_2_bytes =
+        oscore::cbor::encode(Bytes::new(&v_msg_2_seq)).unwrap();
 }
 
 fn hexstring(slice: &[u8]) -> String {

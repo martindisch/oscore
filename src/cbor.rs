@@ -26,7 +26,7 @@ pub fn encode_sequence(object: impl Serialize) -> Result<Vec<u8>> {
 
 fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>> {
     // Initialize a buffer, as well as a writer and serializer relying on it
-    let mut buf = [0u8; 128];
+    let mut buf = [0u8; 256];
     let writer = SliceWrite::new(&mut buf);
     let mut serializer = Serializer::new(writer);
     // Attempt serialization and determine the length

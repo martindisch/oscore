@@ -51,10 +51,10 @@ pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
 /// EDHOC message_2.
 #[derive(Debug, PartialEq)]
 pub struct Message2 {
-    c_u: Vec<u8>,
-    x_v: Vec<u8>,
-    c_v: Vec<u8>,
-    ciphertext: Vec<u8>,
+    pub c_u: Vec<u8>,
+    pub x_v: Vec<u8>,
+    pub c_v: Vec<u8>,
+    pub ciphertext: Vec<u8>,
 }
 
 /// Serializes EDHOC message_2.
@@ -156,7 +156,7 @@ pub fn build_plaintext_2(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
 /// Encrypts and authenticates with ChaCha20-Poly1305.
 ///
 /// DO NOT reuse the nonce with the same key.
-fn aead_seal(
+pub fn aead_seal(
     secret_key: &[u8],
     nonce: &[u8],
     plaintext: &[u8],
@@ -181,7 +181,7 @@ fn aead_seal(
 }
 
 /// Decrypts and verifies with ChaCha20Poly1305.
-fn aead_open(
+pub fn aead_open(
     secret_key: &[u8],
     nonce: &[u8],
     ciphertext: &[u8],
@@ -442,12 +442,8 @@ mod tests {
         // Check verification fail on wrong AD
         let mut ad_manip = AEAD_AD.to_vec();
         ad_manip[16] = 0x00;
-        assert!(aead_open(
-            &AEAD_SECRET_KEY,
-            &AEAD_NONCE,
-            &ct,
-            &ad_manip
-        )
-        .is_err());
+        assert!(
+            aead_open(&AEAD_SECRET_KEY, &AEAD_NONCE, &ct, &ad_manip).is_err()
+        );
     }
 }
