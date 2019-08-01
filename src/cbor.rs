@@ -24,6 +24,7 @@ pub fn encode_sequence(object: impl Serialize) -> Result<Vec<u8>> {
     serialize(object, 1)
 }
 
+/// Serializes an object, returning its bytes from an offset.
 fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>> {
     // Initialize a buffer, as well as a writer and serializer relying on it
     let mut buf = [0u8; 256];
@@ -107,6 +108,8 @@ pub fn map_to_array(bytes: &mut [u8]) -> Result<()> {
     }
 }
 
+/// Returns the byte indicating the CBOR array type with the given number of
+/// elements.
 fn array_byte(n: u8) -> Result<u8> {
     match n {
         _ if n > 23 => Err(Error::TooManyItems),

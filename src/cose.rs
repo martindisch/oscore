@@ -52,6 +52,7 @@ pub fn verify(
     Ok(public_key.verify::<Sha512>(&to_be_signed, &signature)?)
 }
 
+/// Returns the COSE `Sig_structure` used as input to the signature algorithm.
 fn build_to_be_signed(
     id_cred_x: &[u8],
     th_i: &[u8],
@@ -155,7 +156,7 @@ pub fn get_kid(id_cred_x: &[u8]) -> Result<Vec<u8>> {
     Ok(id_cred_x.1.into_vec())
 }
 
-/// Returns the COSE_Encrypt0 structure used as associated data in the AEAD.
+/// Returns the `COSE_Encrypt0` structure used as associated data in the AEAD.
 pub fn build_ad(th_i: &[u8]) -> Result<Vec<u8>> {
     encode(("Encrypt0", Bytes::new(&[]), Bytes::new(th_i)))
 }
