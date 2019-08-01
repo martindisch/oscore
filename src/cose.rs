@@ -3,8 +3,7 @@ use ed25519_dalek::{Keypair, Signature};
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha512;
 
-use crate::cbor::{array_to_map, decode, encode, map_to_array};
-use crate::Result;
+use crate::{cbor, Result};
 
 /// Returns the signature from signing the `Sig_structure` of the given data.
 ///
@@ -66,7 +65,7 @@ fn build_to_be_signed(
         Bytes::new(cred_x),    // payload
     );
 
-    encode(&sig_struct)
+    cbor::encode(&sig_struct)
 }
 
 /// Returns a CBOR encoded `COSE_KDF_Context`.
@@ -82,7 +81,7 @@ pub fn build_kdf_context(
     // (AlgorithmID, PartyUInfo, PartyVInfo, SuppPubInfo)
     let cose_kdf_context = (algorithm_id, [(); 3], [(); 3], supp_pub_info);
 
-    encode(cose_kdf_context)
+    cbor::encode(cose_kdf_context)
 }
 
 /// An Octet Key Pair (OKP) `COSE_Key`.
@@ -106,9 +105,9 @@ pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
     //  kty key, kty value, kid key, kid value)
     let raw_key = (-1, 4, -2, Bytes::new(x), 1, 1, 2, Bytes::new(kid));
     // Get the byte representation of it
-    let mut bytes = encode(raw_key)?;
+    let mut bytes = cbor::encode(raw_key)?;
     // This is a CBOR array, but we want a map
-    array_to_map(&mut bytes)?;
+    cbor::array_to_map(&mut bytes)?;
 
     Ok(bytes)
 }
@@ -117,10 +116,10 @@ pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
 pub fn deserialize_cose_key(bytes: &[u8]) -> Result<CoseKey> {
     // Turn the CBOR map into an array that we can deserialize
     let mut owned_bytes = bytes.to_vec();
-    map_to_array(&mut owned_bytes)?;
+    cbor::map_to_array(&mut owned_bytes)?;
     // Try to deserialize into our raw format
     let raw_key: (i32, u32, i32, ByteBuf, i32, u32, i32, ByteBuf) =
-        decode(&mut owned_bytes)?;
+        cbor::decode(&mut owned_bytes)?;
 
     // On success, just move the items into the "nice" key structure
     Ok(CoseKey {
@@ -138,9 +137,9 @@ pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
     // (kid key, kid value)
     let id_cred_x = (4, Bytes::new(kid));
     // Get the byte representation of it
-    let mut bytes = encode(id_cred_x)?;
+    let mut bytes = cbor::encode(id_cred_x)?;
     // This is a CBOR array, but we want a map
-    array_to_map(&mut bytes)?;
+    cbor::array_to_map(&mut bytes)?;
 
     Ok(bytes)
 }
@@ -149,16 +148,16 @@ pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
 pub fn get_kid(id_cred_x: &[u8]) -> Result<Vec<u8>> {
     // Turn the CBOR map into an array that we can deserialize
     let mut owned_bytes = id_cred_x.to_vec();
-    map_to_array(&mut owned_bytes)?;
+    cbor::map_to_array(&mut owned_bytes)?;
     // Try to deserialize into our raw format
-    let id_cred_x: (u32, ByteBuf) = decode(&mut owned_bytes)?;
+    let id_cred_x: (u32, ByteBuf) = cbor::decode(&mut owned_bytes)?;
 
     Ok(id_cred_x.1.into_vec())
 }
 
 /// Returns the `COSE_Encrypt0` structure used as associated data in the AEAD.
 pub fn build_ad(th_i: &[u8]) -> Result<Vec<u8>> {
-    encode(("Encrypt0", Bytes::new(&[]), Bytes::new(th_i)))
+    cbor::encode(("Encrypt0", Bytes::new(&[]), Bytes::new(th_i)))
 }
 
 #[cfg(test)]

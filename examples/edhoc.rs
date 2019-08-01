@@ -1,7 +1,10 @@
 use serde_bytes::{ByteBuf, Bytes};
 use x25519_dalek::{PublicKey, StaticSecret};
 
-use oscore::edhoc::{Message1, Message2};
+use oscore::{
+    cbor, cose, edhoc,
+    edhoc::{Message1, Message2},
+};
 
 fn main() {
     // Party U ----------------------------------------------------------------
@@ -25,17 +28,16 @@ fn main() {
         c_u: b"Party U".to_vec(),
     };
     // Get CBOR sequence for message
-    let u_msg_1_seq = oscore::edhoc::serialize_message_1(&u_msg_1).unwrap();
+    let u_msg_1_seq = edhoc::serialize_message_1(&u_msg_1).unwrap();
     // Wrap it in a bstr for transmission
-    let mut msg_1_bytes =
-        oscore::cbor::encode(Bytes::new(&u_msg_1_seq)).unwrap();
+    let mut msg_1_bytes = cbor::encode(Bytes::new(&u_msg_1_seq)).unwrap();
 
     // Party V ----------------------------------------------------------------
 
     // Unwrap sequence from bstr
-    let v_msg_1_seq: ByteBuf = oscore::cbor::decode(&mut msg_1_bytes).unwrap();
+    let v_msg_1_seq: ByteBuf = cbor::decode(&mut msg_1_bytes).unwrap();
     // Decode the first message
-    let v_msg_1 = oscore::edhoc::deserialize_message_1(&v_msg_1_seq).unwrap();
+    let v_msg_1 = edhoc::deserialize_message_1(&v_msg_1_seq).unwrap();
     // Verify that the selected suite is supported
     if v_msg_1.suite != 0 {
         unimplemented!("Other cipher suites");
@@ -73,12 +75,11 @@ fn main() {
     let v_c_v = b"Party V";
 
     // Build the COSE header map identifying the public authentication key
-    let v_id_cred_v = oscore::cose::build_id_cred_x(v_kid).unwrap();
+    let v_id_cred_v = cose::build_id_cred_x(v_kid).unwrap();
     // Build the COSE_Key containing our ECDH public key
-    let v_cred_v =
-        oscore::cose::serialize_cose_key(v_x_v.as_bytes(), v_kid).unwrap();
+    let v_cred_v = cose::serialize_cose_key(v_x_v.as_bytes(), v_kid).unwrap();
     // Compute TH_2
-    let v_th_2 = oscore::edhoc::compute_th_2(
+    let v_th_2 = edhoc::compute_th_2(
         &v_msg_1_seq,
         &v_msg_1.c_u,
         v_x_v.as_bytes(),
@@ -86,11 +87,10 @@ fn main() {
     )
     .unwrap();
     // Sign it
-    let v_sig =
-        oscore::cose::sign(&v_id_cred_v, &v_th_2, &v_cred_v, &v_auth).unwrap();
+    let v_sig = cose::sign(&v_id_cred_v, &v_th_2, &v_cred_v, &v_auth).unwrap();
 
     // Derive K_2
-    let v_k_2 = oscore::edhoc::edhoc_key_derivation(
+    let v_k_2 = edhoc::edhoc_key_derivation(
         &"ChaCha20/Poly1305",
         256,
         &v_th_2,
@@ -98,7 +98,7 @@ fn main() {
     )
     .unwrap();
     // Derive IV_2
-    let v_iv_2 = oscore::edhoc::edhoc_key_derivation(
+    let v_iv_2 = edhoc::edhoc_key_derivation(
         &"IV-GENERATION",
         96,
         &v_th_2,
@@ -107,13 +107,12 @@ fn main() {
     .unwrap();
 
     // Put together the plaintext for the encryption
-    let v_plaintext = oscore::edhoc::build_plaintext_2(v_kid, &v_sig).unwrap();
+    let v_plaintext = edhoc::build_plaintext_2(v_kid, &v_sig).unwrap();
     // Compute the associated data
-    let v_ad = oscore::cose::build_ad(&v_th_2).unwrap();
+    let v_ad = cose::build_ad(&v_th_2).unwrap();
     // Get the ciphertext
     let v_ciphertext =
-        oscore::edhoc::aead_seal(&v_k_2, &v_iv_2, &v_plaintext, &v_ad)
-            .unwrap();
+        edhoc::aead_seal(&v_k_2, &v_iv_2, &v_plaintext, &v_ad).unwrap();
 
     // Produce message_2
     let v_msg_2 = Message2 {
@@ -123,10 +122,9 @@ fn main() {
         ciphertext: v_ciphertext,
     };
     // Get CBOR sequence for message
-    let v_msg_2_seq = oscore::edhoc::serialize_message_2(&v_msg_2).unwrap();
+    let v_msg_2_seq = edhoc::serialize_message_2(&v_msg_2).unwrap();
     // Wrap it in a bstr for transmission
-    let mut msg_2_bytes =
-        oscore::cbor::encode(Bytes::new(&v_msg_2_seq)).unwrap();
+    let mut msg_2_bytes = cbor::encode(Bytes::new(&v_msg_2_seq)).unwrap();
 }
 
 fn hexstring(slice: &[u8]) -> String {

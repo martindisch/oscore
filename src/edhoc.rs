@@ -5,9 +5,7 @@ use orion::hazardous::aead;
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha256;
 
-use crate::cbor::{decode_sequence, encode, encode_sequence};
-use crate::cose::build_kdf_context;
-use crate::Result;
+use crate::{cbor, cose, Result};
 
 /// EDHOC message_1.
 #[derive(Debug, PartialEq)]
@@ -29,7 +27,7 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
         Bytes::new(&msg.c_u),
     );
 
-    Ok(encode_sequence(raw_msg)?)
+    Ok(cbor::encode_sequence(raw_msg)?)
 }
 
 /// Deserializes EDHOC message_1.
@@ -37,7 +35,7 @@ pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
     let raw_msg: (i32, i32, ByteBuf, ByteBuf) =
-        decode_sequence(msg, 4, &mut temp)?;
+        cbor::decode_sequence(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
     Ok(Message1 {
@@ -68,7 +66,7 @@ pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
         Bytes::new(&msg.ciphertext),
     );
 
-    Ok(encode_sequence(raw_msg)?)
+    Ok(cbor::encode_sequence(raw_msg)?)
 }
 
 /// Deserializes EDHOC message_2.
@@ -76,7 +74,7 @@ pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
     let raw_msg: (ByteBuf, ByteBuf, ByteBuf, ByteBuf) =
-        decode_sequence(msg, 4, &mut temp)?;
+        cbor::decode_sequence(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
     Ok(Message2 {
@@ -99,7 +97,7 @@ pub fn edhoc_key_derivation(
     // Since we have asymmetric authentication, the salt is 0
     let salt = None;
     // For the Expand step, take the COSE_KDF_Context structure as info
-    let info = build_kdf_context(algorithm_id, key_data_length, other)?;
+    let info = cose::build_kdf_context(algorithm_id, key_data_length, other)?;
 
     // This is the extract step, resulting in the pseudorandom key (PRK)
     let h = Hkdf::<Sha256>::new(salt, &ikm);
@@ -118,15 +116,18 @@ pub fn compute_th_2(
     c_v: &[u8],
 ) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items from the data
-    let data_2 =
-        encode_sequence((Bytes::new(c_u), Bytes::new(x_v), Bytes::new(c_v)))?;
+    let data_2 = cbor::encode_sequence((
+        Bytes::new(c_u),
+        Bytes::new(x_v),
+        Bytes::new(c_v),
+    ))?;
     // Start the sequence we'll use from message_1, which is already a sequence
     // of CBOR items
     let mut seq = message_1.to_vec();
     // Concatenate it with the sequence we just created
     seq.extend(data_2);
     // Wrap the new sequence in a bstr to get the input to h()
-    let bstr = encode(Bytes::new(&seq))?;
+    let bstr = cbor::encode(Bytes::new(&seq))?;
 
     // Return the hash of this
     h(&bstr)
@@ -139,7 +140,7 @@ fn h(bstr: &[u8]) -> Result<Vec<u8>> {
     let hash: [u8; 32] = sha256.fixed_result().into();
 
     // Return the bstr encoding
-    encode(Bytes::new(&hash))
+    cbor::encode(Bytes::new(&hash))
 }
 
 /// Returns the CBOR bstr making up the plaintext of message_2.
@@ -147,10 +148,10 @@ pub fn build_plaintext_2(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items
     // Since ID_CRED_V contains a single kid parameter, take only the bstr of
     // it. Since the signature is raw bytes, wrap it in a bstr.
-    let seq = encode_sequence((Bytes::new(kid), Bytes::new(signature)))?;
+    let seq = cbor::encode_sequence((Bytes::new(kid), Bytes::new(signature)))?;
 
     // Return the sequence wrapped in a bstr
-    encode(Bytes::new(&seq))
+    cbor::encode(Bytes::new(&seq))
 }
 
 /// Encrypts and authenticates with ChaCha20-Poly1305.

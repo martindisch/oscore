@@ -1,11 +1,8 @@
 use alloc::vec::Vec;
 use serde::Serialize;
-use serde_cbor::de::from_mut_slice;
-use serde_cbor::ser::SliceWrite;
-use serde_cbor::Serializer;
+use serde_cbor::{de, ser::SliceWrite, Serializer};
 
-use crate::error::Error;
-use crate::Result;
+use crate::{error::Error, Result};
 
 /// Serializes an object into CBOR.
 pub fn encode(object: impl Serialize) -> Result<Vec<u8>> {
@@ -44,7 +41,7 @@ pub fn decode<'a, T>(bytes: &'a mut [u8]) -> Result<T>
 where
     T: serde::Deserialize<'a>,
 {
-    Ok(from_mut_slice(bytes)?)
+    Ok(de::from_mut_slice(bytes)?)
 }
 
 /// Deserializes a sequence of CBOR encoded data items into an object.
@@ -71,7 +68,7 @@ where
     tmp_vec.extend(bytes);
 
     // Now we can try to deserialize that
-    Ok(from_mut_slice(tmp_vec)?)
+    Ok(de::from_mut_slice(tmp_vec)?)
 }
 
 /// Changes the given CBOR bytes from an array of n elements to a map of n / 2
