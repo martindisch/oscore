@@ -163,6 +163,25 @@ pub fn compute_th_2(
     h(&bstr)
 }
 
+/// Calculates the transcript hash of the third message.
+pub fn compute_th_3(
+    th_2: &[u8],
+    ciphertext_2: &[u8],
+    c_v: &[u8],
+) -> Result<Vec<u8>> {
+    // Create a sequence of CBOR items
+    let seq = cbor::encode_sequence((
+        Bytes::new(th_2),
+        Bytes::new(ciphertext_2),
+        Bytes::new(c_v),
+    ))?;
+    // Wrap the sequence in a bstr to get the input to h()
+    let bstr = cbor::encode(Bytes::new(&seq))?;
+
+    // Return the hash of this
+    h(&bstr)
+}
+
 /// Returns a CBOR bstr containing the hash of the input CBOR bstr.
 fn h(bstr: &[u8]) -> Result<Vec<u8>> {
     let mut sha256 = Sha256::default();
@@ -469,6 +488,19 @@ mod tests {
         let t_h =
             compute_th_2(&TH_2_MSG1, &TH_2_C_U, &TH_2_X_V, &TH_2_C_V).unwrap();
         assert_eq!(h(&TH_2_INPUT).unwrap(), t_h);
+    }
+
+    static TH_3_TH_2: [u8; 2] = [0x01, 0x02];
+    static TH_3_CIPHERTEXT: [u8; 2] = [0x03, 0x04];
+    static TH_3_C_V: [u8; 1] = [0x05];
+    static TH_3_INPUT: [u8; 9] =
+        [0x48, 0x42, 0x01, 0x02, 0x42, 0x03, 0x04, 0x41, 0x05];
+
+    #[test]
+    fn th_3() {
+        let t_h =
+            compute_th_3(&TH_3_TH_2, &TH_3_CIPHERTEXT, &TH_3_C_V).unwrap();
+        assert_eq!(h(&TH_3_INPUT).unwrap(), t_h);
     }
 
     static PLAINTEXT_KID: [u8; 15] = *b"bob@example.org";
