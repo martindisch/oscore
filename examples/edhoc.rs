@@ -107,7 +107,7 @@ fn main() {
     .unwrap();
 
     // Put together the plaintext for the encryption
-    let v_plaintext = edhoc::build_plaintext_2(v_kid, &v_sig).unwrap();
+    let v_plaintext = edhoc::build_plaintext(v_kid, &v_sig).unwrap();
     // Compute the associated data
     let v_ad = cose::build_ad(&v_th_2).unwrap();
     // Get the ciphertext
@@ -171,7 +171,7 @@ fn main() {
         edhoc::aead_open(&u_k_2, &u_iv_2, &u_msg_2.ciphertext, &u_ad).unwrap();
     // Fetch the contents of the plaintext
     let (u_v_kid, u_v_sig) =
-        edhoc::extract_plaintext_2(&mut u_plaintext).unwrap();
+        edhoc::extract_plaintext(&mut u_plaintext).unwrap();
 
     // Build the COSE header map identifying the public authentication key of V
     let u_id_cred_v = cose::build_id_cred_x(&u_v_kid).unwrap();

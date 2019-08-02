@@ -192,8 +192,8 @@ fn h(bstr: &[u8]) -> Result<Vec<u8>> {
     cbor::encode(Bytes::new(&hash))
 }
 
-/// Returns the CBOR bstr making up the plaintext of message_2.
-pub fn build_plaintext_2(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
+/// Returns the CBOR bstr making up the plaintext of message_i.
+pub fn build_plaintext(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items
     // Since ID_CRED_V contains a single kid parameter, take only the bstr of
     // it. Since the signature is raw bytes, wrap it in a bstr.
@@ -204,8 +204,8 @@ pub fn build_plaintext_2(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Extracts and returns the `kid` and signature from the plaintext of
-/// message_2.
-pub fn extract_plaintext_2(
+/// message_i.
+pub fn extract_plaintext(
     plaintext: &mut [u8],
 ) -> Result<(Vec<u8>, Vec<u8>)> {
     // Unwrap the CBOR sequence from the bstr
@@ -511,12 +511,12 @@ mod tests {
     ];
 
     #[test]
-    fn plaintext_2() {
+    fn plaintext() {
         let mut plaintext =
-            build_plaintext_2(&PLAINTEXT_KID, &PLAINTEXT_SIG).unwrap();
+            build_plaintext(&PLAINTEXT_KID, &PLAINTEXT_SIG).unwrap();
         assert_eq!(&PLAINTEXT_2[..], &plaintext[..]);
 
-        let (kid, sig) = extract_plaintext_2(&mut plaintext).unwrap();
+        let (kid, sig) = extract_plaintext(&mut plaintext).unwrap();
         assert_eq!(&PLAINTEXT_KID[..], &kid[..]);
         assert_eq!(&PLAINTEXT_SIG[..], &sig[..]);
     }
