@@ -44,7 +44,7 @@ fn main() {
     }
 
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)
-    // The ECDH private key used by U
+    // The ECDH private key used by V
     let v_priv = [
         16, 165, 169, 23, 227, 139, 247, 13, 53, 60, 173, 235, 46, 22, 199,
         69, 54, 240, 59, 183, 80, 23, 70, 121, 195, 57, 176, 97, 255, 171,
