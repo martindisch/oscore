@@ -154,6 +154,21 @@ pub fn build_plaintext_2(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
     cbor::encode(Bytes::new(&seq))
 }
 
+/// Extracts and returns the `kid` and signature from the plaintext of
+/// message_2.
+pub fn extract_plaintext_2(
+    plaintext: &mut [u8],
+) -> Result<(Vec<u8>, Vec<u8>)> {
+    // Unwrap the CBOR sequence from the bstr
+    let seq: ByteBuf = cbor::decode(plaintext)?;
+    // Extract the kid and signature from the contained sequence
+    let mut temp = Vec::with_capacity(seq.len() + 1);
+    let (kid, sig): (ByteBuf, ByteBuf) =
+        cbor::decode_sequence(&seq, 2, &mut temp)?;
+
+    Ok((kid.into_vec(), sig.into_vec()))
+}
+
 /// Encrypts and authenticates with ChaCha20-Poly1305.
 ///
 /// DO NOT reuse the nonce with the same key.
@@ -392,9 +407,13 @@ mod tests {
 
     #[test]
     fn plaintext_2() {
-        let plaintext =
+        let mut plaintext =
             build_plaintext_2(&PLAINTEXT_KID, &PLAINTEXT_SIG).unwrap();
         assert_eq!(&PLAINTEXT_2[..], &plaintext[..]);
+
+        let (kid, sig) = extract_plaintext_2(&mut plaintext).unwrap();
+        assert_eq!(&PLAINTEXT_KID[..], &kid[..]);
+        assert_eq!(&PLAINTEXT_SIG[..], &sig[..]);
     }
 
     static AEAD_SECRET_KEY: [u8; 32] = [
