@@ -125,6 +125,61 @@ fn main() {
     let v_msg_2_seq = edhoc::serialize_message_2(&v_msg_2).unwrap();
     // Wrap it in a bstr for transmission
     let mut msg_2_bytes = cbor::encode(Bytes::new(&v_msg_2_seq)).unwrap();
+
+    // Party U ----------------------------------------------------------------
+    // Unwrap sequence from bstr
+    let u_msg_2_seq: ByteBuf = cbor::decode(&mut msg_2_bytes).unwrap();
+    // Decode the second message
+    let u_msg_2 = edhoc::deserialize_message_2(&u_msg_2_seq).unwrap();
+
+    // Use V's public key to generate the ephemeral shared secret
+    let mut u_x_v_bytes = [0; 32];
+    u_x_v_bytes.copy_from_slice(&u_msg_2.x_v[..32]);
+    let u_v_public = x25519_dalek::PublicKey::from(u_x_v_bytes);
+    let u_shared_secret = u_secret.diffie_hellman(&u_v_public);
+
+    // Compute TH_2
+    let u_th_2 = edhoc::compute_th_2(
+        &u_msg_1_seq,
+        &u_msg_1.c_u,
+        &u_msg_2.x_v,
+        &u_msg_2.c_v,
+    )
+    .unwrap();
+
+    // Derive K_2
+    let u_k_2 = edhoc::edhoc_key_derivation(
+        &"ChaCha20/Poly1305",
+        256,
+        &u_th_2,
+        u_shared_secret.as_bytes(),
+    )
+    .unwrap();
+    // Derive IV_2
+    let u_iv_2 = edhoc::edhoc_key_derivation(
+        &"IV-GENERATION",
+        96,
+        &u_th_2,
+        u_shared_secret.as_bytes(),
+    )
+    .unwrap();
+
+    // Compute the associated data
+    let u_ad = cose::build_ad(&u_th_2).unwrap();
+    // Decrypt and verify the ciphertext
+    let mut u_plaintext =
+        edhoc::aead_open(&u_k_2, &u_iv_2, &u_msg_2.ciphertext, &u_ad).unwrap();
+    // Fetch the contents of the plaintext
+    let (u_v_kid, u_v_sig) =
+        edhoc::extract_plaintext_2(&mut u_plaintext).unwrap();
+
+    // Build the COSE header map identifying the public authentication key of V
+    let u_id_cred_v = cose::build_id_cred_x(&u_v_kid).unwrap();
+    // Build the COSE_Key containing V's ECDH public key
+    let u_cred_v = cose::serialize_cose_key(&u_msg_2.x_v, &u_v_kid).unwrap();
+    // Verify the signed data from Party V
+    cose::verify(&u_id_cred_v, &u_th_2, &u_cred_v, &v_auth[32..], &u_v_sig)
+        .unwrap();
 }
 
 fn hexstring(slice: &[u8]) -> String {
