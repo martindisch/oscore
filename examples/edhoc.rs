@@ -238,6 +238,51 @@ fn main() {
     let u_msg_3_seq = edhoc::serialize_message_3(&u_msg_3).unwrap();
     // Wrap it in a bstr for transmission
     let mut msg_3_bytes = cbor::encode(Bytes::new(&u_msg_3_seq)).unwrap();
+
+    // Party V ----------------------------------------------------------------
+    // Unwrap sequence from bstr
+    let v_msg_3_seq: ByteBuf = cbor::decode(&mut msg_3_bytes).unwrap();
+    // Decode the third message
+    let v_msg_3 = edhoc::deserialize_message_3(&v_msg_3_seq).unwrap();
+
+    // Compute TH_3
+    let v_th_3 =
+        edhoc::compute_th_3(&v_th_2, &v_msg_2.ciphertext, &v_msg_2.c_v)
+            .unwrap();
+
+    // Derive K_3
+    let v_k_3 = edhoc::edhoc_key_derivation(
+        &"ChaCha20/Poly1305",
+        256,
+        &v_th_3,
+        v_shared_secret.as_bytes(),
+    )
+    .unwrap();
+    // Derive IV_3
+    let v_iv_3 = edhoc::edhoc_key_derivation(
+        &"IV-GENERATION",
+        96,
+        &v_th_3,
+        v_shared_secret.as_bytes(),
+    )
+    .unwrap();
+
+    // Compute the associated data
+    let v_ad = cose::build_ad(&v_th_3).unwrap();
+    // Decrypt and verify the ciphertext
+    let mut v_plaintext =
+        edhoc::aead_open(&v_k_3, &v_iv_3, &v_msg_3.ciphertext, &v_ad).unwrap();
+    // Fetch the contents of the plaintext
+    let (v_u_kid, v_u_sig) =
+        edhoc::extract_plaintext(&mut v_plaintext).unwrap();
+
+    // Build the COSE header map identifying the public authentication key of U
+    let v_id_cred_u = cose::build_id_cred_x(&v_u_kid).unwrap();
+    // Build the COSE_Key containing U's ECDH public key
+    let v_cred_u = cose::serialize_cose_key(&v_msg_1.x_u, &v_u_kid).unwrap();
+    // Verify the signed data from Party U
+    cose::verify(&v_id_cred_u, &v_th_3, &v_cred_u, &u_auth[32..], &v_u_sig)
+        .unwrap();
 }
 
 fn hexstring(slice: &[u8]) -> String {
