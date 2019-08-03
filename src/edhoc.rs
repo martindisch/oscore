@@ -116,6 +116,12 @@ pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
 }
 
 /// The `EDHOC-Key-Derivation` function.
+///
+/// # Arguments
+/// * `algorithm_id` - The algorithm name, e.g. AES-CCM-64-64-128.
+/// * `key_data_length` - The desired key length in bits.
+/// * `other` - Typically a transcript hash.
+/// * `secret` - The ECDH shared secret to use as input keying material.
 pub fn edhoc_key_derivation(
     algorithm_id: &str,
     key_data_length: usize,
@@ -139,6 +145,12 @@ pub fn edhoc_key_derivation(
 }
 
 /// The `EDHOC-Exporter` interface.
+///
+/// # Arguments
+/// * `label` - Chosen by the application.
+/// * `length` - The length in bytes (chosen by the application).
+/// * `th_4` - TH_4.
+/// * `secret` - The ECDH shared secret to use as input keying material.
 pub fn edhoc_exporter(
     label: &str,
     length: usize,

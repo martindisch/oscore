@@ -71,6 +71,11 @@ fn build_to_be_signed(
 /// Returns a CBOR encoded `COSE_KDF_Context`.
 ///
 /// This is used as the info input for the HKDF-Expand step.
+///
+/// # Arguments
+/// * `algorithm_id` - The algorithm name, e.g. AES-CCM-64-64-128.
+/// * `key_data_length` - The desired key length in bits.
+/// * `other` - Typically a transcript hash.
 pub fn build_kdf_context(
     algorithm_id: &str,
     key_data_length: usize,
