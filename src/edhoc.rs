@@ -205,9 +205,7 @@ pub fn build_plaintext(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
 
 /// Extracts and returns the `kid` and signature from the plaintext of
 /// message_i.
-pub fn extract_plaintext(
-    plaintext: &mut [u8],
-) -> Result<(Vec<u8>, Vec<u8>)> {
+pub fn extract_plaintext(plaintext: &mut [u8]) -> Result<(Vec<u8>, Vec<u8>)> {
     // Unwrap the CBOR sequence from the bstr
     let seq: ByteBuf = cbor::decode(plaintext)?;
     // Extract the kid and signature from the contained sequence
