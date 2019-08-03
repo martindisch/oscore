@@ -3,11 +3,14 @@ use x25519_dalek::{PublicKey, StaticSecret};
 
 use oscore::{
     cbor, cose, edhoc,
-    edhoc::{Message1, Message2},
+    edhoc::{Message1, Message2, Message3},
 };
 
 fn main() {
     // Party U ----------------------------------------------------------------
+    // Some general information for this party
+    let u_kid = b"alice@example.org";
+    let u_c_u = b"Party U";
 
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)
     // The ECDH private key used by U
@@ -25,7 +28,7 @@ fn main() {
         r#type: 0,
         suite: 0,
         x_u: u_x_u.as_bytes().to_vec(),
-        c_u: b"Party U".to_vec(),
+        c_u: u_c_u.to_vec(),
     };
     // Get CBOR sequence for message
     let u_msg_1_seq = edhoc::serialize_message_1(&u_msg_1).unwrap();
@@ -33,6 +36,9 @@ fn main() {
     let mut msg_1_bytes = cbor::encode(Bytes::new(&u_msg_1_seq)).unwrap();
 
     // Party V ----------------------------------------------------------------
+    // Some general information for this party
+    let v_kid = b"bob@example.org";
+    let v_c_v = b"Party V";
 
     // Unwrap sequence from bstr
     let v_msg_1_seq: ByteBuf = cbor::decode(&mut msg_1_bytes).unwrap();
@@ -69,10 +75,6 @@ fn main() {
         0x16, 0x51, 0x4B, 0x88, 0x57, 0x19, 0x64, 0x3B, 0x63, 0xC5, 0x81,
         0xFD, 0x8B, 0x57, 0xDD, 0x3A, 0xC8, 0x01, 0x1A, 0xC6,
     ];
-
-    // Some general information for this party
-    let v_kid = b"bob@example.org";
-    let v_c_v = b"Party V";
 
     // Build the COSE header map identifying the public authentication key
     let v_id_cred_v = cose::build_id_cred_x(v_kid).unwrap();
@@ -180,6 +182,62 @@ fn main() {
     // Verify the signed data from Party V
     cose::verify(&u_id_cred_v, &u_th_2, &u_cred_v, &v_auth[32..], &u_v_sig)
         .unwrap();
+
+    // This is the keypair used to authenticate. V must have the public key.
+    let u_auth = [
+        0x76, 0x9E, 0x0B, 0xE0, 0xF4, 0x30, 0x9A, 0x6D, 0x6D, 0x6E, 0xC7,
+        0x8D, 0x61, 0xE0, 0xFB, 0xCF, 0x48, 0x3C, 0x8D, 0xE4, 0x2C, 0x39,
+        0x30, 0xD0, 0x4A, 0x4B, 0xA9, 0x17, 0x8F, 0x6C, 0xA7, 0x0F, 0xB3,
+        0x94, 0x7F, 0x71, 0xA5, 0xCC, 0xA4, 0xF1, 0xD2, 0xA3, 0x42, 0xAE,
+        0x62, 0x24, 0x17, 0x5E, 0x83, 0x77, 0x49, 0x34, 0x7E, 0x54, 0x21,
+        0x8C, 0x35, 0xED, 0x0C, 0xC8, 0x0A, 0x26, 0x69, 0x79,
+    ];
+
+    // Build the COSE header map identifying the public authentication key
+    let u_id_cred_u = cose::build_id_cred_x(u_kid).unwrap();
+    // Build the COSE_Key containing our ECDH public key
+    let u_cred_u = cose::serialize_cose_key(u_x_u.as_bytes(), u_kid).unwrap();
+    // Compute TH_3
+    let u_th_3 =
+        edhoc::compute_th_3(&u_th_2, &u_msg_2.ciphertext, &u_msg_2.c_v)
+            .unwrap();
+    // Sign it
+    let u_sig = cose::sign(&u_id_cred_u, &u_th_3, &u_cred_u, &u_auth).unwrap();
+
+    // Derive K_3
+    let u_k_3 = edhoc::edhoc_key_derivation(
+        &"ChaCha20/Poly1305",
+        256,
+        &u_th_3,
+        u_shared_secret.as_bytes(),
+    )
+    .unwrap();
+    // Derive IV_3
+    let u_iv_3 = edhoc::edhoc_key_derivation(
+        &"IV-GENERATION",
+        96,
+        &u_th_3,
+        u_shared_secret.as_bytes(),
+    )
+    .unwrap();
+
+    // Put together the plaintext for the encryption
+    let u_plaintext = edhoc::build_plaintext(u_kid, &u_sig).unwrap();
+    // Compute the associated data
+    let u_ad = cose::build_ad(&u_th_3).unwrap();
+    // Get the ciphertext
+    let u_ciphertext =
+        edhoc::aead_seal(&u_k_3, &u_iv_3, &u_plaintext, &u_ad).unwrap();
+
+    // Produce message_3
+    let u_msg_3 = Message3 {
+        c_v: u_msg_2.c_v.to_vec(),
+        ciphertext: u_ciphertext,
+    };
+    // Get CBOR sequence for message
+    let u_msg_3_seq = edhoc::serialize_message_3(&u_msg_3).unwrap();
+    // Wrap it in a bstr for transmission
+    let mut msg_3_bytes = cbor::encode(Bytes::new(&u_msg_3_seq)).unwrap();
 }
 
 fn hexstring(slice: &[u8]) -> String {
