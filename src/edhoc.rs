@@ -138,6 +138,16 @@ pub fn edhoc_key_derivation(
     Ok(okm)
 }
 
+/// The `EDHOC-Exporter` interface.
+pub fn edhoc_exporter(
+    label: &str,
+    length: usize,
+    th_4: &[u8],
+    secret: &[u8],
+) -> Result<Vec<u8>> {
+    edhoc_key_derivation(label, 8 * length, th_4, secret)
+}
+
 /// Calculates the transcript hash of the second message.
 pub fn compute_th_2(
     message_1: &[u8],
@@ -438,6 +448,10 @@ mod tests {
         0xE8, 0x60, 0x7B, 0xF7, 0x5D,
     ];
 
+    static EXPORTER_LABEL: &str = "OSCORE Master Salt";
+    static EXPORTER_LENGTH: usize = 8;
+    static EXPORTER_TH_4: [u8; 7] = [0x46, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05];
+
     #[test]
     fn key_derivation() {
         let okm = edhoc_key_derivation(ALG, LENGTH, &OTHER, &SECRET).unwrap();
@@ -452,6 +466,27 @@ mod tests {
         secret[1] = 0x42;
         let okm = edhoc_key_derivation(ALG, LENGTH, &OTHER, &secret).unwrap();
         assert_ne!(&OKM[..], &okm[..]);
+    }
+
+    #[test]
+    fn exporter() {
+        let key = edhoc_exporter(
+            EXPORTER_LABEL,
+            EXPORTER_LENGTH,
+            &EXPORTER_TH_4,
+            &SECRET,
+        )
+        .unwrap();
+        assert_eq!(
+            &edhoc_key_derivation(
+                EXPORTER_LABEL,
+                8 * EXPORTER_LENGTH,
+                &EXPORTER_TH_4,
+                &SECRET
+            )
+            .unwrap()[..],
+            &key[..]
+        );
     }
 
     static H_INPUT: [u8; 46] = [
