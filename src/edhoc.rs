@@ -204,6 +204,18 @@ pub fn compute_th_3(
     h(&bstr)
 }
 
+/// Calculates the final transcript hash used for the `EDHOC-Exporter`.
+pub fn compute_th_4(th_3: &[u8], ciphertext_3: &[u8]) -> Result<Vec<u8>> {
+    // Create a sequence of CBOR items
+    let seq =
+        cbor::encode_sequence((Bytes::new(th_3), Bytes::new(ciphertext_3)))?;
+    // Wrap the sequence in a bstr to get the input to h()
+    let bstr = cbor::encode(Bytes::new(&seq))?;
+
+    // Return the hash of this
+    h(&bstr)
+}
+
 /// Returns a CBOR bstr containing the hash of the input CBOR bstr.
 fn h(bstr: &[u8]) -> Result<Vec<u8>> {
     let mut sha256 = Sha256::default();
@@ -546,6 +558,16 @@ mod tests {
         let t_h =
             compute_th_3(&TH_3_TH_2, &TH_3_CIPHERTEXT, &TH_3_C_V).unwrap();
         assert_eq!(h(&TH_3_INPUT).unwrap(), t_h);
+    }
+
+    static TH_4_TH_3: [u8; 2] = [0x01, 0x02];
+    static TH_4_CIPHERTEXT: [u8; 2] = [0x03, 0x04];
+    static TH_4_INPUT: [u8; 7] = [0x46, 0x42, 0x01, 0x02, 0x42, 0x03, 0x04];
+
+    #[test]
+    fn th_4() {
+        let t_h = compute_th_4(&TH_4_TH_3, &TH_4_CIPHERTEXT).unwrap();
+        assert_eq!(h(&TH_4_INPUT).unwrap(), t_h);
     }
 
     static PLAINTEXT_KID: [u8; 15] = *b"bob@example.org";
