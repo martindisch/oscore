@@ -239,6 +239,23 @@ fn main() {
     // Wrap it in a bstr for transmission
     let mut msg_3_bytes = cbor::encode(Bytes::new(&u_msg_3_seq)).unwrap();
 
+    // Derive values for the OSCORE context
+    let u_th_4 = edhoc::compute_th_4(&u_th_3, &u_msg_3.ciphertext).unwrap();
+    let u_master_secret = edhoc::edhoc_exporter(
+        "OSCORE Master Secret",
+        32,
+        &u_th_4,
+        u_shared_secret.as_bytes(),
+    )
+    .unwrap();
+    let u_master_salt = edhoc::edhoc_exporter(
+        "OSCORE Master Salt",
+        8,
+        &u_th_4,
+        u_shared_secret.as_bytes(),
+    )
+    .unwrap();
+
     // Party V ----------------------------------------------------------------
     // Unwrap sequence from bstr
     let v_msg_3_seq: ByteBuf = cbor::decode(&mut msg_3_bytes).unwrap();
@@ -283,6 +300,35 @@ fn main() {
     // Verify the signed data from Party U
     cose::verify(&v_id_cred_u, &v_th_3, &v_cred_u, &u_auth[32..], &v_u_sig)
         .unwrap();
+
+    // Derive values for the OSCORE context
+    let v_th_4 = edhoc::compute_th_4(&v_th_3, &v_msg_3.ciphertext).unwrap();
+    let v_master_secret = edhoc::edhoc_exporter(
+        "OSCORE Master Secret",
+        32,
+        &v_th_4,
+        v_shared_secret.as_bytes(),
+    )
+    .unwrap();
+    let v_master_salt = edhoc::edhoc_exporter(
+        "OSCORE Master Salt",
+        8,
+        &v_th_4,
+        v_shared_secret.as_bytes(),
+    )
+    .unwrap();
+
+    // Verification -----------------------------------------------------------
+    assert_eq!(u_master_secret, v_master_secret);
+    assert_eq!(u_master_salt, v_master_salt);
+
+    println!(
+        "OSCORE Context established.\n\
+         Master Secret:\n{}\n\
+         Master Salt:\n{}",
+        hexstring(&u_master_secret),
+        hexstring(&u_master_salt)
+    );
 }
 
 fn hexstring(slice: &[u8]) -> String {
