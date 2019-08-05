@@ -10,8 +10,8 @@ use crate::{cbor, cose, Result};
 /// EDHOC message_1.
 #[derive(Debug, PartialEq)]
 pub struct Message1 {
-    pub r#type: i32,
-    pub suite: i32,
+    pub r#type: isize,
+    pub suite: isize,
     pub x_u: Vec<u8>,
     pub c_u: Vec<u8>,
 }
@@ -34,7 +34,7 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
 pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
-    let raw_msg: (i32, i32, ByteBuf, ByteBuf) =
+    let raw_msg: (isize, isize, ByteBuf, ByteBuf) =
         cbor::decode_sequence(msg, 4, &mut temp)?;
 
     // On success, just move the items into the "nice" message structure
@@ -306,8 +306,8 @@ pub fn aead_open(
 mod tests {
     use super::*;
 
-    static TYPE: i32 = 1;
-    static SUITE: i32 = 0;
+    static TYPE: isize = 1;
+    static SUITE: isize = 0;
     static C_U: [u8; 1] = [0xC3];
     static C_V: [u8; 1] = [0xC4];
 

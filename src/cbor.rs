@@ -24,7 +24,7 @@ pub fn encode_sequence(object: impl Serialize) -> Result<Vec<u8>> {
 /// Serializes an object, returning its bytes from an offset.
 fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>> {
     // Initialize a buffer, as well as a writer and serializer relying on it
-    let mut buf = [0u8; 256];
+    let mut buf = [0; 256];
     let writer = SliceWrite::new(&mut buf);
     let mut serializer = Serializer::new(writer);
     // Attempt serialization and determine the length
@@ -55,7 +55,7 @@ where
 /// * `tmp_vec` - Buffer used for deserialization.
 pub fn decode_sequence<'a, T>(
     bytes: &[u8],
-    n_items: u8,
+    n_items: usize,
     tmp_vec: &'a mut Vec<u8>,
 ) -> Result<T>
 where
@@ -107,13 +107,13 @@ pub fn map_to_array(bytes: &mut [u8]) -> Result<()> {
 
 /// Returns the byte indicating the CBOR array type with the given number of
 /// elements.
-fn array_byte(n: u8) -> Result<u8> {
+fn array_byte(n: usize) -> Result<u8> {
     match n {
         _ if n > 23 => Err(Error::TooManyItems),
         // The major type for arrays is indicated by the three leftmost bits.
         // By doing bitwise OR with the number of items, we assign the
         // remaining bits for the number of elements.
-        n => Ok(0b100_00000 | n),
+        n => Ok(0b100_00000 | n as u8),
     }
 }
 

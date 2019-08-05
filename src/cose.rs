@@ -92,9 +92,9 @@ pub fn build_kdf_context(
 /// An Octet Key Pair (OKP) `COSE_Key`.
 #[derive(Debug, PartialEq)]
 pub struct CoseKey {
-    crv: u32,
+    crv: usize,
     x: Vec<u8>,
-    kty: u32,
+    kty: usize,
     kid: Vec<u8>,
 }
 
@@ -123,7 +123,7 @@ pub fn deserialize_cose_key(bytes: &[u8]) -> Result<CoseKey> {
     let mut owned_bytes = bytes.to_vec();
     cbor::map_to_array(&mut owned_bytes)?;
     // Try to deserialize into our raw format
-    let raw_key: (i32, u32, i32, ByteBuf, i32, u32, i32, ByteBuf) =
+    let raw_key: (isize, usize, isize, ByteBuf, isize, usize, isize, ByteBuf) =
         cbor::decode(&mut owned_bytes)?;
 
     // On success, just move the items into the "nice" key structure
@@ -155,7 +155,7 @@ pub fn get_kid(id_cred_x: &[u8]) -> Result<Vec<u8>> {
     let mut owned_bytes = id_cred_x.to_vec();
     cbor::map_to_array(&mut owned_bytes)?;
     // Try to deserialize into our raw format
-    let id_cred_x: (u32, ByteBuf) = cbor::decode(&mut owned_bytes)?;
+    let id_cred_x: (usize, ByteBuf) = cbor::decode(&mut owned_bytes)?;
 
     Ok(id_cred_x.1.into_vec())
 }
@@ -258,9 +258,9 @@ mod tests {
         assert_eq!(&CONTEXT2[..], &context_bytes[..]);
     }
 
-    static CURVE: u32 = 4;
+    static CURVE: usize = 4;
     static X: [u8; 4] = [0x00, 0x01, 0x02, 0x03];
-    static KTY: u32 = 1;
+    static KTY: usize = 1;
     static KID: [u8; 4] = [0x04, 0x05, 0x06, 0x07];
     static KEY_BYTES: [u8; 17] = [
         0xA4, 0x20, 0x04, 0x21, 0x44, 0x00, 0x01, 0x02, 0x03, 0x01, 0x01,
