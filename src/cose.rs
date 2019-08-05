@@ -310,5 +310,4 @@ mod tests {
     fn encrypt_0() {
         assert_eq!(&ENCRYPT_0[..], &build_ad(&ENCRYPT_0_TH).unwrap()[..]);
     }
-
 }
