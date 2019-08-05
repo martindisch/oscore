@@ -1,8 +1,53 @@
 use alloc::vec::Vec;
+use core::{cmp, result};
 use serde::Serialize;
-use serde_cbor::{de, ser::SliceWrite, Serializer};
+use serde_cbor::{de, ser::Write, Serializer};
 
 use crate::{error::Error, Result};
+
+/// Implements the `Write` trait from `serde_cbor` using a `Vec<u8>`.
+///
+/// It allocates when necessary, so can be used for indefinite-length data,
+/// unlike `SliceWrite`.
+struct VecWrite {
+    vec: Vec<u8>,
+}
+
+impl VecWrite {
+    /// Constructs a new `VecWrite` based on a 128 byte `Vec<u8>`.
+    pub fn new() -> VecWrite {
+        VecWrite::with_capacity(128)
+    }
+
+    /// Constructs a new `VecWrite` based on a `Vec<u8>` of specified capacity.
+    pub fn with_capacity(capacity: usize) -> VecWrite {
+        VecWrite {
+            vec: Vec::with_capacity(capacity),
+        }
+    }
+
+    /// Extracts a slice containing the entire vector.
+    pub fn as_slice<'a>(&'a self) -> &'a [u8] {
+        &self.vec
+    }
+}
+
+impl Write for VecWrite {
+    type Error = serde_cbor::Error;
+
+    fn write_all(&mut self, buf: &[u8]) -> result::Result<(), Self::Error> {
+        if self.vec.capacity() - self.vec.len() < buf.len() {
+            // Allocate to make sure we have either at least 128 bytes free
+            // space, or if what we're trying to insert is larger than that,
+            // make room for it and 8 additional bytes (for later inserts).
+            self.vec.reserve(cmp::max(128, buf.len() + 8));
+        }
+        // Copy buffer elements into our vector
+        self.vec.extend_from_slice(buf);
+
+        Ok(())
+    }
+}
 
 /// Serializes an object into CBOR.
 pub fn encode(object: impl Serialize) -> Result<Vec<u8>> {
@@ -23,17 +68,15 @@ pub fn encode_sequence(object: impl Serialize) -> Result<Vec<u8>> {
 
 /// Serializes an object, returning its bytes from an offset.
 fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>> {
-    // Initialize a buffer, as well as a writer and serializer relying on it
-    let mut buf = [0; 256];
-    let writer = SliceWrite::new(&mut buf);
+    // Initialize a writer and serializer relying on it
+    let writer = VecWrite::new();
     let mut serializer = Serializer::new(writer);
-    // Attempt serialization and determine the length
+    // Attempt serialization
     object.serialize(&mut serializer)?;
     let writer = serializer.into_inner();
-    let size = writer.bytes_written();
 
     // Return the bytes from the offset the caller requested
-    Ok(buf[offset..size].to_vec())
+    Ok(writer.as_slice()[offset..].to_vec())
 }
 
 /// Deserializes a CBOR encoded object.
@@ -119,6 +162,8 @@ fn array_byte(n: usize) -> Result<u8> {
 
 #[cfg(test)]
 mod tests {
+    use serde_bytes::Bytes;
+
     use super::*;
 
     #[test]
@@ -182,5 +227,58 @@ mod tests {
         let mut arr_24 = ARR_24.to_vec();
         assert!(map_to_array(&mut map_12).is_err());
         assert!(array_to_map(&mut arr_24).is_err());
+    }
+
+    static OUTPUT_MIXED: [u8; 24] = [
+        0x84, 0x18, 0x2A, 0x6D, 0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x2C, 0x20,
+        0x77, 0x6F, 0x72, 0x6C, 0x64, 0x21, 0x83, 0x01, 0x02, 0x03, 0x42,
+        0x04, 0x05,
+    ];
+    static OUTPUT_LARGE: [u8; 154] = [
+        0x82, 0x58, 0x8C, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+        0x4A, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02,
+    ];
+
+    #[test]
+    fn vec_write() {
+        let input_mixed =
+            (42, "Hello, world!", (1, 2, 3), Bytes::new(&[0x04, 0x05]));
+
+        // Initialize the writer with just enough capacity so there's no
+        // need to reallocate
+        let writer = VecWrite::with_capacity(24);
+        let mut serializer = Serializer::new(writer);
+        input_mixed.serialize(&mut serializer).unwrap();
+        let writer = serializer.into_inner();
+        assert_eq!(&OUTPUT_MIXED, writer.as_slice());
+
+        // Initialize the writer with one byte less than necessary, so there's
+        // one reallocation
+        let writer = VecWrite::with_capacity(23);
+        let mut serializer = Serializer::new(writer);
+        input_mixed.serialize(&mut serializer).unwrap();
+        let writer = serializer.into_inner();
+        assert_eq!(&OUTPUT_MIXED, writer.as_slice());
+
+        // Test the ability to allocate more than the default 128 bytes if what
+        // it needs to write is larger
+        let input = (Bytes::new(&[1; 140]), Bytes::new(&[2; 10]));
+        let writer = VecWrite::with_capacity(10);
+        let mut serializer = Serializer::new(writer);
+        input.serialize(&mut serializer).unwrap();
+        let writer = serializer.into_inner();
+        assert_eq!(&OUTPUT_LARGE[..], writer.as_slice());
     }
 }

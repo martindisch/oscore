@@ -10,7 +10,7 @@ doctest = false
 
 [dependencies]
 serde = { version = "1.0.97", default-features = false, features = ["derive", "alloc"] }
-serde_cbor = { version = "0.10.1", default-features = false }
+serde_cbor = { version = "0.10.1", default-features = false, features = ["unsealed_read_write"] }
 serde_bytes = { version = "0.11.1", default-features = false, features = ["alloc"] }
 ed25519-dalek = { version = "0.9.1", default-features = false }
 sha2 = { version = "0.8.0", default-features = false }
