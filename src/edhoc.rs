@@ -49,7 +49,7 @@ pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
 /// EDHOC message_2.
 #[derive(Debug, PartialEq)]
 pub struct Message2 {
-    pub c_u: Vec<u8>,
+    pub c_u: Option<Vec<u8>>,
     pub x_v: Vec<u8>,
     pub c_v: Vec<u8>,
     pub ciphertext: Vec<u8>,
@@ -57,62 +57,103 @@ pub struct Message2 {
 
 /// Serializes EDHOC message_2.
 pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
-    // Pack the data into a structure that nicely serializes almost into
-    // what we want to have as the actual bytes for the EDHOC message
-    let raw_msg = (
-        Bytes::new(&msg.c_u),
-        Bytes::new(&msg.x_v),
-        Bytes::new(&msg.c_v),
-        Bytes::new(&msg.ciphertext),
-    );
-
-    Ok(cbor::encode_sequence(raw_msg)?)
+    if msg.c_u.is_some() {
+        // Case where we have U's connection identifier
+        cbor::encode_sequence((
+            Bytes::new(msg.c_u.as_ref().unwrap()),
+            Bytes::new(&msg.x_v),
+            Bytes::new(&msg.c_v),
+            Bytes::new(&msg.ciphertext),
+        ))
+    } else {
+        // Case where we don't
+        cbor::encode_sequence((
+            Bytes::new(&msg.x_v),
+            Bytes::new(&msg.c_v),
+            Bytes::new(&msg.ciphertext),
+        ))
+    }
 }
 
 /// Deserializes EDHOC message_2.
 pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
-    // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
-    let raw_msg: (ByteBuf, ByteBuf, ByteBuf, ByteBuf) =
-        cbor::decode_sequence(msg, 4, &mut temp)?;
-
-    // On success, just move the items into the "nice" message structure
-    Ok(Message2 {
-        c_u: raw_msg.0.into_vec(),
-        x_v: raw_msg.1.into_vec(),
-        c_v: raw_msg.2.into_vec(),
-        ciphertext: raw_msg.3.into_vec(),
-    })
+    // First, attempt to decode the variant without c_u
+    if let Ok((x_v, c_v, ciphertext)) =
+        cbor::decode_sequence::<(ByteBuf, ByteBuf, ByteBuf)>(msg, 3, &mut temp)
+    {
+        // If that worked, return the Message2 variant without it
+        Ok(Message2 {
+            c_u: None,
+            x_v: x_v.into_vec(),
+            c_v: c_v.into_vec(),
+            ciphertext: ciphertext.into_vec(),
+        })
+    } else {
+        // Otherwise, try the one with c_u
+        temp.clear();
+        let (c_u, x_v, c_v, ciphertext) =
+            cbor::decode_sequence::<(ByteBuf, ByteBuf, ByteBuf, ByteBuf)>(
+                msg, 4, &mut temp,
+            )?;
+        // If we managed this time, we can fill up the whole struct
+        Ok(Message2 {
+            c_u: Some(c_u.into_vec()),
+            x_v: x_v.into_vec(),
+            c_v: c_v.into_vec(),
+            ciphertext: ciphertext.into_vec(),
+        })
+    }
 }
 
 /// EDHOC message_3.
 #[derive(Debug, PartialEq)]
 pub struct Message3 {
-    pub c_v: Vec<u8>,
+    pub c_v: Option<Vec<u8>>,
     pub ciphertext: Vec<u8>,
 }
 
 /// Serializes EDHOC message_3.
 pub fn serialize_message_3(msg: &Message3) -> Result<Vec<u8>> {
-    // Pack the data into a structure that nicely serializes almost into
-    // what we want to have as the actual bytes for the EDHOC message
-    let raw_msg = (Bytes::new(&msg.c_v), Bytes::new(&msg.ciphertext));
-
-    Ok(cbor::encode_sequence(raw_msg)?)
+    if msg.c_v.is_some() {
+        // Case where we have V's connection identifier
+        cbor::encode_sequence((
+            Bytes::new(msg.c_v.as_ref().unwrap()),
+            Bytes::new(&msg.ciphertext),
+        ))
+    } else {
+        // Case where we don't.
+        // Since we have a single element (the ciphertext), there's no need
+        // to use the sequence encoder.
+        cbor::encode(Bytes::new(&msg.ciphertext))
+    }
 }
 
 /// Deserializes EDHOC message_3.
 pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
-    // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
-    let raw_msg: (ByteBuf, ByteBuf) =
-        cbor::decode_sequence(msg, 2, &mut temp)?;
-
-    // On success, just move the items into the "nice" message structure
-    Ok(Message3 {
-        c_v: raw_msg.0.into_vec(),
-        ciphertext: raw_msg.1.into_vec(),
-    })
+    // First, attempt to decode the variant with c_v
+    if let Ok((c_v, ciphertext)) =
+        cbor::decode_sequence::<(ByteBuf, ByteBuf)>(msg, 2, &mut temp)
+    {
+        // If that worked, return the Message3 variant with it
+        Ok(Message3 {
+            c_v: Some(c_v.into_vec()),
+            ciphertext: ciphertext.into_vec(),
+        })
+    } else {
+        // Otherwise, try the one without it.
+        // Again, we have a single element and therefore don't use the sequence
+        // decoder. The regular encoder needs to operate on a mutable
+        // reference, so clone the contents.
+        let mut cpy = msg.to_vec();
+        let ciphertext = cbor::decode::<ByteBuf>(&mut cpy)?;
+        // If we managed this time, we can return the struct without c_v
+        Ok(Message3 {
+            c_v: None,
+            ciphertext: ciphertext.into_vec(),
+        })
+    }
 }
 
 /// Returns the bytes of an EDHOC error message with the given text.
@@ -431,60 +472,75 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
     fn returns_err() {
         let bytes = vec![0xFF];
-        deserialize_message_1(&bytes).unwrap();
+        assert!(deserialize_message_1(&bytes).is_err());
+        assert!(deserialize_message_2(&bytes).is_err());
+        assert!(deserialize_message_3(&bytes).is_err());
     }
 
     #[test]
     fn serialize_2() {
-        let original = Message2 {
-            c_u: C_U.to_vec(),
+        let mut original = Message2 {
+            c_u: Some(C_U.to_vec()),
             x_v: MSG2_X_V.to_vec(),
             c_v: C_V.to_vec(),
             ciphertext: MSG2_CIPHERTEXT.to_vec(),
         };
-
         assert_eq!(
             &MSG2_BYTES[..],
+            &serialize_message_2(&original).unwrap()[..]
+        );
+
+        original.c_u = None;
+        assert_eq!(
+            &MSG2_BYTES[2..],
             &serialize_message_2(&original).unwrap()[..]
         );
     }
 
     #[test]
     fn deserialize_2() {
-        let original = Message2 {
-            c_u: C_U.to_vec(),
+        let mut original = Message2 {
+            c_u: Some(C_U.to_vec()),
             x_v: MSG2_X_V.to_vec(),
             c_v: C_V.to_vec(),
             ciphertext: MSG2_CIPHERTEXT.to_vec(),
         };
-
         assert_eq!(original, deserialize_message_2(&MSG2_BYTES).unwrap());
+
+        original.c_u = None;
+        assert_eq!(original, deserialize_message_2(&MSG2_BYTES[2..]).unwrap());
     }
 
     #[test]
     fn serialize_3() {
-        let original = Message3 {
-            c_v: C_V.to_vec(),
+        let mut original = Message3 {
+            c_v: Some(C_V.to_vec()),
             ciphertext: MSG3_CIPHERTEXT.to_vec(),
         };
-
         assert_eq!(
             &MSG3_BYTES[..],
+            &serialize_message_3(&original).unwrap()[..]
+        );
+
+        original.c_v = None;
+        assert_eq!(
+            &MSG3_BYTES[2..],
             &serialize_message_3(&original).unwrap()[..]
         );
     }
 
     #[test]
     fn deserialize_3() {
-        let original = Message3 {
-            c_v: C_V.to_vec(),
+        let mut original = Message3 {
+            c_v: Some(C_V.to_vec()),
             ciphertext: MSG3_CIPHERTEXT.to_vec(),
         };
-
         assert_eq!(original, deserialize_message_3(&MSG3_BYTES).unwrap());
+
+        original.c_v = None;
+        assert_eq!(original, deserialize_message_3(&MSG3_BYTES[2..]).unwrap());
     }
 
     static ERR_MSG: &str = "Unicode: 助, 😀";

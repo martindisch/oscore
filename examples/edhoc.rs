@@ -28,7 +28,9 @@ fn main() {
 
     // Encode the necessary information into the first message
     let u_msg_1 = Message1 {
-        r#type: 0,
+        // This would be the case in CoAP, where party U can correlate
+        // message_1 and message_2 with the token
+        r#type: 1,
         suite: 0,
         x_u: u_x_u.as_bytes().to_vec(),
         c_u: u_c_u.to_vec(),
@@ -119,9 +121,15 @@ fn main() {
     let v_ciphertext =
         edhoc::aead_seal(&v_k_2, &v_iv_2, &v_plaintext, &v_ad).unwrap();
 
+    // Determine whether to include c_u or not
+    let v_c_u = if v_msg_1.r#type % 4 == 1 || v_msg_1.r#type % 4 == 3 {
+        None
+    } else {
+        Some(v_msg_1.c_u.clone())
+    };
     // Produce message_2
     let v_msg_2 = Message2 {
-        c_u: v_msg_1.c_u.clone(),
+        c_u: v_c_u,
         x_v: v_x_v.as_bytes().to_vec(),
         c_v: v_c_v.to_vec(),
         ciphertext: v_ciphertext,
@@ -234,9 +242,15 @@ fn main() {
     let u_ciphertext =
         edhoc::aead_seal(&u_k_3, &u_iv_3, &u_plaintext, &u_ad).unwrap();
 
+    // Determine whether to include c_v or not
+    let u_c_v = if u_msg_1.r#type % 4 == 2 || u_msg_1.r#type % 4 == 3 {
+        None
+    } else {
+        Some(u_msg_2.c_v.to_vec())
+    };
     // Produce message_3
     let u_msg_3 = Message3 {
-        c_v: u_msg_2.c_v.to_vec(),
+        c_v: u_c_v,
         ciphertext: u_ciphertext,
     };
     // Get CBOR sequence for message
