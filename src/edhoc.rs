@@ -5,7 +5,7 @@ use orion::hazardous::aead;
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha256;
 
-use crate::{cbor, cose, Result};
+use crate::{cbor, cose, error::Error, Result};
 
 /// EDHOC message_1.
 #[derive(Debug, PartialEq)]
@@ -132,6 +132,19 @@ pub fn extract_error_message(msg: &[u8]) -> Result<String> {
         cbor::decode_sequence(msg, 2, &mut temp)?;
 
     Ok(err_msg)
+}
+
+/// Returns `Error::Edhoc` variant containing the error message, if the given
+/// message was an EDHOC error message.
+///
+/// Use it by passing a received message to it, before trying to parse it.
+pub fn fail_on_error_message(msg: &[u8]) -> Result<()> {
+    match extract_error_message(msg) {
+        // If we succeed, it really is an error message
+        Ok(err_msg) => Err(Error::Edhoc(err_msg)),
+        // If not, then we don't have an error message
+        Err(_) => Ok(()),
+    }
 }
 
 /// The `EDHOC-Key-Derivation` function.
@@ -490,6 +503,21 @@ mod tests {
     fn extract_err() {
         let err_msg = extract_error_message(&ERR_MSG_BYTES).unwrap();
         assert_eq!(ERR_MSG, &err_msg);
+    }
+
+    #[test]
+    fn err_catching() {
+        // Don't fail when parsing something that's not an error message
+        assert!(fail_on_error_message(&MSG1_BYTES).is_ok());
+        let msg_2_bytes = cbor::encode(Bytes::new(&MSG3_BYTES)).unwrap();
+        assert!(fail_on_error_message(&msg_2_bytes).is_ok());
+
+        // If it is an error message, give us the correct error variant
+        let msg = match fail_on_error_message(&ERR_MSG_BYTES) {
+            Err(Error::Edhoc(err_msg)) => err_msg,
+            _ => String::from("Not what we're looking for"),
+        };
+        assert_eq!(ERR_MSG, &msg);
     }
 
     static ALG: &str = "AES-CCM-64-64-128";

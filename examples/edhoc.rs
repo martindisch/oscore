@@ -7,6 +7,9 @@ use oscore::{
 };
 
 fn main() {
+    // TODO: An EDHOC error message should be sent to the other party whenever
+    // an operation fails and the protocol is abandoned.
+
     // Party U ----------------------------------------------------------------
     // Some general information for this party
     let u_kid = b"alice@example.org";
@@ -131,6 +134,8 @@ fn main() {
     // Party U ----------------------------------------------------------------
     // Unwrap sequence from bstr
     let u_msg_2_seq: ByteBuf = cbor::decode(&mut msg_2_bytes).unwrap();
+    // Check if we don't have an error message
+    edhoc::fail_on_error_message(&u_msg_2_seq).unwrap();
     // Decode the second message
     let u_msg_2 = edhoc::deserialize_message_2(&u_msg_2_seq).unwrap();
 
@@ -259,6 +264,8 @@ fn main() {
     // Party V ----------------------------------------------------------------
     // Unwrap sequence from bstr
     let v_msg_3_seq: ByteBuf = cbor::decode(&mut msg_3_bytes).unwrap();
+    // Check if we don't have an error message
+    edhoc::fail_on_error_message(&v_msg_3_seq).unwrap();
     // Decode the third message
     let v_msg_3 = edhoc::deserialize_message_3(&v_msg_3_seq).unwrap();
 
@@ -317,6 +324,12 @@ fn main() {
         v_shared_secret.as_bytes(),
     )
     .unwrap();
+
+    // Party U ----------------------------------------------------------------
+    // It's possible that Party V failed verification of message_3, in which
+    // case it sends an EDHOC error message.
+    // Technically, Party U would have to be ready to receive this message and
+    // invalidate any protocol state.
 
     // Verification -----------------------------------------------------------
     assert_eq!(u_master_secret, v_master_secret);

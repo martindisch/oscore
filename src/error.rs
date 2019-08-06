@@ -1,3 +1,4 @@
+use alloc::string::String;
 use core::fmt;
 
 /// The error type for this crate, wrapping errors from various libraries.
@@ -8,6 +9,7 @@ pub enum Error {
     Ed25519(ed25519_dalek::SignatureError),
     Hkdf(hkdf::InvalidLength),
     Aead(orion::errors::UnknownCryptoError),
+    Edhoc(String),
 }
 
 impl From<serde_cbor::Error> for Error {
@@ -44,6 +46,7 @@ impl fmt::Display for Error {
             Error::Ed25519(e) => write!(f, "Signature error: {}", e),
             Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
             Error::Aead(e) => write!(f, "AEAD error: {}", e),
+            Error::Edhoc(e) => write!(f, "EDHOC error message: {}", e),
         }
     }
 }
