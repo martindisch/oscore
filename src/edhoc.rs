@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use digest::{FixedOutput, Input};
 use hkdf::Hkdf;
 use orion::hazardous::aead;
@@ -113,6 +113,25 @@ pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
         c_v: raw_msg.0.into_vec(),
         ciphertext: raw_msg.1.into_vec(),
     })
+}
+
+/// Returns the bytes of an EDHOC error message with the given text.
+pub fn build_error_message(err_msg: &str) -> Result<Vec<u8>> {
+    // Build a tuple for the sequence of items
+    // (type, err_msg)
+    let raw_msg = (-1, err_msg);
+
+    cbor::encode_sequence(raw_msg)
+}
+
+/// Returns the extracted message from the EDHOC error message.
+pub fn extract_error_message(msg: &[u8]) -> Result<String> {
+    // Try to deserialize into our raw message format
+    let mut temp = Vec::with_capacity(msg.len() + 1);
+    let (_, err_msg): (isize, String) =
+        cbor::decode_sequence(msg, 2, &mut temp)?;
+
+    Ok(err_msg)
 }
 
 /// The `EDHOC-Key-Derivation` function.
@@ -453,6 +472,24 @@ mod tests {
         };
 
         assert_eq!(original, deserialize_message_3(&MSG3_BYTES).unwrap());
+    }
+
+    static ERR_MSG: &str = "Unicode: 助, 😀";
+    static ERR_MSG_BYTES: [u8; 20] = [
+        0x20, 0x72, 0x55, 0x6E, 0x69, 0x63, 0x6F, 0x64, 0x65, 0x3A, 0x20,
+        0xE5, 0x8A, 0xA9, 0x2C, 0x20, 0xF0, 0x9F, 0x98, 0x80,
+    ];
+
+    #[test]
+    fn build_err() {
+        let err_bytes = build_error_message(ERR_MSG).unwrap();
+        assert_eq!(&ERR_MSG_BYTES, &err_bytes[..]);
+    }
+
+    #[test]
+    fn extract_err() {
+        let err_msg = extract_error_message(&ERR_MSG_BYTES).unwrap();
+        assert_eq!(ERR_MSG, &err_msg);
     }
 
     static ALG: &str = "AES-CCM-64-64-128";
