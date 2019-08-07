@@ -81,6 +81,13 @@ fn main() {
         0xFD, 0x8B, 0x57, 0xDD, 0x3A, 0xC8, 0x01, 0x1A, 0xC6,
     ];
 
+    // Determine whether to include c_u in message_2 or not
+    let v_c_u = if v_msg_1.r#type % 4 == 1 || v_msg_1.r#type % 4 == 3 {
+        None
+    } else {
+        Some(v_msg_1.c_u.clone())
+    };
+
     // Build the COSE header map identifying the public authentication key
     let v_id_cred_v = cose::build_id_cred_x(v_kid).unwrap();
     // Build the COSE_Key containing our ECDH public key
@@ -88,8 +95,7 @@ fn main() {
     // Compute TH_2
     let v_th_2 = edhoc::compute_th_2(
         &v_msg_1_seq,
-        // TODO:
-        Some(&v_msg_1.c_u),
+        as_deref(&v_c_u),
         v_x_v.as_bytes(),
         v_c_v,
     )
@@ -122,12 +128,6 @@ fn main() {
     let v_ciphertext =
         edhoc::aead_seal(&v_k_2, &v_iv_2, &v_plaintext, &v_ad).unwrap();
 
-    // Determine whether to include c_u or not
-    let v_c_u = if v_msg_1.r#type % 4 == 1 || v_msg_1.r#type % 4 == 3 {
-        None
-    } else {
-        Some(v_msg_1.c_u.clone())
-    };
     // Produce message_2
     let v_msg_2 = Message2 {
         c_u: v_c_u,
@@ -157,8 +157,7 @@ fn main() {
     // Compute TH_2
     let u_th_2 = edhoc::compute_th_2(
         &u_msg_1_seq,
-        // TODO:
-        Some(&u_msg_1.c_u),
+        as_deref(&u_msg_2.c_u),
         &u_msg_2.x_v,
         &u_msg_2.c_v,
     )
@@ -208,14 +207,20 @@ fn main() {
         0x8C, 0x35, 0xED, 0x0C, 0xC8, 0x0A, 0x26, 0x69, 0x79,
     ];
 
+    // Determine whether to include c_v in message_3 or not
+    let u_c_v = if u_msg_1.r#type % 4 == 2 || u_msg_1.r#type % 4 == 3 {
+        None
+    } else {
+        Some(u_msg_2.c_v.to_vec())
+    };
+
     // Build the COSE header map identifying the public authentication key
     let u_id_cred_u = cose::build_id_cred_x(u_kid).unwrap();
     // Build the COSE_Key containing our ECDH public key
     let u_cred_u = cose::serialize_cose_key(u_x_u.as_bytes(), u_kid).unwrap();
     // Compute TH_3
     let u_th_3 =
-        // TODO:
-        edhoc::compute_th_3(&u_th_2, &u_msg_2.ciphertext, Some(&u_msg_2.c_v))
+        edhoc::compute_th_3(&u_th_2, &u_msg_2.ciphertext, as_deref(&u_c_v))
             .unwrap();
     // Sign it
     let u_sig = cose::sign(&u_id_cred_u, &u_th_3, &u_cred_u, &u_auth).unwrap();
@@ -245,12 +250,6 @@ fn main() {
     let u_ciphertext =
         edhoc::aead_seal(&u_k_3, &u_iv_3, &u_plaintext, &u_ad).unwrap();
 
-    // Determine whether to include c_v or not
-    let u_c_v = if u_msg_1.r#type % 4 == 2 || u_msg_1.r#type % 4 == 3 {
-        None
-    } else {
-        Some(u_msg_2.c_v.to_vec())
-    };
     // Produce message_3
     let u_msg_3 = Message3 {
         c_v: u_c_v,
@@ -287,10 +286,12 @@ fn main() {
     let v_msg_3 = edhoc::deserialize_message_3(&v_msg_3_seq).unwrap();
 
     // Compute TH_3
-    let v_th_3 =
-        // TODO:
-        edhoc::compute_th_3(&v_th_2, &v_msg_2.ciphertext, Some(&v_msg_2.c_v))
-            .unwrap();
+    let v_th_3 = edhoc::compute_th_3(
+        &v_th_2,
+        &v_msg_2.ciphertext,
+        as_deref(&v_msg_3.c_v),
+    )
+    .unwrap();
 
     // Derive K_3
     let v_k_3 = edhoc::edhoc_key_derivation(
@@ -360,6 +361,18 @@ fn main() {
         hexstring(&u_master_secret),
         hexstring(&u_master_salt)
     );
+}
+
+/// Converts from `&Option<T>` to `Option<&T::Target>`.
+///
+/// Leaves the original Option in-place, creating a new one with a reference
+/// to the original one, additionally coercing the contents via `Deref`.
+///
+/// This is extracted from the `inner_deref` feature of unstable Rust
+/// (https://github.com/rust-lang/rust/issues/50264) and can be removed, as
+/// soon as the feature becomes stable.
+fn as_deref<T: core::ops::Deref>(option: &Option<T>) -> Option<&T::Target> {
+    option.as_ref().map(|t| t.deref())
 }
 
 fn hexstring(slice: &[u8]) -> String {
