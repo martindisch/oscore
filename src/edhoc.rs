@@ -236,16 +236,22 @@ pub fn edhoc_exporter(
 /// Calculates the transcript hash of the second message.
 pub fn compute_th_2(
     message_1: &[u8],
-    c_u: &[u8],
+    c_u: Option<&[u8]>,
     x_v: &[u8],
     c_v: &[u8],
 ) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items from the data
-    let data_2 = cbor::encode_sequence((
-        Bytes::new(c_u),
-        Bytes::new(x_v),
-        Bytes::new(c_v),
-    ))?;
+    let data_2 = if c_u.is_some() {
+        // Case where we have c_u
+        cbor::encode_sequence((
+            Bytes::new(c_u.unwrap()),
+            Bytes::new(x_v),
+            Bytes::new(c_v),
+        ))?
+    } else {
+        // Case where we don't
+        cbor::encode_sequence((Bytes::new(x_v), Bytes::new(c_v)))?
+    };
     // Start the sequence we'll use from message_1, which is already a sequence
     // of CBOR items
     let mut seq = message_1.to_vec();
@@ -262,14 +268,20 @@ pub fn compute_th_2(
 pub fn compute_th_3(
     th_2: &[u8],
     ciphertext_2: &[u8],
-    c_v: &[u8],
+    c_v: Option<&[u8]>,
 ) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items
-    let seq = cbor::encode_sequence((
-        Bytes::new(th_2),
-        Bytes::new(ciphertext_2),
-        Bytes::new(c_v),
-    ))?;
+    let seq = if c_v.is_some() {
+        // Case where we have c_v
+        cbor::encode_sequence((
+            Bytes::new(th_2),
+            Bytes::new(ciphertext_2),
+            Bytes::new(c_v.unwrap()),
+        ))?
+    } else {
+        // Case where we don't
+        cbor::encode_sequence((Bytes::new(th_2), Bytes::new(ciphertext_2)))?
+    };
     // Wrap the sequence in a bstr to get the input to h()
     let bstr = cbor::encode(Bytes::new(&seq))?;
 
@@ -660,12 +672,19 @@ mod tests {
     static TH_2_C_V: [u8; 1] = [0x02];
     static TH_2_INPUT: [u8; 9] =
         [0x48, 0x01, 0x02, 0x41, 0x00, 0x41, 0x01, 0x41, 0x02];
+    static TH_2_INPUT_SHORTER: [u8; 7] =
+        [0x46, 0x01, 0x02, 0x41, 0x01, 0x41, 0x02];
 
     #[test]
     fn th_2() {
         let t_h =
-            compute_th_2(&TH_2_MSG1, &TH_2_C_U, &TH_2_X_V, &TH_2_C_V).unwrap();
+            compute_th_2(&TH_2_MSG1, Some(&TH_2_C_U), &TH_2_X_V, &TH_2_C_V)
+                .unwrap();
         assert_eq!(h(&TH_2_INPUT).unwrap(), t_h);
+
+        let t_h =
+            compute_th_2(&TH_2_MSG1, None, &TH_2_X_V, &TH_2_C_V).unwrap();
+        assert_eq!(h(&TH_2_INPUT_SHORTER).unwrap(), t_h);
     }
 
     static TH_3_TH_2: [u8; 2] = [0x01, 0x02];
@@ -673,12 +692,17 @@ mod tests {
     static TH_3_C_V: [u8; 1] = [0x05];
     static TH_3_INPUT: [u8; 9] =
         [0x48, 0x42, 0x01, 0x02, 0x42, 0x03, 0x04, 0x41, 0x05];
+    static TH_3_INPUT_SHORTER: [u8; 7] =
+        [0x46, 0x42, 0x01, 0x02, 0x42, 0x03, 0x04];
 
     #[test]
     fn th_3() {
-        let t_h =
-            compute_th_3(&TH_3_TH_2, &TH_3_CIPHERTEXT, &TH_3_C_V).unwrap();
+        let t_h = compute_th_3(&TH_3_TH_2, &TH_3_CIPHERTEXT, Some(&TH_3_C_V))
+            .unwrap();
         assert_eq!(h(&TH_3_INPUT).unwrap(), t_h);
+
+        let t_h = compute_th_3(&TH_3_TH_2, &TH_3_CIPHERTEXT, None).unwrap();
+        assert_eq!(h(&TH_3_INPUT_SHORTER).unwrap(), t_h);
     }
 
     static TH_4_TH_3: [u8; 2] = [0x01, 0x02];

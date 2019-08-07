@@ -88,7 +88,8 @@ fn main() {
     // Compute TH_2
     let v_th_2 = edhoc::compute_th_2(
         &v_msg_1_seq,
-        &v_msg_1.c_u,
+        // TODO:
+        Some(&v_msg_1.c_u),
         v_x_v.as_bytes(),
         v_c_v,
     )
@@ -156,7 +157,8 @@ fn main() {
     // Compute TH_2
     let u_th_2 = edhoc::compute_th_2(
         &u_msg_1_seq,
-        &u_msg_1.c_u,
+        // TODO:
+        Some(&u_msg_1.c_u),
         &u_msg_2.x_v,
         &u_msg_2.c_v,
     )
@@ -212,7 +214,8 @@ fn main() {
     let u_cred_u = cose::serialize_cose_key(u_x_u.as_bytes(), u_kid).unwrap();
     // Compute TH_3
     let u_th_3 =
-        edhoc::compute_th_3(&u_th_2, &u_msg_2.ciphertext, &u_msg_2.c_v)
+        // TODO:
+        edhoc::compute_th_3(&u_th_2, &u_msg_2.ciphertext, Some(&u_msg_2.c_v))
             .unwrap();
     // Sign it
     let u_sig = cose::sign(&u_id_cred_u, &u_th_3, &u_cred_u, &u_auth).unwrap();
@@ -285,7 +288,8 @@ fn main() {
 
     // Compute TH_3
     let v_th_3 =
-        edhoc::compute_th_3(&v_th_2, &v_msg_2.ciphertext, &v_msg_2.c_v)
+        // TODO:
+        edhoc::compute_th_3(&v_th_2, &v_msg_2.ciphertext, Some(&v_msg_2.c_v))
             .unwrap();
 
     // Derive K_3
