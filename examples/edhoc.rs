@@ -37,7 +37,8 @@ fn main() {
     let u_kid = b"alice@example.org";
 
     let msg1_sender = Msg1Sender::new(u_c_u, u_priv, u_auth, u_kid);
-    let (mut msg1_bytes, msg2_receiver) = msg1_sender.generate_message_1(1);
+    let (mut msg1_bytes, msg2_receiver) =
+        msg1_sender.generate_message_1(1).unwrap();
 
     // Party V ----------------------------------------------------------------
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)
@@ -62,21 +63,22 @@ fn main() {
     let v_kid = b"bob@example.org";
 
     let msg1_receiver = Msg1Receiver::new(v_c_v, v_priv, v_auth, v_kid);
-    let msg2_sender = msg1_receiver.handle_message_1(&mut msg1_bytes);
-    let (mut msg2_bytes, msg3_receiver) = msg2_sender.generate_message_2();
+    let msg2_sender = msg1_receiver.handle_message_1(&mut msg1_bytes).unwrap();
+    let (mut msg2_bytes, msg3_receiver) =
+        msg2_sender.generate_message_2().unwrap();
 
     // Party U ----------------------------------------------------------------
     let (v_kid, msg2_verifier) =
-        msg2_receiver.extract_peer_kid(&mut msg2_bytes);
-    let msg3_sender = msg2_verifier.verify_message_2(&v_public);
+        msg2_receiver.extract_peer_kid(&mut msg2_bytes).unwrap();
+    let msg3_sender = msg2_verifier.verify_message_2(&v_public).unwrap();
     let (mut msg3_bytes, u_master_secret, u_master_salt) =
-        msg3_sender.generate_message_3();
+        msg3_sender.generate_message_3().unwrap();
 
     // Party V ----------------------------------------------------------------
     let (u_kid, msg3_verifier) =
-        msg3_receiver.extract_peer_kid(&mut msg3_bytes);
+        msg3_receiver.extract_peer_kid(&mut msg3_bytes).unwrap();
     let (v_master_secret, v_master_salt) =
-        msg3_verifier.verify_message_3(&u_public);
+        msg3_verifier.verify_message_3(&u_public).unwrap();
 
     // Party U ----------------------------------------------------------------
     // It's possible that Party V failed verification of message_3, in which
