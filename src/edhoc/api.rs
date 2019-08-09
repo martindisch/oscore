@@ -58,24 +58,24 @@ impl Msg1Sender {
         (
             msg_1_bytes,
             Msg2Receiver {
-                msg_1_seq,
                 secret: self.secret,
                 x_u: self.x_u,
-                msg_1,
                 auth: self.auth,
                 kid: self.kid,
+                msg_1_seq,
+                msg_1,
             },
         )
     }
 }
 
 pub struct Msg2Receiver {
-    msg_1_seq: Vec<u8>,
     secret: StaticSecret,
     x_u: PublicKey,
-    msg_1: Message1,
     auth: [u8; 64],
     kid: Vec<u8>,
+    msg_1_seq: Vec<u8>,
+    msg_1: Message1,
 }
 
 impl Msg2Receiver {
@@ -135,30 +135,30 @@ impl Msg2Receiver {
         (
             v_kid_cpy,
             Msg2Verifier {
-                th_2,
-                x_u: self.x_u,
-                msg_1: self.msg_1,
-                msg_2,
                 shared_secret,
+                x_u: self.x_u,
                 auth: self.auth,
                 kid: self.kid,
-                v_sig,
+                msg_1: self.msg_1,
+                msg_2,
+                th_2,
                 v_kid,
+                v_sig,
             },
         )
     }
 }
 
 pub struct Msg2Verifier {
-    th_2: Vec<u8>,
-    x_u: PublicKey,
-    msg_1: Message1,
-    msg_2: Message2,
     shared_secret: SharedSecret,
+    x_u: PublicKey,
     auth: [u8; 64],
     kid: Vec<u8>,
-    v_sig: Vec<u8>,
+    msg_1: Message1,
+    msg_2: Message2,
+    th_2: Vec<u8>,
     v_kid: Vec<u8>,
+    v_sig: Vec<u8>,
 }
 
 impl Msg2Verifier {
@@ -174,25 +174,25 @@ impl Msg2Verifier {
             .unwrap();
 
         Msg3Sender {
-            th_2: self.th_2,
-            x_u: self.x_u,
-            msg_1: self.msg_1,
-            msg_2: self.msg_2,
             shared_secret: self.shared_secret,
+            x_u: self.x_u,
             auth: self.auth,
             kid: self.kid,
+            msg_1: self.msg_1,
+            msg_2: self.msg_2,
+            th_2: self.th_2,
         }
     }
 }
 
 pub struct Msg3Sender {
-    th_2: Vec<u8>,
-    x_u: PublicKey,
-    msg_1: Message1,
-    msg_2: Message2,
     shared_secret: SharedSecret,
+    x_u: PublicKey,
     auth: [u8; 64],
     kid: Vec<u8>,
+    msg_1: Message1,
+    msg_2: Message2,
+    th_2: Vec<u8>,
 }
 
 impl Msg3Sender {
@@ -319,25 +319,25 @@ impl Msg1Receiver {
         let shared_secret = self.secret.diffie_hellman(&u_public);
 
         Msg2Sender {
-            msg_1,
-            x_v: self.x_v,
-            msg_1_seq: msg_1_seq.into_vec(),
-            shared_secret,
             c_v: self.c_v,
+            shared_secret,
+            x_v: self.x_v,
             auth: self.auth,
             kid: self.kid,
+            msg_1_seq: msg_1_seq.into_vec(),
+            msg_1,
         }
     }
 }
 
 pub struct Msg2Sender {
-    msg_1: Message1,
-    x_v: PublicKey,
     c_v: Vec<u8>,
-    msg_1_seq: Vec<u8>,
     shared_secret: SharedSecret,
+    x_v: PublicKey,
     auth: [u8; 64],
     kid: Vec<u8>,
+    msg_1_seq: Vec<u8>,
+    msg_1: Message1,
 }
 
 impl Msg2Sender {
@@ -405,20 +405,20 @@ impl Msg2Sender {
         (
             msg_2_bytes,
             Msg3Receiver {
-                th_2,
+                shared_secret: self.shared_secret,
                 msg_1: self.msg_1,
                 msg_2,
-                shared_secret: self.shared_secret,
+                th_2,
             },
         )
     }
 }
 
 pub struct Msg3Receiver {
-    th_2: Vec<u8>,
+    shared_secret: SharedSecret,
     msg_1: Message1,
     msg_2: Message2,
-    shared_secret: SharedSecret,
+    th_2: Vec<u8>,
 }
 
 impl Msg3Receiver {
@@ -471,24 +471,24 @@ impl Msg3Receiver {
         (
             u_kid_cpy,
             Msg3Verifier {
-                msg_1: self.msg_1,
                 shared_secret: self.shared_secret,
-                u_sig,
-                u_kid,
-                th_3,
+                msg_1: self.msg_1,
                 msg_3,
+                th_3,
+                u_kid,
+                u_sig,
             },
         )
     }
 }
 
 pub struct Msg3Verifier {
-    msg_1: Message1,
     shared_secret: SharedSecret,
-    u_sig: Vec<u8>,
-    u_kid: Vec<u8>,
-    th_3: Vec<u8>,
+    msg_1: Message1,
     msg_3: Message3,
+    th_3: Vec<u8>,
+    u_kid: Vec<u8>,
+    u_sig: Vec<u8>,
 }
 
 impl Msg3Verifier {
