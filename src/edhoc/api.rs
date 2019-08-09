@@ -13,10 +13,17 @@ pub struct Msg1Sender {
     u_c_u: Vec<u8>,
     u_secret: StaticSecret,
     u_x_u: PublicKey,
+    auth: [u8; 64],
+    kid: Vec<u8>,
 }
 
 impl Msg1Sender {
-    pub fn new(c_u: &[u8], ecdh_secret: [u8; 32]) -> Msg1Sender {
+    pub fn new(
+        c_u: &[u8],
+        ecdh_secret: [u8; 32],
+        auth: [u8; 64],
+        kid: &[u8],
+    ) -> Msg1Sender {
         // The corresponding DH secret
         let u_secret = StaticSecret::from(ecdh_secret);
         // The corresponding public key
@@ -26,6 +33,8 @@ impl Msg1Sender {
             u_c_u: c_u.to_vec(),
             u_secret,
             u_x_u,
+            auth,
+            kid: kid.to_vec(),
         }
     }
 
@@ -51,6 +60,8 @@ impl Msg1Sender {
                 u_secret: self.u_secret,
                 u_x_u: self.u_x_u,
                 u_msg_1,
+                auth: self.auth,
+                kid: self.kid,
             },
         )
     }
@@ -60,10 +71,17 @@ pub struct Msg1Receiver {
     v_c_v: Vec<u8>,
     v_secret: StaticSecret,
     v_x_v: PublicKey,
+    auth: [u8; 64],
+    kid: Vec<u8>,
 }
 
 impl Msg1Receiver {
-    pub fn new(c_v: &[u8], ecdh_secret: [u8; 32]) -> Msg1Receiver {
+    pub fn new(
+        c_v: &[u8],
+        ecdh_secret: [u8; 32],
+        auth: [u8; 64],
+        kid: &[u8],
+    ) -> Msg1Receiver {
         // The corresponding DH secret
         let v_secret = StaticSecret::from(ecdh_secret);
         // The corresponding public key
@@ -73,6 +91,8 @@ impl Msg1Receiver {
             v_c_v: c_v.to_vec(),
             v_secret,
             v_x_v,
+            auth,
+            kid: kid.to_vec(),
         }
     }
 
@@ -97,6 +117,8 @@ impl Msg1Receiver {
             v_msg_1_seq: v_msg_1_seq.into_vec(),
             v_shared_secret,
             v_c_v: self.v_c_v,
+            auth: self.auth,
+            kid: self.kid,
         }
     }
 }
@@ -107,22 +129,12 @@ pub struct Msg2Sender {
     v_c_v: Vec<u8>,
     v_msg_1_seq: Vec<u8>,
     v_shared_secret: SharedSecret,
+    auth: [u8; 64],
+    kid: Vec<u8>,
 }
 
 impl Msg2Sender {
     pub fn generate_message_2(self) -> (Vec<u8>, Msg3Receiver) {
-        // This is the keypair used to authenticate.
-        // U must have the public key.
-        let v_auth = [
-            0xBB, 0x5A, 0x16, 0x81, 0xBB, 0x9B, 0xC3, 0x12, 0x67, 0x8F, 0x53,
-            0xD3, 0x14, 0x7F, 0xFF, 0x83, 0xF9, 0x56, 0xDB, 0x1F, 0xC6, 0xF4,
-            0x35, 0xA8, 0xDF, 0xB6, 0xB1, 0x0A, 0xA7, 0x1E, 0xFA, 0x1C, 0x88,
-            0x3D, 0x9F, 0x20, 0xAF, 0x73, 0xF7, 0x8E, 0xD2, 0x94, 0x78, 0xE4,
-            0x16, 0x51, 0x4B, 0x88, 0x57, 0x19, 0x64, 0x3B, 0x63, 0xC5, 0x81,
-            0xFD, 0x8B, 0x57, 0xDD, 0x3A, 0xC8, 0x01, 0x1A, 0xC6,
-        ];
-        let v_kid = b"bob@example.org";
-
         // Determine whether to include c_u in message_2 or not
         let v_c_u =
             if self.v_msg_1.r#type % 4 == 1 || self.v_msg_1.r#type % 4 == 3 {
@@ -132,10 +144,11 @@ impl Msg2Sender {
             };
 
         // Build the COSE header map identifying the public authentication key
-        let v_id_cred_v = cose::build_id_cred_x(v_kid).unwrap();
+        let v_id_cred_v = cose::build_id_cred_x(&self.kid).unwrap();
         // Build the COSE_Key containing our ECDH public key
         let v_cred_v =
-            cose::serialize_cose_key(self.v_x_v.as_bytes(), v_kid).unwrap();
+            cose::serialize_cose_key(self.v_x_v.as_bytes(), &self.kid)
+                .unwrap();
         // Compute TH_2
         let v_th_2 = util::compute_th_2(
             &self.v_msg_1_seq,
@@ -146,7 +159,7 @@ impl Msg2Sender {
         .unwrap();
         // Sign it
         let v_sig =
-            cose::sign(&v_id_cred_v, &v_th_2, &v_cred_v, &v_auth).unwrap();
+            cose::sign(&v_id_cred_v, &v_th_2, &v_cred_v, &self.auth).unwrap();
 
         // Derive K_2
         let v_k_2 = util::edhoc_key_derivation(
@@ -166,7 +179,7 @@ impl Msg2Sender {
         .unwrap();
 
         // Put together the plaintext for the encryption
-        let v_plaintext = util::build_plaintext(v_kid, &v_sig).unwrap();
+        let v_plaintext = util::build_plaintext(&self.kid, &v_sig).unwrap();
         // Compute the associated data
         let v_ad = cose::build_ad(&v_th_2).unwrap();
         // Get the ciphertext
@@ -202,6 +215,8 @@ pub struct Msg2Receiver {
     u_secret: StaticSecret,
     u_x_u: PublicKey,
     u_msg_1: Message1,
+    auth: [u8; 64],
+    kid: Vec<u8>,
 }
 
 impl Msg2Receiver {
@@ -275,6 +290,8 @@ impl Msg2Receiver {
             u_msg_1: self.u_msg_1,
             u_msg_2,
             u_shared_secret,
+            auth: self.auth,
+            kid: self.kid,
         }
     }
 }
@@ -285,20 +302,12 @@ pub struct Msg3Sender {
     u_msg_1: Message1,
     u_msg_2: Message2,
     u_shared_secret: SharedSecret,
+    auth: [u8; 64],
+    kid: Vec<u8>,
 }
 
 impl Msg3Sender {
     pub fn generate_message_3(&self) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
-        let u_auth = [
-            0x76, 0x9E, 0x0B, 0xE0, 0xF4, 0x30, 0x9A, 0x6D, 0x6D, 0x6E, 0xC7,
-            0x8D, 0x61, 0xE0, 0xFB, 0xCF, 0x48, 0x3C, 0x8D, 0xE4, 0x2C, 0x39,
-            0x30, 0xD0, 0x4A, 0x4B, 0xA9, 0x17, 0x8F, 0x6C, 0xA7, 0x0F, 0xB3,
-            0x94, 0x7F, 0x71, 0xA5, 0xCC, 0xA4, 0xF1, 0xD2, 0xA3, 0x42, 0xAE,
-            0x62, 0x24, 0x17, 0x5E, 0x83, 0x77, 0x49, 0x34, 0x7E, 0x54, 0x21,
-            0x8C, 0x35, 0xED, 0x0C, 0xC8, 0x0A, 0x26, 0x69, 0x79,
-        ];
-        let u_kid = b"alice@example.org";
-
         // Determine whether to include c_v in message_3 or not
         let u_c_v =
             if self.u_msg_1.r#type % 4 == 2 || self.u_msg_1.r#type % 4 == 3 {
@@ -308,10 +317,11 @@ impl Msg3Sender {
             };
 
         // Build the COSE header map identifying the public authentication key
-        let u_id_cred_u = cose::build_id_cred_x(u_kid).unwrap();
+        let u_id_cred_u = cose::build_id_cred_x(&self.kid).unwrap();
         // Build the COSE_Key containing our ECDH public key
         let u_cred_u =
-            cose::serialize_cose_key(self.u_x_u.as_bytes(), u_kid).unwrap();
+            cose::serialize_cose_key(self.u_x_u.as_bytes(), &self.kid)
+                .unwrap();
         // Compute TH_3
         let u_th_3 = util::compute_th_3(
             &self.u_th_2,
@@ -321,7 +331,7 @@ impl Msg3Sender {
         .unwrap();
         // Sign it
         let u_sig =
-            cose::sign(&u_id_cred_u, &u_th_3, &u_cred_u, &u_auth).unwrap();
+            cose::sign(&u_id_cred_u, &u_th_3, &u_cred_u, &self.auth).unwrap();
 
         // Derive K_3
         let u_k_3 = util::edhoc_key_derivation(
@@ -341,7 +351,7 @@ impl Msg3Sender {
         .unwrap();
 
         // Put together the plaintext for the encryption
-        let u_plaintext = util::build_plaintext(u_kid, &u_sig).unwrap();
+        let u_plaintext = util::build_plaintext(&self.kid, &u_sig).unwrap();
         // Compute the associated data
         let u_ad = cose::build_ad(&u_th_3).unwrap();
         // Get the ciphertext
