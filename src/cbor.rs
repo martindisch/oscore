@@ -76,6 +76,7 @@ fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>> {
     let writer = serializer.into_inner();
 
     // Return the bytes from the offset the caller requested
+    // TODO: There should be a way to move a range out of the vector
     Ok(writer.as_slice()[offset..].to_vec())
 }
 

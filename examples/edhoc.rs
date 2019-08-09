@@ -39,7 +39,7 @@ fn main() {
     let msg1_sender = Msg1Sender::new(u_c_u, u_priv, u_auth, u_kid);
     // type = 1 would be the case in CoAP, where party U can correlate
     // message_1 and message_2 with the token
-    let (mut msg1_bytes, msg2_receiver) =
+    let (msg1_bytes, msg2_receiver) =
         msg1_sender.generate_message_1(1).unwrap();
 
     // Party V ----------------------------------------------------------------

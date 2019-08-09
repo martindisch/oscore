@@ -118,13 +118,12 @@ pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Returns the `COSE_Key` structure deserialized from the given bytes.
-pub fn deserialize_cose_key(bytes: &[u8]) -> Result<CoseKey> {
+pub fn deserialize_cose_key(mut bytes: Vec<u8>) -> Result<CoseKey> {
     // Turn the CBOR map into an array that we can deserialize
-    let mut owned_bytes = bytes.to_vec();
-    cbor::map_to_array(&mut owned_bytes)?;
+    cbor::map_to_array(&mut bytes)?;
     // Try to deserialize into our raw format
     let raw_key: (isize, usize, isize, ByteBuf, isize, usize, isize, ByteBuf) =
-        cbor::decode(&mut owned_bytes)?;
+        cbor::decode(&mut bytes)?;
 
     // On success, just move the items into the "nice" key structure
     Ok(CoseKey {
@@ -150,12 +149,11 @@ pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Returns the `kid` from the COSE header map.
-pub fn get_kid(id_cred_x: &[u8]) -> Result<Vec<u8>> {
+pub fn get_kid(mut id_cred_x: Vec<u8>) -> Result<Vec<u8>> {
     // Turn the CBOR map into an array that we can deserialize
-    let mut owned_bytes = id_cred_x.to_vec();
-    cbor::map_to_array(&mut owned_bytes)?;
+    cbor::map_to_array(&mut id_cred_x)?;
     // Try to deserialize into our raw format
-    let id_cred_x: (usize, ByteBuf) = cbor::decode(&mut owned_bytes)?;
+    let id_cred_x: (usize, ByteBuf) = cbor::decode(&mut id_cred_x)?;
 
     Ok(id_cred_x.1.into_vec())
 }
@@ -280,9 +278,9 @@ mod tests {
             kty: KTY,
             kid: KID.to_vec(),
         };
-        let mut bytes = KEY_BYTES.to_vec();
+        let bytes = KEY_BYTES.to_vec();
 
-        assert_eq!(key, deserialize_cose_key(&mut bytes).unwrap());
+        assert_eq!(key, deserialize_cose_key(bytes).unwrap());
     }
 
     static KID_2: [u8; 2] = [0x00, 0x01];
@@ -296,7 +294,7 @@ mod tests {
 
     #[test]
     fn decode_id_cred_x() {
-        let kid = get_kid(&ID_CRED_X_2).unwrap();
+        let kid = get_kid(ID_CRED_X_2.to_vec()).unwrap();
         assert_eq!(&KID_2[..], &kid[..]);
     }
 

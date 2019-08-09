@@ -99,7 +99,7 @@ impl Msg2Receiver {
 
         // Compute TH_2
         let th_2 = util::compute_th_2(
-            &self.msg_1_seq,
+            self.msg_1_seq,
             as_deref(&msg_2.c_u),
             &msg_2.x_v,
             &msg_2.c_v,
@@ -123,10 +123,9 @@ impl Msg2Receiver {
         // Compute the associated data
         let ad = cose::build_ad(&th_2)?;
         // Decrypt and verify the ciphertext
-        let mut plaintext =
-            util::aead_open(&k_2, &iv_2, &msg_2.ciphertext, &ad)?;
+        let plaintext = util::aead_open(&k_2, &iv_2, &msg_2.ciphertext, &ad)?;
         // Fetch the contents of the plaintext
-        let (v_kid, v_sig) = util::extract_plaintext(&mut plaintext)?;
+        let (v_kid, v_sig) = util::extract_plaintext(plaintext)?;
         // Copy this, since we need to return one and keep one
         let v_kid_cpy = v_kid.clone();
 
@@ -345,7 +344,7 @@ impl Msg2Sender {
         let cred_v = cose::serialize_cose_key(self.x_v.as_bytes(), &self.kid)?;
         // Compute TH_2
         let th_2 = util::compute_th_2(
-            &self.msg_1_seq,
+            self.msg_1_seq,
             as_deref(&c_u),
             self.x_v.as_bytes(),
             &self.c_v,
@@ -443,10 +442,9 @@ impl Msg3Receiver {
         // Compute the associated data
         let ad = cose::build_ad(&th_3)?;
         // Decrypt and verify the ciphertext
-        let mut plaintext =
-            util::aead_open(&k_3, &iv_3, &msg_3.ciphertext, &ad)?;
+        let plaintext = util::aead_open(&k_3, &iv_3, &msg_3.ciphertext, &ad)?;
         // Fetch the contents of the plaintext
-        let (u_kid, u_sig) = util::extract_plaintext(&mut plaintext)?;
+        let (u_kid, u_sig) = util::extract_plaintext(plaintext)?;
         // Copy this, since we need to return one and keep one
         let u_kid_cpy = u_kid.clone();
 

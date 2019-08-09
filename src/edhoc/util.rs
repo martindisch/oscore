@@ -235,7 +235,7 @@ pub fn edhoc_exporter(
 
 /// Calculates the transcript hash of the second message.
 pub fn compute_th_2(
-    message_1: &[u8],
+    message_1: Vec<u8>,
     c_u: Option<&[u8]>,
     x_v: &[u8],
     c_v: &[u8],
@@ -253,8 +253,7 @@ pub fn compute_th_2(
         cbor::encode_sequence((Bytes::new(x_v), Bytes::new(c_v)))?
     };
     // Start the sequence we'll use from message_1, which is already a sequence
-    // of CBOR items
-    let mut seq = message_1.to_vec();
+    let mut seq = message_1;
     // Concatenate it with the sequence we just created
     seq.extend(data_2);
     // Wrap the new sequence in a bstr to get the input to h()
@@ -324,9 +323,11 @@ pub fn build_plaintext(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
 
 /// Extracts and returns the `kid` and signature from the plaintext of
 /// message_i.
-pub fn extract_plaintext(plaintext: &mut [u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+pub fn extract_plaintext(
+    mut plaintext: Vec<u8>,
+) -> Result<(Vec<u8>, Vec<u8>)> {
     // Unwrap the CBOR sequence from the bstr
-    let seq: ByteBuf = cbor::decode(plaintext)?;
+    let seq: ByteBuf = cbor::decode(&mut plaintext)?;
     // Extract the kid and signature from the contained sequence
     let mut temp = Vec::with_capacity(seq.len() + 1);
     let (kid, sig): (ByteBuf, ByteBuf) =
@@ -677,13 +678,17 @@ mod tests {
 
     #[test]
     fn th_2() {
-        let t_h =
-            compute_th_2(&TH_2_MSG1, Some(&TH_2_C_U), &TH_2_X_V, &TH_2_C_V)
-                .unwrap();
+        let t_h = compute_th_2(
+            TH_2_MSG1.to_vec(),
+            Some(&TH_2_C_U),
+            &TH_2_X_V,
+            &TH_2_C_V,
+        )
+        .unwrap();
         assert_eq!(h(&TH_2_INPUT).unwrap(), t_h);
 
-        let t_h =
-            compute_th_2(&TH_2_MSG1, None, &TH_2_X_V, &TH_2_C_V).unwrap();
+        let t_h = compute_th_2(TH_2_MSG1.to_vec(), None, &TH_2_X_V, &TH_2_C_V)
+            .unwrap();
         assert_eq!(h(&TH_2_INPUT_SHORTER).unwrap(), t_h);
     }
 
@@ -724,11 +729,11 @@ mod tests {
 
     #[test]
     fn plaintext() {
-        let mut plaintext =
+        let plaintext =
             build_plaintext(&PLAINTEXT_KID, &PLAINTEXT_SIG).unwrap();
         assert_eq!(&PLAINTEXT_2[..], &plaintext[..]);
 
-        let (kid, sig) = extract_plaintext(&mut plaintext).unwrap();
+        let (kid, sig) = extract_plaintext(plaintext).unwrap();
         assert_eq!(&PLAINTEXT_KID[..], &kid[..]);
         assert_eq!(&PLAINTEXT_SIG[..], &sig[..]);
     }
