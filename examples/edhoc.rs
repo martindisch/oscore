@@ -37,7 +37,7 @@ fn main() {
     let u_kid = b"alice@example.org";
 
     let msg1_sender = Msg1Sender::new(u_c_u, u_priv, u_auth, u_kid);
-    let (mut msg1_bytes, msg2_receiver) = msg1_sender.generate_message_1();
+    let (mut msg1_bytes, msg2_receiver) = msg1_sender.generate_message_1(1);
 
     // Party V ----------------------------------------------------------------
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)

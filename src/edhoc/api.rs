@@ -38,12 +38,12 @@ impl Msg1Sender {
         }
     }
 
-    pub fn generate_message_1(self) -> (Vec<u8>, Msg2Receiver) {
+    pub fn generate_message_1(self, r#type: isize) -> (Vec<u8>, Msg2Receiver) {
         // Encode the necessary information into the first message
         let msg_1 = Message1 {
             // This would be the case in CoAP, where party U can correlate
             // message_1 and message_2 with the token
-            r#type: 1,
+            r#type,
             suite: 0,
             x_u: self.x_u.as_bytes().to_vec(),
             c_u: self.c_u,
