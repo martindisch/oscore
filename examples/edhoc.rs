@@ -23,7 +23,7 @@ fn main() {
         170, 82, 95, 72, 77, 44, 124, 143, 102, 139, 156, 120, 63, 2, 27, 70,
     ];
     // Choose a connection identifier
-    let u_c_u = b"Party U";
+    let u_c_u = b"Party U".to_vec();
     // This is the keypair used to authenticate.
     // V must have the public key.
     let u_auth = [
@@ -34,9 +34,11 @@ fn main() {
         0x62, 0x24, 0x17, 0x5E, 0x83, 0x77, 0x49, 0x34, 0x7E, 0x54, 0x21,
         0x8C, 0x35, 0xED, 0x0C, 0xC8, 0x0A, 0x26, 0x69, 0x79,
     ];
-    let u_kid = b"alice@example.org";
+    let u_kid = b"alice@example.org".to_vec();
 
     let msg1_sender = Msg1Sender::new(u_c_u, u_priv, u_auth, u_kid);
+    // type = 1 would be the case in CoAP, where party U can correlate
+    // message_1 and message_2 with the token
     let (mut msg1_bytes, msg2_receiver) =
         msg1_sender.generate_message_1(1).unwrap();
 
@@ -49,7 +51,7 @@ fn main() {
         154, 93,
     ];
     // Choose a connection identifier
-    let v_c_v = b"Party V";
+    let v_c_v = b"Party V".to_vec();
     // This is the keypair used to authenticate.
     // U must have the public key.
     let v_auth = [
@@ -60,23 +62,23 @@ fn main() {
         0x16, 0x51, 0x4B, 0x88, 0x57, 0x19, 0x64, 0x3B, 0x63, 0xC5, 0x81,
         0xFD, 0x8B, 0x57, 0xDD, 0x3A, 0xC8, 0x01, 0x1A, 0xC6,
     ];
-    let v_kid = b"bob@example.org";
+    let v_kid = b"bob@example.org".to_vec();
 
     let msg1_receiver = Msg1Receiver::new(v_c_v, v_priv, v_auth, v_kid);
-    let msg2_sender = msg1_receiver.handle_message_1(&mut msg1_bytes).unwrap();
-    let (mut msg2_bytes, msg3_receiver) =
+    let msg2_sender = msg1_receiver.handle_message_1(msg1_bytes).unwrap();
+    let (msg2_bytes, msg3_receiver) =
         msg2_sender.generate_message_2().unwrap();
 
     // Party U ----------------------------------------------------------------
     let (v_kid, msg2_verifier) =
-        msg2_receiver.extract_peer_kid(&mut msg2_bytes).unwrap();
+        msg2_receiver.extract_peer_kid(msg2_bytes).unwrap();
     let msg3_sender = msg2_verifier.verify_message_2(&v_public).unwrap();
-    let (mut msg3_bytes, u_master_secret, u_master_salt) =
+    let (msg3_bytes, u_master_secret, u_master_salt) =
         msg3_sender.generate_message_3().unwrap();
 
     // Party V ----------------------------------------------------------------
     let (u_kid, msg3_verifier) =
-        msg3_receiver.extract_peer_kid(&mut msg3_bytes).unwrap();
+        msg3_receiver.extract_peer_kid(msg3_bytes).unwrap();
     let (v_master_secret, v_master_salt) =
         msg3_verifier.verify_message_3(&u_public).unwrap();
 

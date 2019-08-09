@@ -21,22 +21,22 @@ pub struct Msg1Sender {
 
 impl Msg1Sender {
     pub fn new(
-        c_u: &[u8],
+        c_u: Vec<u8>,
         ecdh_secret: [u8; 32],
         auth: [u8; 64],
-        kid: &[u8],
+        kid: Vec<u8>,
     ) -> Msg1Sender {
-        // The corresponding DH secret
+        // From the secret bytes, create the DH secret
         let secret = StaticSecret::from(ecdh_secret);
-        // The corresponding public key
+        // and from that build the corresponding public key
         let x_u = PublicKey::from(&secret);
 
         Msg1Sender {
-            c_u: c_u.to_vec(),
+            c_u,
             secret,
             x_u,
             auth,
-            kid: kid.to_vec(),
+            kid,
         }
     }
 
@@ -46,8 +46,6 @@ impl Msg1Sender {
     ) -> Result<(Vec<u8>, Msg2Receiver)> {
         // Encode the necessary information into the first message
         let msg_1 = Message1 {
-            // This would be the case in CoAP, where party U can correlate
-            // message_1 and message_2 with the token
             r#type,
             suite: 0,
             x_u: self.x_u.as_bytes().to_vec(),
@@ -84,10 +82,10 @@ pub struct Msg2Receiver {
 impl Msg2Receiver {
     pub fn extract_peer_kid(
         self,
-        msg_2: &mut [u8],
+        mut msg_2: Vec<u8>,
     ) -> Result<(Vec<u8>, Msg2Verifier)> {
         // Unwrap sequence from bstr
-        let msg_2_seq: ByteBuf = cbor::decode(msg_2)?;
+        let msg_2_seq: ByteBuf = cbor::decode(&mut msg_2)?;
         // Check if we don't have an error message
         util::fail_on_error_message(&msg_2_seq)?;
         // Decode the second message
@@ -129,7 +127,7 @@ impl Msg2Receiver {
             util::aead_open(&k_2, &iv_2, &msg_2.ciphertext, &ad)?;
         // Fetch the contents of the plaintext
         let (v_kid, v_sig) = util::extract_plaintext(&mut plaintext)?;
-        // Copy to keep for yourself
+        // Copy this, since we need to return one and keep one
         let v_kid_cpy = v_kid.clone();
 
         Ok((
@@ -194,12 +192,12 @@ pub struct Msg3Sender {
 }
 
 impl Msg3Sender {
-    pub fn generate_message_3(&self) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+    pub fn generate_message_3(self) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
         // Determine whether to include c_v in message_3 or not
         let c_v = if self.msg_1.r#type % 4 == 2 || self.msg_1.r#type % 4 == 3 {
             None
         } else {
-            Some(self.msg_2.c_v.to_vec())
+            Some(self.msg_2.c_v)
         };
 
         // Build the COSE header map identifying the public authentication key
@@ -275,31 +273,32 @@ pub struct Msg1Receiver {
 
 impl Msg1Receiver {
     pub fn new(
-        c_v: &[u8],
+        c_v: Vec<u8>,
         ecdh_secret: [u8; 32],
         auth: [u8; 64],
-        kid: &[u8],
+        kid: Vec<u8>,
     ) -> Msg1Receiver {
-        // The corresponding DH secret
+        // From the secret bytes, create the DH secret
         let secret = StaticSecret::from(ecdh_secret);
-        // The corresponding public key
+        // and from that build the corresponding public key
         let x_v = PublicKey::from(&secret);
 
         Msg1Receiver {
-            c_v: c_v.to_vec(),
+            c_v,
             secret,
             x_v,
             auth,
-            kid: kid.to_vec(),
+            kid,
         }
     }
 
-    pub fn handle_message_1(self, msg_1: &mut [u8]) -> Result<Msg2Sender> {
+    pub fn handle_message_1(self, mut msg_1: Vec<u8>) -> Result<Msg2Sender> {
         // Unwrap sequence from bstr
-        let msg_1_seq: ByteBuf = cbor::decode(msg_1)?;
+        let msg_1_seq: ByteBuf = cbor::decode(&mut msg_1)?;
         // Decode the first message
         let msg_1 = util::deserialize_message_1(&msg_1_seq)?;
         // Verify that the selected suite is supported
+        // TODO: Return error instead of panicking
         if msg_1.suite != 0 {
             unimplemented!("Other cipher suites");
         }
@@ -380,7 +379,7 @@ impl Msg2Sender {
         let msg_2 = Message2 {
             c_u: c_u,
             x_v: self.x_v.as_bytes().to_vec(),
-            c_v: self.c_v.to_vec(),
+            c_v: self.c_v,
             ciphertext: ciphertext,
         };
         // Get CBOR sequence for message
@@ -410,10 +409,10 @@ pub struct Msg3Receiver {
 impl Msg3Receiver {
     pub fn extract_peer_kid(
         self,
-        msg_3: &mut [u8],
+        mut msg_3: Vec<u8>,
     ) -> Result<(Vec<u8>, Msg3Verifier)> {
         // Unwrap sequence from bstr
-        let msg_3_seq: ByteBuf = cbor::decode(msg_3)?;
+        let msg_3_seq: ByteBuf = cbor::decode(&mut msg_3)?;
         // Check if we don't have an error message
         util::fail_on_error_message(&msg_3_seq)?;
         // Decode the third message
@@ -448,7 +447,7 @@ impl Msg3Receiver {
             util::aead_open(&k_3, &iv_3, &msg_3.ciphertext, &ad)?;
         // Fetch the contents of the plaintext
         let (u_kid, u_sig) = util::extract_plaintext(&mut plaintext)?;
-        // Copy to keep for yourself
+        // Copy this, since we need to return one and keep one
         let u_kid_cpy = u_kid.clone();
 
         Ok((
