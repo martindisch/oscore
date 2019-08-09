@@ -9,6 +9,8 @@ use edhoc::{
     util::{Message1, Message2, Message3},
 };
 
+// Party U constructs ---------------------------------------------------------
+
 pub struct Msg1Sender {
     c_u: Vec<u8>,
     secret: StaticSecret,
@@ -62,146 +64,6 @@ impl Msg1Sender {
                 msg_1,
                 auth: self.auth,
                 kid: self.kid,
-            },
-        )
-    }
-}
-
-pub struct Msg1Receiver {
-    c_v: Vec<u8>,
-    secret: StaticSecret,
-    x_v: PublicKey,
-    auth: [u8; 64],
-    kid: Vec<u8>,
-}
-
-impl Msg1Receiver {
-    pub fn new(
-        c_v: &[u8],
-        ecdh_secret: [u8; 32],
-        auth: [u8; 64],
-        kid: &[u8],
-    ) -> Msg1Receiver {
-        // The corresponding DH secret
-        let secret = StaticSecret::from(ecdh_secret);
-        // The corresponding public key
-        let x_v = PublicKey::from(&secret);
-
-        Msg1Receiver {
-            c_v: c_v.to_vec(),
-            secret,
-            x_v,
-            auth,
-            kid: kid.to_vec(),
-        }
-    }
-
-    pub fn handle_message_1(self, msg_1: &mut [u8]) -> Msg2Sender {
-        // Unwrap sequence from bstr
-        let msg_1_seq: ByteBuf = cbor::decode(msg_1).unwrap();
-        // Decode the first message
-        let msg_1 = util::deserialize_message_1(&msg_1_seq).unwrap();
-        // Verify that the selected suite is supported
-        if msg_1.suite != 0 {
-            unimplemented!("Other cipher suites");
-        }
-        // Use U's public key to generate the ephemeral shared secret
-        let mut x_u_bytes = [0; 32];
-        x_u_bytes.copy_from_slice(&msg_1.x_u[..32]);
-        let u_public = x25519_dalek::PublicKey::from(x_u_bytes);
-        let shared_secret = self.secret.diffie_hellman(&u_public);
-
-        Msg2Sender {
-            msg_1,
-            x_v: self.x_v,
-            msg_1_seq: msg_1_seq.into_vec(),
-            shared_secret,
-            c_v: self.c_v,
-            auth: self.auth,
-            kid: self.kid,
-        }
-    }
-}
-
-pub struct Msg2Sender {
-    msg_1: Message1,
-    x_v: PublicKey,
-    c_v: Vec<u8>,
-    msg_1_seq: Vec<u8>,
-    shared_secret: SharedSecret,
-    auth: [u8; 64],
-    kid: Vec<u8>,
-}
-
-impl Msg2Sender {
-    pub fn generate_message_2(self) -> (Vec<u8>, Msg3Receiver) {
-        // Determine whether to include c_u in message_2 or not
-        let c_u = if self.msg_1.r#type % 4 == 1 || self.msg_1.r#type % 4 == 3 {
-            None
-        } else {
-            Some(self.msg_1.c_u.clone())
-        };
-
-        // Build the COSE header map identifying the public authentication key
-        let id_cred_v = cose::build_id_cred_x(&self.kid).unwrap();
-        // Build the COSE_Key containing our ECDH public key
-        let cred_v =
-            cose::serialize_cose_key(self.x_v.as_bytes(), &self.kid).unwrap();
-        // Compute TH_2
-        let th_2 = util::compute_th_2(
-            &self.msg_1_seq,
-            as_deref(&c_u),
-            self.x_v.as_bytes(),
-            &self.c_v,
-        )
-        .unwrap();
-        // Sign it
-        let sig = cose::sign(&id_cred_v, &th_2, &cred_v, &self.auth).unwrap();
-
-        // Derive K_2
-        let k_2 = util::edhoc_key_derivation(
-            &"ChaCha20/Poly1305",
-            256,
-            &th_2,
-            self.shared_secret.as_bytes(),
-        )
-        .unwrap();
-        // Derive IV_2
-        let iv_2 = util::edhoc_key_derivation(
-            &"IV-GENERATION",
-            96,
-            &th_2,
-            self.shared_secret.as_bytes(),
-        )
-        .unwrap();
-
-        // Put together the plaintext for the encryption
-        let plaintext = util::build_plaintext(&self.kid, &sig).unwrap();
-        // Compute the associated data
-        let ad = cose::build_ad(&th_2).unwrap();
-        // Get the ciphertext
-        let ciphertext =
-            util::aead_seal(&k_2, &iv_2, &plaintext, &ad).unwrap();
-
-        // Produce message_2
-        let msg_2 = Message2 {
-            c_u: c_u,
-            x_v: self.x_v.as_bytes().to_vec(),
-            c_v: self.c_v.to_vec(),
-            ciphertext: ciphertext,
-        };
-        // Get CBOR sequence for message
-        let msg_2_seq = util::serialize_message_2(&msg_2).unwrap();
-        // Wrap it in a bstr for transmission
-        let msg_2_bytes = cbor::encode(Bytes::new(&msg_2_seq)).unwrap();
-
-        (
-            msg_2_bytes,
-            Msg3Receiver {
-                th_2,
-                msg_1: self.msg_1,
-                msg_2,
-                shared_secret: self.shared_secret,
             },
         )
     }
@@ -410,6 +272,148 @@ impl Msg3Sender {
     }
 }
 
+// Party V constructs ---------------------------------------------------------
+
+pub struct Msg1Receiver {
+    c_v: Vec<u8>,
+    secret: StaticSecret,
+    x_v: PublicKey,
+    auth: [u8; 64],
+    kid: Vec<u8>,
+}
+
+impl Msg1Receiver {
+    pub fn new(
+        c_v: &[u8],
+        ecdh_secret: [u8; 32],
+        auth: [u8; 64],
+        kid: &[u8],
+    ) -> Msg1Receiver {
+        // The corresponding DH secret
+        let secret = StaticSecret::from(ecdh_secret);
+        // The corresponding public key
+        let x_v = PublicKey::from(&secret);
+
+        Msg1Receiver {
+            c_v: c_v.to_vec(),
+            secret,
+            x_v,
+            auth,
+            kid: kid.to_vec(),
+        }
+    }
+
+    pub fn handle_message_1(self, msg_1: &mut [u8]) -> Msg2Sender {
+        // Unwrap sequence from bstr
+        let msg_1_seq: ByteBuf = cbor::decode(msg_1).unwrap();
+        // Decode the first message
+        let msg_1 = util::deserialize_message_1(&msg_1_seq).unwrap();
+        // Verify that the selected suite is supported
+        if msg_1.suite != 0 {
+            unimplemented!("Other cipher suites");
+        }
+        // Use U's public key to generate the ephemeral shared secret
+        let mut x_u_bytes = [0; 32];
+        x_u_bytes.copy_from_slice(&msg_1.x_u[..32]);
+        let u_public = x25519_dalek::PublicKey::from(x_u_bytes);
+        let shared_secret = self.secret.diffie_hellman(&u_public);
+
+        Msg2Sender {
+            msg_1,
+            x_v: self.x_v,
+            msg_1_seq: msg_1_seq.into_vec(),
+            shared_secret,
+            c_v: self.c_v,
+            auth: self.auth,
+            kid: self.kid,
+        }
+    }
+}
+
+pub struct Msg2Sender {
+    msg_1: Message1,
+    x_v: PublicKey,
+    c_v: Vec<u8>,
+    msg_1_seq: Vec<u8>,
+    shared_secret: SharedSecret,
+    auth: [u8; 64],
+    kid: Vec<u8>,
+}
+
+impl Msg2Sender {
+    pub fn generate_message_2(self) -> (Vec<u8>, Msg3Receiver) {
+        // Determine whether to include c_u in message_2 or not
+        let c_u = if self.msg_1.r#type % 4 == 1 || self.msg_1.r#type % 4 == 3 {
+            None
+        } else {
+            Some(self.msg_1.c_u.clone())
+        };
+
+        // Build the COSE header map identifying the public authentication key
+        let id_cred_v = cose::build_id_cred_x(&self.kid).unwrap();
+        // Build the COSE_Key containing our ECDH public key
+        let cred_v =
+            cose::serialize_cose_key(self.x_v.as_bytes(), &self.kid).unwrap();
+        // Compute TH_2
+        let th_2 = util::compute_th_2(
+            &self.msg_1_seq,
+            as_deref(&c_u),
+            self.x_v.as_bytes(),
+            &self.c_v,
+        )
+        .unwrap();
+        // Sign it
+        let sig = cose::sign(&id_cred_v, &th_2, &cred_v, &self.auth).unwrap();
+
+        // Derive K_2
+        let k_2 = util::edhoc_key_derivation(
+            &"ChaCha20/Poly1305",
+            256,
+            &th_2,
+            self.shared_secret.as_bytes(),
+        )
+        .unwrap();
+        // Derive IV_2
+        let iv_2 = util::edhoc_key_derivation(
+            &"IV-GENERATION",
+            96,
+            &th_2,
+            self.shared_secret.as_bytes(),
+        )
+        .unwrap();
+
+        // Put together the plaintext for the encryption
+        let plaintext = util::build_plaintext(&self.kid, &sig).unwrap();
+        // Compute the associated data
+        let ad = cose::build_ad(&th_2).unwrap();
+        // Get the ciphertext
+        let ciphertext =
+            util::aead_seal(&k_2, &iv_2, &plaintext, &ad).unwrap();
+
+        // Produce message_2
+        let msg_2 = Message2 {
+            c_u: c_u,
+            x_v: self.x_v.as_bytes().to_vec(),
+            c_v: self.c_v.to_vec(),
+            ciphertext: ciphertext,
+        };
+        // Get CBOR sequence for message
+        let msg_2_seq = util::serialize_message_2(&msg_2).unwrap();
+        // Wrap it in a bstr for transmission
+        let msg_2_bytes = cbor::encode(Bytes::new(&msg_2_seq)).unwrap();
+
+        (
+            msg_2_bytes,
+            Msg3Receiver {
+                th_2,
+                msg_1: self.msg_1,
+                msg_2,
+                shared_secret: self.shared_secret,
+            },
+        )
+    }
+}
+
 pub struct Msg3Receiver {
     th_2: Vec<u8>,
     msg_1: Message1,
@@ -520,6 +524,8 @@ impl Msg3Verifier {
         (master_secret, master_salt)
     }
 }
+
+// Common functionality -------------------------------------------------------
 
 /// Converts from `&Option<T>` to `Option<&T::Target>`.
 ///
