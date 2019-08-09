@@ -220,11 +220,10 @@ pub struct Msg2Receiver {
 }
 
 impl Msg2Receiver {
-    pub fn handle_message_2(
+    pub fn extract_peer_kid(
         self,
         msg_2: &mut [u8],
-        v_public: [u8; 32],
-    ) -> Msg3Sender {
+    ) -> (Vec<u8>, Msg2Verifier) {
         // Unwrap sequence from bstr
         let u_msg_2_seq: ByteBuf = cbor::decode(msg_2).unwrap();
         // Check if we don't have an error message
@@ -273,23 +272,62 @@ impl Msg2Receiver {
         // Fetch the contents of the plaintext
         let (u_v_kid, u_v_sig) =
             util::extract_plaintext(&mut u_plaintext).unwrap();
+        // Copy to keep for yourself
+        let v_kid = u_v_kid.clone();
 
+        (
+            u_v_kid,
+            Msg2Verifier {
+                u_th_2,
+                u_x_u: self.u_x_u,
+                u_msg_1: self.u_msg_1,
+                u_msg_2,
+                u_shared_secret,
+                auth: self.auth,
+                kid: self.kid,
+                sig: u_v_sig,
+                v_kid,
+            },
+        )
+    }
+}
+
+pub struct Msg2Verifier {
+    u_th_2: Vec<u8>,
+    u_x_u: PublicKey,
+    u_msg_1: Message1,
+    u_msg_2: Message2,
+    u_shared_secret: SharedSecret,
+    auth: [u8; 64],
+    kid: Vec<u8>,
+    sig: Vec<u8>,
+    v_kid: Vec<u8>,
+}
+
+impl Msg2Verifier {
+    pub fn verify_message_2(self, v_public: &[u8]) -> Msg3Sender {
         // Build the COSE header map identifying the public authentication key
         // of V
-        let u_id_cred_v = cose::build_id_cred_x(&u_v_kid).unwrap();
+        let u_id_cred_v = cose::build_id_cred_x(&self.v_kid).unwrap();
         // Build the COSE_Key containing V's ECDH public key
         let u_cred_v =
-            cose::serialize_cose_key(&u_msg_2.x_v, &u_v_kid).unwrap();
+            cose::serialize_cose_key(&self.u_msg_2.x_v, &self.v_kid).unwrap();
         // Verify the signed data from Party V
-        cose::verify(&u_id_cred_v, &u_th_2, &u_cred_v, &v_public, &u_v_sig)
-            .unwrap();
+        cose::verify(
+            &u_id_cred_v,
+            &self.u_th_2,
+            &u_cred_v,
+            v_public,
+            &self.sig,
+        )
+        .unwrap();
 
         Msg3Sender {
-            u_th_2,
+            u_th_2: self.u_th_2,
             u_x_u: self.u_x_u,
             u_msg_1: self.u_msg_1,
-            u_msg_2,
-            u_shared_secret,
+            u_msg_2: self.u_msg_2,
+            u_shared_secret: self.u_shared_secret,
             auth: self.auth,
             kid: self.kid,
         }
@@ -397,11 +435,10 @@ pub struct Msg3Receiver {
 }
 
 impl Msg3Receiver {
-    pub fn handle_message_3(
-        &self,
+    pub fn extract_peer_kid(
+        self,
         msg_3: &mut [u8],
-        u_public: [u8; 32],
-    ) -> (Vec<u8>, Vec<u8>) {
+    ) -> (Vec<u8>, Msg3Verifier) {
         // Unwrap sequence from bstr
         let v_msg_3_seq: ByteBuf = cbor::decode(msg_3).unwrap();
         // Check if we don't have an error message
@@ -443,19 +480,58 @@ impl Msg3Receiver {
         // Fetch the contents of the plaintext
         let (v_u_kid, v_u_sig) =
             util::extract_plaintext(&mut v_plaintext).unwrap();
+        // Copy to keep for yourself
+        let u_kid = v_u_kid.clone();
 
+        (
+            v_u_kid,
+            Msg3Verifier {
+                v_th_2: self.v_th_2,
+                v_msg_1: self.v_msg_1,
+                v_msg_2: self.v_msg_2,
+                v_shared_secret: self.v_shared_secret,
+                sig: v_u_sig,
+                u_kid: u_kid,
+                v_th_3,
+                v_msg_3,
+            },
+        )
+    }
+}
+
+pub struct Msg3Verifier {
+    v_th_2: Vec<u8>,
+    v_msg_1: Message1,
+    v_msg_2: Message2,
+    v_shared_secret: SharedSecret,
+    sig: Vec<u8>,
+    u_kid: Vec<u8>,
+    v_th_3: Vec<u8>,
+    v_msg_3: Message3,
+}
+
+impl Msg3Verifier {
+    pub fn verify_message_3(self, u_public: &[u8]) -> (Vec<u8>, Vec<u8>) {
         // Build the COSE header map identifying the public authentication key
         // of U
-        let v_id_cred_u = cose::build_id_cred_x(&v_u_kid).unwrap();
+        let v_id_cred_u = cose::build_id_cred_x(&self.u_kid).unwrap();
         // Build the COSE_Key containing U's ECDH public key
         let v_cred_u =
-            cose::serialize_cose_key(&self.v_msg_1.x_u, &v_u_kid).unwrap();
+            cose::serialize_cose_key(&self.v_msg_1.x_u, &self.u_kid).unwrap();
         // Verify the signed data from Party U
-        cose::verify(&v_id_cred_u, &v_th_3, &v_cred_u, &u_public, &v_u_sig)
-            .unwrap();
+        cose::verify(
+            &v_id_cred_u,
+            &self.v_th_3,
+            &v_cred_u,
+            &u_public,
+            &self.sig,
+        )
+        .unwrap();
 
         // Derive values for the OSCORE context
-        let v_th_4 = util::compute_th_4(&v_th_3, &v_msg_3.ciphertext).unwrap();
+        let v_th_4 =
+            util::compute_th_4(&self.v_th_3, &self.v_msg_3.ciphertext)
+                .unwrap();
         let v_master_secret = util::edhoc_exporter(
             "OSCORE Master Secret",
             32,

@@ -66,14 +66,17 @@ fn main() {
     let (mut msg2_bytes, msg3_receiver) = msg2_sender.generate_message_2();
 
     // Party U ----------------------------------------------------------------
-    let msg3_sender =
-        msg2_receiver.handle_message_2(&mut msg2_bytes, v_public);
+    let (v_kid, msg2_verifier) =
+        msg2_receiver.extract_peer_kid(&mut msg2_bytes);
+    let msg3_sender = msg2_verifier.verify_message_2(&v_public);
     let (mut msg3_bytes, u_master_secret, u_master_salt) =
         msg3_sender.generate_message_3();
 
     // Party V ----------------------------------------------------------------
+    let (u_kid, msg3_verifier) =
+        msg3_receiver.extract_peer_kid(&mut msg3_bytes);
     let (v_master_secret, v_master_salt) =
-        msg3_receiver.handle_message_3(&mut msg3_bytes, u_public);
+        msg3_verifier.verify_message_3(&u_public);
 
     // Party U ----------------------------------------------------------------
     // It's possible that Party V failed verification of message_3, in which
