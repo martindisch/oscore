@@ -157,12 +157,19 @@ pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
 }
 
 /// Returns the bytes of an EDHOC error message with the given text.
-pub fn build_error_message(err_msg: &str) -> Result<Vec<u8>> {
+pub fn build_error_message(err_msg: &str) -> Vec<u8> {
     // Build a tuple for the sequence of items
     // (type, err_msg)
     let raw_msg = (-1, err_msg);
 
-    cbor::encode_sequence(raw_msg)
+    // Try to serialize the message. If we fail for some reason, return a
+    // valid, pregenerated error message saying as much.
+    cbor::encode_sequence(raw_msg).unwrap_or(vec![
+        0x20, 0x78, 0x22, 0x45, 0x72, 0x72, 0x6F, 0x72, 0x20, 0x77, 0x68,
+        0x69, 0x6C, 0x65, 0x20, 0x62, 0x75, 0x69, 0x6C, 0x64, 0x69, 0x6E,
+        0x67, 0x20, 0x65, 0x72, 0x72, 0x6F, 0x72, 0x20, 0x6D, 0x65, 0x73,
+        0x73, 0x61, 0x67, 0x65,
+    ])
 }
 
 /// Returns the extracted message from the EDHOC error message.
@@ -564,7 +571,7 @@ mod tests {
 
     #[test]
     fn build_err() {
-        let err_bytes = build_error_message(ERR_MSG).unwrap();
+        let err_bytes = build_error_message(ERR_MSG);
         assert_eq!(&ERR_MSG_BYTES, &err_bytes[..]);
     }
 
