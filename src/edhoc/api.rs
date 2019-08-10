@@ -2,11 +2,15 @@ use alloc::vec::Vec;
 use serde_bytes::{ByteBuf, Bytes};
 use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};
 
-use crate::{cbor, cose, edhoc, error::Error, Result};
-
-use edhoc::{
-    util,
-    util::{Message1, Message2, Message3},
+use crate::{
+    cbor, cose,
+    edhoc::{
+        util,
+        util::{Message1, Message2, Message3},
+        EdhocError, EdhocResult,
+    },
+    error::Error,
+    Result,
 };
 
 // Party U constructs ---------------------------------------------------------
@@ -81,6 +85,16 @@ pub struct Msg2Receiver {
 
 impl Msg2Receiver {
     pub fn extract_peer_kid(
+        self,
+        msg_2: Vec<u8>,
+    ) -> EdhocResult<(Vec<u8>, Msg2Verifier)> {
+        catch(
+            self.extract_peer_kid_internal(msg_2),
+            "Error processing message_2",
+        )
+    }
+
+    fn extract_peer_kid_internal(
         self,
         mut msg_2: Vec<u8>,
     ) -> Result<(Vec<u8>, Msg2Verifier)> {
@@ -159,7 +173,14 @@ pub struct Msg2Verifier {
 }
 
 impl Msg2Verifier {
-    pub fn verify_message_2(self, v_public: &[u8]) -> Result<Msg3Sender> {
+    pub fn verify_message_2(self, v_public: &[u8]) -> EdhocResult<Msg3Sender> {
+        catch(
+            self.verify_message_2_internal(v_public),
+            "Error verifying message_2",
+        )
+    }
+
+    fn verify_message_2_internal(self, v_public: &[u8]) -> Result<Msg3Sender> {
         // Build the COSE header map identifying the public authentication key
         // of V
         let id_cred_v = cose::build_id_cred_x(&self.v_kid)?;
@@ -191,7 +212,18 @@ pub struct Msg3Sender {
 }
 
 impl Msg3Sender {
-    pub fn generate_message_3(self) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+    pub fn generate_message_3(
+        self,
+    ) -> EdhocResult<(Vec<u8>, Vec<u8>, Vec<u8>)> {
+        catch(
+            self.generate_message_3_internal(),
+            "Error generating message_3",
+        )
+    }
+
+    fn generate_message_3_internal(
+        self,
+    ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>)> {
         // Determine whether to include c_v in message_3 or not
         let c_v = if self.msg_1.r#type % 4 == 2 || self.msg_1.r#type % 4 == 3 {
             None
@@ -291,7 +323,17 @@ impl Msg1Receiver {
         }
     }
 
-    pub fn handle_message_1(self, mut msg_1: Vec<u8>) -> Result<Msg2Sender> {
+    pub fn handle_message_1(self, msg_1: Vec<u8>) -> EdhocResult<Msg2Sender> {
+        catch(
+            self.handle_message_1_internal(msg_1),
+            "Error processing message_1",
+        )
+    }
+
+    fn handle_message_1_internal(
+        self,
+        mut msg_1: Vec<u8>,
+    ) -> Result<Msg2Sender> {
         // Unwrap sequence from bstr
         let msg_1_seq: ByteBuf = cbor::decode(&mut msg_1)?;
         // Decode the first message
@@ -329,7 +371,14 @@ pub struct Msg2Sender {
 }
 
 impl Msg2Sender {
-    pub fn generate_message_2(self) -> Result<(Vec<u8>, Msg3Receiver)> {
+    pub fn generate_message_2(self) -> EdhocResult<(Vec<u8>, Msg3Receiver)> {
+        catch(
+            self.generate_message_2_internal(),
+            "Error generating message_2",
+        )
+    }
+
+    fn generate_message_2_internal(self) -> Result<(Vec<u8>, Msg3Receiver)> {
         // Determine whether to include c_u in message_2 or not
         let c_u = if self.msg_1.r#type % 4 == 1 || self.msg_1.r#type % 4 == 3 {
             None
@@ -407,6 +456,16 @@ pub struct Msg3Receiver {
 impl Msg3Receiver {
     pub fn extract_peer_kid(
         self,
+        msg_3: Vec<u8>,
+    ) -> EdhocResult<(Vec<u8>, Msg3Verifier)> {
+        catch(
+            self.extract_peer_kid_internal(msg_3),
+            "Error processing message_3",
+        )
+    }
+
+    fn extract_peer_kid_internal(
+        self,
         mut msg_3: Vec<u8>,
     ) -> Result<(Vec<u8>, Msg3Verifier)> {
         // Unwrap sequence from bstr
@@ -474,6 +533,16 @@ impl Msg3Verifier {
     pub fn verify_message_3(
         self,
         u_public: &[u8],
+    ) -> EdhocResult<(Vec<u8>, Vec<u8>)> {
+        catch(
+            self.verify_message_3_internal(u_public),
+            "Error verifying message_3",
+        )
+    }
+
+    fn verify_message_3_internal(
+        self,
+        u_public: &[u8],
     ) -> Result<(Vec<u8>, Vec<u8>)> {
         // Build the COSE header map identifying the public authentication key
         // of U
@@ -503,6 +572,22 @@ impl Msg3Verifier {
 }
 
 // Common functionality -------------------------------------------------------
+
+/// If the given result is an `Err` variant, returns an `Err` either containing
+/// the received or the generated EDHOC error message.
+///
+/// The purpose of this is to enable easy throwing of EDHOC error messages on
+/// failure, without a lot of boilerplate code.
+fn catch<T>(res: Result<T>, msg: &str) -> EdhocResult<T> {
+    match res {
+        // When we received an EDHOC error message, repackage it
+        Err(Error::Edhoc(e)) => Err(EdhocError::ReceivedError(e)),
+        // For normal errors, just produce an EDHOC error message
+        Err(_) => Err(EdhocError::CausedError(util::build_error_message(msg))),
+        // If we're ok, "convert" to the desired result type
+        Ok(val) => Ok(val),
+    }
+}
 
 /// Converts from `&Option<T>` to `Option<&T::Target>`.
 ///
