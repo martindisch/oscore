@@ -3,8 +3,9 @@
 #[macro_use]
 extern crate alloc;
 
-pub mod cbor;
-pub mod cose;
+mod cbor;
+mod cose;
+
 pub mod edhoc;
 pub mod error;
 
