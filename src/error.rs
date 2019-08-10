@@ -9,6 +9,7 @@ pub enum Error {
     Ed25519(ed25519_dalek::SignatureError),
     Hkdf(hkdf::InvalidLength),
     Aead(orion::errors::UnknownCryptoError),
+    UnsupportedSuite,
     Edhoc(String),
 }
 
@@ -46,6 +47,7 @@ impl fmt::Display for Error {
             Error::Ed25519(e) => write!(f, "Signature error: {}", e),
             Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
             Error::Aead(e) => write!(f, "AEAD error: {}", e),
+            Error::UnsupportedSuite => write!(f, "Cipher suite unsupported"),
             Error::Edhoc(e) => write!(f, "EDHOC error message: {}", e),
         }
     }

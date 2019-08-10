@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use serde_bytes::{ByteBuf, Bytes};
 use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};
 
-use crate::{cbor, cose, edhoc, Result};
+use crate::{cbor, cose, edhoc, error::Error, Result};
 
 use edhoc::{
     util,
@@ -297,9 +297,8 @@ impl Msg1Receiver {
         // Decode the first message
         let msg_1 = util::deserialize_message_1(&msg_1_seq)?;
         // Verify that the selected suite is supported
-        // TODO: Return error instead of panicking
         if msg_1.suite != 0 {
-            unimplemented!("Other cipher suites");
+            return Err(Error::UnsupportedSuite);
         }
         // Use U's public key to generate the ephemeral shared secret
         let mut x_u_bytes = [0; 32];
