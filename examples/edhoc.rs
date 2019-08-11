@@ -1,4 +1,4 @@
-use oscore::edhoc::{Msg1Receiver, Msg1Sender};
+use oscore::edhoc::{Msg1Receiver, Msg1Sender, OwnError, OwnOrPeerError};
 
 fn main() {
     // TODO: An EDHOC error message should be sent to the other party whenever
@@ -40,6 +40,8 @@ fn main() {
     // type = 1 would be the case in CoAP, where party U can correlate
     // message_1 and message_2 with the token
     let (msg1_bytes, msg2_receiver) =
+        // If an error happens here, we just abort. No need to send a message,
+        // since the protocol hasn't started yet.
         msg1_sender.generate_message_1(1).unwrap();
 
     // Party V ----------------------------------------------------------------
@@ -65,22 +67,56 @@ fn main() {
     let v_kid = b"bob@example.org".to_vec();
 
     let msg1_receiver = Msg1Receiver::new(v_c_v, v_priv, v_auth, v_kid);
-    let msg2_sender = msg1_receiver.handle_message_1(msg1_bytes).unwrap();
-    let (msg2_bytes, msg3_receiver) =
-        msg2_sender.generate_message_2().unwrap();
+    // This is a case where we could cause an error, which we'd send to the
+    // other party
+    let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
+        Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+        Ok(val) => val,
+    };
+    let (msg2_bytes, msg3_receiver) = match msg2_sender.generate_message_2() {
+        Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+        Ok(val) => val,
+    };
 
     // Party U ----------------------------------------------------------------
     let (v_kid, msg2_verifier) =
-        msg2_receiver.extract_peer_kid(msg2_bytes).unwrap();
-    let msg3_sender = msg2_verifier.verify_message_2(&v_public).unwrap();
+        // This is a case where we could receive an error message (just abort
+        // then), or cause an error (send it to the peer)
+        match msg2_receiver.extract_peer_kid(msg2_bytes) {
+            Err(OwnOrPeerError::PeerError(s)) => {
+                panic!("Received error msg: {}", s)
+            }
+            Err(OwnOrPeerError::OwnError(b)) => {
+                panic!("Send these bytes: {:?}", &b)
+            }
+            Ok(val) => val,
+        };
+    let msg3_sender = match msg2_verifier.verify_message_2(&v_public) {
+        Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+        Ok(val) => val,
+    };
     let (msg3_bytes, u_master_secret, u_master_salt) =
-        msg3_sender.generate_message_3().unwrap();
+        match msg3_sender.generate_message_3() {
+            Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+            Ok(val) => val,
+        };
 
     // Party V ----------------------------------------------------------------
     let (u_kid, msg3_verifier) =
-        msg3_receiver.extract_peer_kid(msg3_bytes).unwrap();
+        match msg3_receiver.extract_peer_kid(msg3_bytes) {
+            Err(OwnOrPeerError::PeerError(s)) => {
+                panic!("Received error msg: {}", s)
+            }
+            Err(OwnOrPeerError::OwnError(b)) => {
+                panic!("Send these bytes: {:?}", &b)
+            }
+            Ok(val) => val,
+        };
     let (v_master_secret, v_master_salt) =
-        msg3_verifier.verify_message_3(&u_public).unwrap();
+        match msg3_verifier.verify_message_3(&u_public) {
+            Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+            Ok(val) => val,
+        };
 
     // Party U ----------------------------------------------------------------
     // It's possible that Party V failed verification of message_3, in which
