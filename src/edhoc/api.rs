@@ -108,10 +108,10 @@ impl Msg2Receiver {
         self,
         mut msg_2: Vec<u8>,
     ) -> Result<(Vec<u8>, Msg2Verifier), OwnOrPeerError> {
+        // Check if we don't have an error message
+        util::fail_on_error_message(&msg_2)?;
         // Unwrap sequence from bstr
         let msg_2_seq: ByteBuf = cbor::decode(&mut msg_2)?;
-        // Check if we don't have an error message
-        util::fail_on_error_message(&msg_2_seq)?;
         // Decode the second message
         let msg_2 = util::deserialize_message_2(&msg_2_seq)?;
 
@@ -464,10 +464,10 @@ impl Msg3Receiver {
         self,
         mut msg_3: Vec<u8>,
     ) -> Result<(Vec<u8>, Msg3Verifier), OwnOrPeerError> {
+        // Check if we don't have an error message
+        util::fail_on_error_message(&msg_3)?;
         // Unwrap sequence from bstr
         let msg_3_seq: ByteBuf = cbor::decode(&mut msg_3)?;
-        // Check if we don't have an error message
-        util::fail_on_error_message(&msg_3_seq)?;
         // Decode the third message
         let msg_3 = util::deserialize_message_3(&msg_3_seq)?;
 
