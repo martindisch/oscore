@@ -5,6 +5,7 @@ extern crate alloc;
 
 mod cbor;
 mod cose;
+#[cfg_attr(tarpaulin, skip)]
 mod error;
 
 pub mod edhoc;

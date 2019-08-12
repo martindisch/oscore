@@ -70,6 +70,7 @@
 mod api;
 mod util;
 
+#[cfg_attr(tarpaulin, skip)]
 pub mod error;
 
 pub use api::{
