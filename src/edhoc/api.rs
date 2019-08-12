@@ -57,10 +57,11 @@ impl Msg1Sender {
     /// * `type` - type = 0 is used when there is no external correlation
     ///   mechanism. type = 1 is used when there is an external correlation
     ///   mechanism (e.g. the Token in CoAP) that enables Party U to correlate
-    ///   message_1 and message_2. type = 2 is used when there is an external
-    ///   correlation mechanism that enables Party V to correlate message_2 and
-    ///   message_3. type = 3 is used when there is an external correlation
-    ///   mechanism that enables the parties to correlate all the messages.
+    ///   `message_1` and `message_2`. type = 2 is used when there is an
+    ///   external correlation mechanism that enables Party V to correlate
+    ///   `message_2` and `message_3`. type = 3 is used when there is an
+    ///   external correlation mechanism that enables the parties to correlate
+    ///   all the messages.
     pub fn generate_message_1(
         self,
         r#type: isize,

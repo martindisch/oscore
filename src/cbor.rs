@@ -90,8 +90,8 @@ where
 
 /// Deserializes a sequence of CBOR encoded data items into an object.
 ///
-/// Requires a Vec<u8> of length `bytes` + 1 to use as a buffer and only works
-/// for sequences of at most 23 items.
+/// Requires a `Vec<u8>` of length `bytes` + 1 to use as a buffer and only
+/// works for sequences of at most 23 items.
 ///
 /// # Arguments
 /// * `bytes` - The sequence of CBOR items.

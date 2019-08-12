@@ -7,7 +7,7 @@ use sha2::Sha256;
 
 use crate::{cbor, cose, error::Error, Result};
 
-/// EDHOC message_1.
+/// EDHOC `message_1`.
 #[derive(Debug, PartialEq)]
 pub struct Message1 {
     pub r#type: isize,
@@ -16,7 +16,7 @@ pub struct Message1 {
     pub c_u: Vec<u8>,
 }
 
-/// Serializes EDHOC message_1.
+/// Serializes EDHOC `message_1`.
 pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
     // what we want to have as the actual bytes for the EDHOC message
@@ -30,7 +30,7 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
     Ok(cbor::encode_sequence(raw_msg)?)
 }
 
-/// Deserializes EDHOC message_1.
+/// Deserializes EDHOC `message_1`.
 pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     // Try to deserialize into our raw message format
     let mut temp = Vec::with_capacity(msg.len() + 1);
@@ -46,7 +46,7 @@ pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     })
 }
 
-/// EDHOC message_2.
+/// EDHOC `message_2`.
 #[derive(Debug, PartialEq)]
 pub struct Message2 {
     pub c_u: Option<Vec<u8>>,
@@ -55,7 +55,7 @@ pub struct Message2 {
     pub ciphertext: Vec<u8>,
 }
 
-/// Serializes EDHOC message_2.
+/// Serializes EDHOC `message_2`.
 pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
     if msg.c_u.is_some() {
         // Case where we have U's connection identifier
@@ -75,7 +75,7 @@ pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
     }
 }
 
-/// Deserializes EDHOC message_2.
+/// Deserializes EDHOC `message_2`.
 pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
     let mut temp = Vec::with_capacity(msg.len() + 1);
     // First, attempt to decode the variant without c_u
@@ -106,14 +106,14 @@ pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
     }
 }
 
-/// EDHOC message_3.
+/// EDHOC `message_3`.
 #[derive(Debug, PartialEq)]
 pub struct Message3 {
     pub c_v: Option<Vec<u8>>,
     pub ciphertext: Vec<u8>,
 }
 
-/// Serializes EDHOC message_3.
+/// Serializes EDHOC `message_3`.
 pub fn serialize_message_3(msg: &Message3) -> Result<Vec<u8>> {
     if msg.c_v.is_some() {
         // Case where we have V's connection identifier
@@ -129,7 +129,7 @@ pub fn serialize_message_3(msg: &Message3) -> Result<Vec<u8>> {
     }
 }
 
-/// Deserializes EDHOC message_3.
+/// Deserializes EDHOC `message_3`.
 pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
     let mut temp = Vec::with_capacity(msg.len() + 1);
     // First, attempt to decode the variant with c_v
@@ -317,7 +317,7 @@ fn h(bstr: &[u8]) -> Result<Vec<u8>> {
     cbor::encode(Bytes::new(&hash))
 }
 
-/// Returns the CBOR bstr making up the plaintext of message_i.
+/// Returns the CBOR bstr making up the plaintext of `message_i`.
 pub fn build_plaintext(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items
     // Since ID_CRED_V contains a single kid parameter, take only the bstr of
@@ -329,7 +329,7 @@ pub fn build_plaintext(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Extracts and returns the `kid` and signature from the plaintext of
-/// message_i.
+/// `message_i`.
 pub fn extract_plaintext(
     mut plaintext: Vec<u8>,
 ) -> Result<(Vec<u8>, Vec<u8>)> {
@@ -370,7 +370,7 @@ pub fn aead_seal(
     Ok(dst_out_ct)
 }
 
-/// Decrypts and verifies with ChaCha20Poly1305.
+/// Decrypts and verifies with ChaCha20-Poly1305.
 pub fn aead_open(
     secret_key: &[u8],
     nonce: &[u8],
