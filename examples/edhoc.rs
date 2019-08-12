@@ -70,11 +70,11 @@ fn main() {
     // This is a case where we could cause an error, which we'd send to the
     // other party
     let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
-        Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+        Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
         Ok(val) => val,
     };
     let (msg2_bytes, msg3_receiver) = match msg2_sender.generate_message_2() {
-        Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+        Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
         Ok(val) => val,
     };
 
@@ -87,17 +87,17 @@ fn main() {
                 panic!("Received error msg: {}", s)
             }
             Err(OwnOrPeerError::OwnError(b)) => {
-                panic!("Send these bytes: {:?}", &b)
+                panic!("Send these bytes: {}", hexstring(&b))
             }
             Ok(val) => val,
         };
     let msg3_sender = match msg2_verifier.verify_message_2(&v_public) {
-        Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+        Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
         Ok(val) => val,
     };
     let (msg3_bytes, u_master_secret, u_master_salt) =
         match msg3_sender.generate_message_3() {
-            Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+            Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
             Ok(val) => val,
         };
 
@@ -108,13 +108,13 @@ fn main() {
                 panic!("Received error msg: {}", s)
             }
             Err(OwnOrPeerError::OwnError(b)) => {
-                panic!("Send these bytes: {:?}", &b)
+                panic!("Send these bytes: {}", hexstring(&b))
             }
             Ok(val) => val,
         };
     let (v_master_secret, v_master_salt) =
         match msg3_verifier.verify_message_3(&u_public) {
-            Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
+            Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
             Ok(val) => val,
         };
 
