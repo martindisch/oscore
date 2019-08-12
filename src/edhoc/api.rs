@@ -12,6 +12,7 @@ use crate::{cbor, cose, error::Error};
 
 // Party U constructs ---------------------------------------------------------
 
+/// Generates the first message.
 pub struct Msg1Sender {
     c_u: Vec<u8>,
     secret: StaticSecret,
@@ -21,6 +22,15 @@ pub struct Msg1Sender {
 }
 
 impl Msg1Sender {
+    /// Initializes a new `Msg1Sender`.
+    ///
+    /// # Arguments
+    /// * `c_u` - The chosen connection identifier.
+    /// * `ecdh_secret` - The ECDH secret to use for this protocol run.
+    /// * `auth` - The ed25519 authentication key pair. First 32 bytes are the
+    ///   secret key, the other 32 bytes the public key.
+    /// * `kid` - The key ID by which the other party is able to retrieve the
+    ///   public key corresponding to `auth`.
     pub fn new(
         c_u: Vec<u8>,
         ecdh_secret: [u8; 32],
@@ -41,6 +51,16 @@ impl Msg1Sender {
         }
     }
 
+    /// Returns the bytes of the first message.
+    ///
+    /// # Arguments
+    /// * `type` - type = 0 is used when there is no external correlation
+    ///   mechanism. type = 1 is used when there is an external correlation
+    ///   mechanism (e.g. the Token in CoAP) that enables Party U to correlate
+    ///   message_1 and message_2. type = 2 is used when there is an external
+    ///   correlation mechanism that enables Party V to correlate message_2 and
+    ///   message_3. type = 3 is used when there is an external correlation
+    ///   mechanism that enables the parties to correlate all the messages.
     pub fn generate_message_1(
         self,
         r#type: isize,
@@ -71,6 +91,7 @@ impl Msg1Sender {
     }
 }
 
+/// Processes the second message.
 pub struct Msg2Receiver {
     secret: StaticSecret,
     x_u: PublicKey,
@@ -81,6 +102,7 @@ pub struct Msg2Receiver {
 }
 
 impl Msg2Receiver {
+    /// Returns the key ID of the other party's public authentication key.
     pub fn extract_peer_kid(
         self,
         mut msg_2: Vec<u8>,
@@ -147,6 +169,7 @@ impl Msg2Receiver {
     }
 }
 
+/// Verifies the second message.
 pub struct Msg2Verifier {
     shared_secret: SharedSecret,
     x_u: PublicKey,
@@ -160,6 +183,8 @@ pub struct Msg2Verifier {
 }
 
 impl Msg2Verifier {
+    /// Checks the authenticity of the second message with the other party's
+    /// public authentication key.
     pub fn verify_message_2(
         self,
         v_public: &[u8],
@@ -184,6 +209,7 @@ impl Msg2Verifier {
     }
 }
 
+/// Generates the third message and returns the OSCORE context.
 pub struct Msg3Sender {
     shared_secret: SharedSecret,
     x_u: PublicKey,
@@ -195,6 +221,8 @@ pub struct Msg3Sender {
 }
 
 impl Msg3Sender {
+    /// Returns the bytes of the third message, as well as the OSCORE master
+    /// secret and the OSCORE master salt.
     pub fn generate_message_3(
         self,
     ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), OwnError> {
@@ -268,6 +296,7 @@ impl Msg3Sender {
 
 // Party V constructs ---------------------------------------------------------
 
+/// Handles the first message.
 pub struct Msg1Receiver {
     c_v: Vec<u8>,
     secret: StaticSecret,
@@ -277,6 +306,15 @@ pub struct Msg1Receiver {
 }
 
 impl Msg1Receiver {
+    /// Initializes a new `Msg1Receiver`.
+    ///
+    /// # Arguments
+    /// * `c_v` - The chosen connection identifier.
+    /// * `ecdh_secret` - The ECDH secret to use for this protocol run.
+    /// * `auth` - The ed25519 authentication key pair. First 32 bytes are the
+    ///   secret key, the other 32 bytes the public key.
+    /// * `kid` - The key ID by which the other party is able to retrieve the
+    ///   public key corresponding to `auth`.
     pub fn new(
         c_v: Vec<u8>,
         ecdh_secret: [u8; 32],
@@ -297,6 +335,7 @@ impl Msg1Receiver {
         }
     }
 
+    /// Processes the first message.
     pub fn handle_message_1(
         self,
         mut msg_1: Vec<u8>,
@@ -327,6 +366,7 @@ impl Msg1Receiver {
     }
 }
 
+/// Generates the second message.
 pub struct Msg2Sender {
     c_v: Vec<u8>,
     shared_secret: SharedSecret,
@@ -338,6 +378,7 @@ pub struct Msg2Sender {
 }
 
 impl Msg2Sender {
+    /// Returns the bytes of the second message.
     pub fn generate_message_2(
         self,
     ) -> Result<(Vec<u8>, Msg3Receiver), OwnError> {
@@ -408,6 +449,7 @@ impl Msg2Sender {
     }
 }
 
+/// Processes the third message.
 pub struct Msg3Receiver {
     shared_secret: SharedSecret,
     msg_1: Message1,
@@ -416,6 +458,7 @@ pub struct Msg3Receiver {
 }
 
 impl Msg3Receiver {
+    /// Returns the key ID of the other party's public authentication key.
     pub fn extract_peer_kid(
         self,
         mut msg_3: Vec<u8>,
@@ -472,6 +515,7 @@ impl Msg3Receiver {
     }
 }
 
+/// Verifies the third message and returns the OSCORE context.
 pub struct Msg3Verifier {
     shared_secret: SharedSecret,
     msg_1: Message1,
@@ -482,6 +526,9 @@ pub struct Msg3Verifier {
 }
 
 impl Msg3Verifier {
+    /// Checks the authenticity of the third message with the other party's
+    /// public authentication key and returns the OSCORE master secret and the
+    /// OSCORE master Salt.
     pub fn verify_message_3(
         self,
         u_public: &[u8],

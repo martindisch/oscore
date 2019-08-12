@@ -1,3 +1,5 @@
+//! The errors of the `edhoc` module.
+
 use core::fmt;
 
 use super::util;
