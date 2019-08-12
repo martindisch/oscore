@@ -4,9 +4,9 @@ use serde_bytes::{ByteBuf, Bytes};
 use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};
 
 use super::{
+    error::{EarlyError, OwnError, OwnOrPeerError},
     util,
     util::{Message1, Message2, Message3},
-    OwnError, OwnOrPeerError,
 };
 use crate::{cbor, cose, error::Error};
 
@@ -44,7 +44,7 @@ impl Msg1Sender {
     pub fn generate_message_1(
         self,
         r#type: isize,
-    ) -> Result<(Vec<u8>, Msg2Receiver), Error> {
+    ) -> Result<(Vec<u8>, Msg2Receiver), EarlyError> {
         // Encode the necessary information into the first message
         let msg_1 = Message1 {
             r#type,

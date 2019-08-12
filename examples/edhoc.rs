@@ -1,4 +1,7 @@
-use oscore::edhoc::{Msg1Receiver, Msg1Sender, OwnError, OwnOrPeerError};
+use oscore::edhoc::{
+    error::{OwnError, OwnOrPeerError},
+    Msg1Receiver, Msg1Sender,
+};
 
 fn main() {
     // TODO: An EDHOC error message should be sent to the other party whenever

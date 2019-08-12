@@ -10,7 +10,7 @@ static ERR_AEAD: &str = "Error using AEAD";
 static ERR_SUITE: &str = "Cipher suite unsupported";
 
 /// The error type for operations that process a message from the other party
-/// and may fail if the message is an error message (in which case the protocl
+/// and may fail if the message is an error message (in which case the protocol
 /// needs to be aborted), or if a failure happened while processing, in which
 /// case an EDHOC error message is generated that needs to be transmitted to
 /// the other party, prior to aborting the protocol.
@@ -93,5 +93,22 @@ impl From<Error> for OwnError {
 impl fmt::Display for OwnError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Generated EDHOC error message: {:?}", &self.0)
+    }
+}
+
+/// The error type for operations that may fail before any messages have been
+/// sent, which means the protocol can be aborted without any further action.
+#[derive(Debug)]
+pub struct EarlyError(pub Error);
+
+impl From<Error> for EarlyError {
+    fn from(e: Error) -> EarlyError {
+        EarlyError(e)
+    }
+}
+
+impl fmt::Display for EarlyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Encountered early error: {}", &self.0)
     }
 }
