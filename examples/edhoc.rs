@@ -79,7 +79,7 @@ fn main() {
     };
 
     // Party U ----------------------------------------------------------------
-    let (v_kid, msg2_verifier) =
+    let (_v_kid, msg2_verifier) =
         // This is a case where we could receive an error message (just abort
         // then), or cause an error (send it to the peer)
         match msg2_receiver.extract_peer_kid(msg2_bytes) {
@@ -102,7 +102,7 @@ fn main() {
         };
 
     // Party V ----------------------------------------------------------------
-    let (u_kid, msg3_verifier) =
+    let (_u_kid, msg3_verifier) =
         match msg3_receiver.extract_peer_kid(msg3_bytes) {
             Err(OwnOrPeerError::PeerError(s)) => {
                 panic!("Received error msg: {}", s)

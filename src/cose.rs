@@ -118,6 +118,7 @@ pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Returns the `COSE_Key` structure deserialized from the given bytes.
+#[allow(dead_code)]
 pub fn deserialize_cose_key(mut bytes: Vec<u8>) -> Result<CoseKey> {
     // Turn the CBOR map into an array that we can deserialize
     cbor::map_to_array(&mut bytes)?;
@@ -149,6 +150,7 @@ pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
 }
 
 /// Returns the `kid` from the COSE header map.
+#[allow(dead_code)]
 pub fn get_kid(mut id_cred_x: Vec<u8>) -> Result<Vec<u8>> {
     // Turn the CBOR map into an array that we can deserialize
     cbor::map_to_array(&mut id_cred_x)?;

@@ -136,6 +136,7 @@ pub fn array_to_map(bytes: &mut [u8]) -> Result<()> {
 /// of n * 2 items.
 ///
 /// Only works for arrays with at most 23 items.
+#[allow(dead_code)]
 pub fn map_to_array(bytes: &mut [u8]) -> Result<()> {
     // The 5 least significant bits are the number of key/value pairs
     let n = 0b000_11111 & bytes[0];
