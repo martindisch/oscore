@@ -1,15 +1,25 @@
+//! The errors of the crate.
+
 use alloc::string::String;
 use core::fmt;
 
-/// The error type for this crate, wrapping errors from various libraries.
+/// The catch-all error type for this crate, mostly just wrapping errors from
+/// various libraries.
 #[derive(Debug)]
 pub enum Error {
+    /// Wraps errors from `serde_cbor`.
     Cbor(serde_cbor::Error),
+    /// Tried to encode/decode CBOR sequence of more than 23 items.
     TooManyItems,
+    /// Wraps errors from `ed25519_dalek`.
     Ed25519(ed25519_dalek::SignatureError),
+    /// Wraps errors from `hkdf`.
     Hkdf(hkdf::InvalidLength),
+    /// Wraps errors from `orion`.
     Aead(orion::errors::UnknownCryptoError),
+    /// Using an unsupported cipher suite.
     UnsupportedSuite,
+    /// Wraps a received EDHOC error message.
     Edhoc(String),
 }
 

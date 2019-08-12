@@ -5,9 +5,9 @@ extern crate alloc;
 
 mod cbor;
 mod cose;
+mod error;
 
 pub mod edhoc;
-pub mod error;
 
-/// The result type for normal operations of this crate.
-pub type Result<T> = core::result::Result<T, error::Error>;
+/// The result type for internal operations of this crate.
+type Result<T> = core::result::Result<T, error::Error>;
