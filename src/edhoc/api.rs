@@ -132,14 +132,14 @@ impl Msg2Receiver {
         // Derive K_2
         let k_2 = util::edhoc_key_derivation(
             &"ChaCha20/Poly1305",
-            256,
+            util::CCM_KEY_LEN * 8,
             &th_2,
             shared_secret.as_bytes(),
         )?;
         // Derive IV_2
         let iv_2 = util::edhoc_key_derivation(
             &"IV-GENERATION",
-            96,
+            util::CCM_NONCE_LEN * 8,
             &th_2,
             shared_secret.as_bytes(),
         )?;
@@ -250,14 +250,14 @@ impl Msg3Sender {
         // Derive K_3
         let k_3 = util::edhoc_key_derivation(
             &"ChaCha20/Poly1305",
-            256,
+            util::CCM_KEY_LEN * 8,
             &th_3,
             self.shared_secret.as_bytes(),
         )?;
         // Derive IV_3
         let iv_3 = util::edhoc_key_derivation(
             &"IV-GENERATION",
-            96,
+            util::CCM_NONCE_LEN * 8,
             &th_3,
             self.shared_secret.as_bytes(),
         )?;
@@ -407,14 +407,14 @@ impl Msg2Sender {
         // Derive K_2
         let k_2 = util::edhoc_key_derivation(
             &"ChaCha20/Poly1305",
-            256,
+            util::CCM_KEY_LEN * 8,
             &th_2,
             self.shared_secret.as_bytes(),
         )?;
         // Derive IV_2
         let iv_2 = util::edhoc_key_derivation(
             &"IV-GENERATION",
-            96,
+            util::CCM_NONCE_LEN * 8,
             &th_2,
             self.shared_secret.as_bytes(),
         )?;
@@ -481,14 +481,14 @@ impl Msg3Receiver {
         // Derive K_3
         let k_3 = util::edhoc_key_derivation(
             &"ChaCha20/Poly1305",
-            256,
+            util::CCM_KEY_LEN * 8,
             &th_3,
             self.shared_secret.as_bytes(),
         )?;
         // Derive IV_3
         let iv_3 = util::edhoc_key_derivation(
             &"IV-GENERATION",
-            96,
+            util::CCM_NONCE_LEN * 8,
             &th_3,
             self.shared_secret.as_bytes(),
         )?;

@@ -15,8 +15,8 @@ pub enum Error {
     Ed25519(ed25519_dalek::SignatureError),
     /// Wraps errors from `hkdf`.
     Hkdf(hkdf::InvalidLength),
-    /// Wraps errors from `orion`.
-    Aead(orion::errors::UnknownCryptoError),
+    /// Wraps errors from `aes_ccm`.
+    Aead(aes_ccm::Error),
     /// Using an unsupported cipher suite.
     UnsupportedSuite,
     /// Wraps a received EDHOC error message.
@@ -41,8 +41,8 @@ impl From<hkdf::InvalidLength> for Error {
     }
 }
 
-impl From<orion::errors::UnknownCryptoError> for Error {
-    fn from(e: orion::errors::UnknownCryptoError) -> Error {
+impl From<aes_ccm::Error> for Error {
+    fn from(e: aes_ccm::Error) -> Error {
         Error::Aead(e)
     }
 }

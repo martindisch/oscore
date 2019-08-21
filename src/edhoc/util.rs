@@ -1,11 +1,15 @@
+use aes_ccm::CcmMode;
 use alloc::{string::String, vec::Vec};
 use digest::{FixedOutput, Input};
 use hkdf::Hkdf;
-use orion::hazardous::aead;
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha256;
 
 use crate::{cbor, cose, error::Error, Result};
+
+pub const CCM_KEY_LEN: usize = 16;
+pub const CCM_NONCE_LEN: usize = 13;
+pub const CCM_MAC_LEN: usize = 8;
 
 /// EDHOC `message_1`.
 #[derive(Debug, PartialEq)]
@@ -343,54 +347,50 @@ pub fn extract_plaintext(
     Ok((kid.into_vec(), sig.into_vec()))
 }
 
-/// Encrypts and authenticates with ChaCha20-Poly1305.
+/// Encrypts and authenticates with AES-CCM-16-64-128.
 ///
 /// DO NOT reuse the nonce with the same key.
 pub fn aead_seal(
-    secret_key: &[u8],
+    key: &[u8],
     nonce: &[u8],
     plaintext: &[u8],
     ad: &[u8],
 ) -> Result<Vec<u8>> {
-    // Build secret key & nonce structs
-    let secret_key =
-        aead::chacha20poly1305::SecretKey::from_slice(secret_key)?;
-    let nonce = aead::chacha20poly1305::Nonce::from_slice(nonce)?;
+    // Prepare key & nonce. This is fine, since it's not part of the public
+    // API and we can guarantee that key & nonce always have the right length.
+    let mut key_arr = [0; CCM_KEY_LEN];
+    key_arr.copy_from_slice(key);
+    let mut nonce_arr = [0; CCM_NONCE_LEN];
+    nonce_arr.copy_from_slice(nonce);
+    // Initialize CCM mode
+    let ccm = CcmMode::new(&key_arr, nonce_arr, CCM_MAC_LEN)?;
     // Allocate space for ciphertext & Poly1305 tag
-    let mut dst_out_ct = vec![0; plaintext.len() + 16];
+    let mut dst_out_ct = vec![0; plaintext.len() + CCM_MAC_LEN];
     // Encrypt and place ciphertext & tag in dst_out_ct
-    aead::chacha20poly1305::seal(
-        &secret_key,
-        &nonce,
-        plaintext,
-        Some(ad),
-        &mut dst_out_ct,
-    )?;
+    ccm.generate_encrypt(&mut dst_out_ct, ad, plaintext)?;
 
     Ok(dst_out_ct)
 }
 
-/// Decrypts and verifies with ChaCha20-Poly1305.
+/// Decrypts and verifies with AES-CCM-16-64-128.
 pub fn aead_open(
-    secret_key: &[u8],
+    key: &[u8],
     nonce: &[u8],
     ciphertext: &[u8],
     ad: &[u8],
 ) -> Result<Vec<u8>> {
-    // Build secret key & nonce structs
-    let secret_key =
-        aead::chacha20poly1305::SecretKey::from_slice(secret_key)?;
-    let nonce = aead::chacha20poly1305::Nonce::from_slice(nonce)?;
+    // Prepare key & nonce. This is fine, since it's not part of the public
+    // API and we can guarantee that key & nonce always have the right length.
+    let mut key_arr = [0; CCM_KEY_LEN];
+    key_arr.copy_from_slice(key);
+    let mut nonce_arr = [0; CCM_NONCE_LEN];
+    nonce_arr.copy_from_slice(nonce);
+    // Initialize CCM mode
+    let ccm = CcmMode::new(&key_arr, nonce_arr, CCM_MAC_LEN)?;
     // Allocate space for the plaintext
-    let mut dst_out_pt = vec![0; ciphertext.len() - 16];
+    let mut dst_out_pt = vec![0; ciphertext.len() - CCM_MAC_LEN];
     // Verify tag, if correct then decrypt and place plaintext in dst_out_pt
-    aead::chacha20poly1305::open(
-        &secret_key,
-        &nonce,
-        ciphertext,
-        Some(ad),
-        &mut dst_out_pt,
-    )?;
+    ccm.decrypt_verify(&mut dst_out_pt, ad, ciphertext)?;
 
     Ok(dst_out_pt)
 }
@@ -745,23 +745,20 @@ mod tests {
         assert_eq!(&PLAINTEXT_SIG[..], &sig[..]);
     }
 
-    static AEAD_SECRET_KEY: [u8; 32] = [
-        0x11, 0x20, 0xB1, 0xC9, 0x90, 0x7B, 0xD8, 0xEA, 0xBC, 0x7C, 0x0F,
-        0x91, 0x4D, 0x47, 0x4C, 0xA2, 0xB8, 0x0B, 0x32, 0x67, 0xD9, 0x97,
-        0xE6, 0x73, 0xF4, 0x39, 0x21, 0xA3, 0x31, 0x81, 0x02, 0x1D,
+    static AEAD_SECRET_KEY: [u8; CCM_KEY_LEN] = [
+        0xC0, 0xC1, 0xC2, 0xC3, 0xC4, 0xC5, 0xC6, 0xC7, 0xC8, 0xC9, 0xCA,
+        0xCB, 0xCC, 0xCD, 0xCE, 0xCF,
     ];
-    static AEAD_NONCE: [u8; 12] = [
-        0x07, 0x00, 0x00, 0x00, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+    static AEAD_NONCE: [u8; CCM_NONCE_LEN] = [
+        0x00, 0x00, 0x00, 0x03, 0x02, 0x01, 0x00, 0xA0, 0xA1, 0xA2, 0xA3,
+        0xA4, 0xA5,
     ];
-    static AEAD_PT: [u8; 13] = [
-        0x48, 0x65, 0x6C, 0x6C, 0x6F, 0x2C, 0x20, 0x77, 0x6F, 0x72, 0x6C,
-        0x64, 0x21,
+    static AEAD_PT: [u8; 23] = [
+        0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12,
+        0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D,
+        0x1E,
     ];
-    static AEAD_AD: [u8; 23] = [
-        0x41, 0x75, 0x74, 0x68, 0x65, 0x6E, 0x74, 0x69, 0x63, 0x61, 0x74,
-        0x65, 0x20, 0x6D, 0x65, 0x2C, 0x20, 0x70, 0x6C, 0x65, 0x61, 0x73,
-        0x65,
-    ];
+    static AEAD_AD: [u8; 8] = [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07];
 
     #[test]
     fn aead() {
@@ -790,7 +787,7 @@ mod tests {
 
         // Check verification fail on wrong AD
         let mut ad_manip = AEAD_AD.to_vec();
-        ad_manip[16] = 0x00;
+        ad_manip[6] = 0x00;
         assert!(
             aead_open(&AEAD_SECRET_KEY, &AEAD_NONCE, &ct, &ad_manip).is_err()
         );
