@@ -1,6 +1,5 @@
 use alloc::vec::Vec;
 use core::result::Result;
-use serde_bytes::{ByteBuf, Bytes};
 use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};
 
 use super::{
@@ -8,7 +7,7 @@ use super::{
     util,
     util::{Message1, Message2, Message3},
 };
-use crate::{cbor, cose, error::Error};
+use crate::{cose, error::Error};
 
 // Party U constructs ---------------------------------------------------------
 
@@ -75,8 +74,8 @@ impl Msg1Sender {
         };
         // Get CBOR sequence for message
         let msg_1_seq = util::serialize_message_1(&msg_1)?;
-        // Wrap it in a bstr for transmission
-        let msg_1_bytes = cbor::encode(Bytes::new(&msg_1_seq))?;
+        // Copy for returning
+        let msg_1_bytes = msg_1_seq.clone();
 
         Ok((
             msg_1_bytes,
@@ -106,14 +105,12 @@ impl Msg2Receiver {
     /// Returns the key ID of the other party's public authentication key.
     pub fn extract_peer_kid(
         self,
-        mut msg_2: Vec<u8>,
+        msg_2: Vec<u8>,
     ) -> Result<(Vec<u8>, Msg2Verifier), OwnOrPeerError> {
         // Check if we don't have an error message
         util::fail_on_error_message(&msg_2)?;
-        // Unwrap sequence from bstr
-        let msg_2_seq: ByteBuf = cbor::decode(&mut msg_2)?;
         // Decode the second message
-        let msg_2 = util::deserialize_message_2(&msg_2_seq)?;
+        let msg_2 = util::deserialize_message_2(&msg_2)?;
 
         // Use V's public key to generate the ephemeral shared secret
         let mut x_v_bytes = [0; 32];
@@ -273,8 +270,6 @@ impl Msg3Sender {
         let msg_3 = Message3 { c_v, ciphertext };
         // Get CBOR sequence for message
         let msg_3_seq = util::serialize_message_3(&msg_3)?;
-        // Wrap it in a bstr for transmission
-        let msg_3_bytes = cbor::encode(Bytes::new(&msg_3_seq))?;
 
         // Derive values for the OSCORE context
         let th_4 = util::compute_th_4(&th_3, &msg_3.ciphertext)?;
@@ -291,7 +286,7 @@ impl Msg3Sender {
             self.shared_secret.as_bytes(),
         )?;
 
-        Ok((msg_3_bytes, master_secret, master_salt))
+        Ok((msg_3_seq, master_secret, master_salt))
     }
 }
 
@@ -339,10 +334,10 @@ impl Msg1Receiver {
     /// Processes the first message.
     pub fn handle_message_1(
         self,
-        mut msg_1: Vec<u8>,
+        msg_1: Vec<u8>,
     ) -> Result<Msg2Sender, OwnError> {
-        // Unwrap sequence from bstr
-        let msg_1_seq: ByteBuf = cbor::decode(&mut msg_1)?;
+        // Alias this
+        let msg_1_seq = msg_1;
         // Decode the first message
         let msg_1 = util::deserialize_message_1(&msg_1_seq)?;
         // Verify that the selected suite is supported
@@ -361,7 +356,7 @@ impl Msg1Receiver {
             x_v: self.x_v,
             auth: self.auth,
             kid: self.kid,
-            msg_1_seq: msg_1_seq.into_vec(),
+            msg_1_seq,
             msg_1,
         })
     }
@@ -435,11 +430,9 @@ impl Msg2Sender {
         };
         // Get CBOR sequence for message
         let msg_2_seq = util::serialize_message_2(&msg_2)?;
-        // Wrap it in a bstr for transmission
-        let msg_2_bytes = cbor::encode(Bytes::new(&msg_2_seq))?;
 
         Ok((
-            msg_2_bytes,
+            msg_2_seq,
             Msg3Receiver {
                 shared_secret: self.shared_secret,
                 msg_1: self.msg_1,
@@ -462,14 +455,12 @@ impl Msg3Receiver {
     /// Returns the key ID of the other party's public authentication key.
     pub fn extract_peer_kid(
         self,
-        mut msg_3: Vec<u8>,
+        msg_3: Vec<u8>,
     ) -> Result<(Vec<u8>, Msg3Verifier), OwnOrPeerError> {
         // Check if we don't have an error message
         util::fail_on_error_message(&msg_3)?;
-        // Unwrap sequence from bstr
-        let msg_3_seq: ByteBuf = cbor::decode(&mut msg_3)?;
         // Decode the third message
-        let msg_3 = util::deserialize_message_3(&msg_3_seq)?;
+        let msg_3 = util::deserialize_message_3(&msg_3)?;
 
         // Compute TH_3
         let th_3 = util::compute_th_3(
@@ -682,7 +673,7 @@ mod tests {
             Msg1Sender::new(U_C_U.to_vec(), U_PRIV, U_AUTH, U_KID.to_vec());
         let (mut msg1_bytes, _) = msg1_sender.generate_message_1(1).unwrap();
         // Change the suite
-        msg1_bytes[3] = 0x01;
+        msg1_bytes[1] = 0x01;
 
         // Party V ------------------------------------------------------------
         let msg1_receiver =
