@@ -221,6 +221,7 @@ pub struct Msg3Sender {
 impl Msg3Sender {
     /// Returns the bytes of the third message, as well as the OSCORE master
     /// secret and the OSCORE master salt.
+    #[allow(clippy::type_complexity)]
     pub fn generate_message_3(
         self,
     ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), OwnError> {
@@ -423,10 +424,10 @@ impl Msg2Sender {
 
         // Produce message_2
         let msg_2 = Message2 {
-            c_u: c_u,
+            c_u,
             x_v: self.x_v.as_bytes().to_vec(),
             c_v: self.c_v,
-            ciphertext: ciphertext,
+            ciphertext,
         };
         // Get CBOR sequence for message
         let msg_2_seq = util::serialize_message_2(&msg_2)?;

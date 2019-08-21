@@ -27,7 +27,7 @@ impl VecWrite {
     }
 
     /// Extracts a slice containing the entire vector.
-    pub fn as_slice<'a>(&'a self) -> &'a [u8] {
+    pub fn as_slice(&self) -> &[u8] {
         &self.vec
     }
 }
