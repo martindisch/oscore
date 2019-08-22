@@ -204,7 +204,7 @@ pub fn fail_on_error_message(msg: &[u8]) -> Result<()> {
 /// The `EDHOC-Key-Derivation` function.
 ///
 /// # Arguments
-/// * `algorithm_id` - The algorithm name, e.g. AES-CCM-64-64-128.
+/// * `algorithm_id` - The algorithm name, e.g. AES-CCM-16-64-128.
 /// * `key_data_length` - The desired key length in bits.
 /// * `other` - Typically a transcript hash.
 /// * `secret` - The ECDH shared secret to use as input keying material.
@@ -598,7 +598,7 @@ mod tests {
         assert_eq!(ERR_MSG, &msg);
     }
 
-    static ALG: &str = "AES-CCM-64-64-128";
+    static ALG: &str = "AES-CCM-16-64-128";
     static LENGTH: usize = 128;
     static OTHER: [u8; 32] = [
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x10,
@@ -611,8 +611,8 @@ mod tests {
         0xE7, 0xB7, 0x55, 0xCF, 0x79, 0x28, 0x3A, 0x95, 0xC2, 0x68,
     ];
     static OKM: [u8; 16] = [
-        0x50, 0x40, 0x8F, 0x15, 0xC4, 0x42, 0x91, 0xFD, 0x22, 0x3F, 0x36,
-        0xE8, 0x60, 0x7B, 0xF7, 0x5D,
+        0x06, 0xA0, 0x53, 0x83, 0x03, 0xD8, 0x39, 0x5D, 0x1E, 0xFB, 0x90,
+        0x90, 0x88, 0x03, 0x67, 0x37,
     ];
 
     static EXPORTER_LABEL: &str = "OSCORE Master Salt";
