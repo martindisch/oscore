@@ -81,7 +81,6 @@ impl Msg1Sender {
             msg_1_bytes,
             Msg2Receiver {
                 secret: self.secret,
-                x_u: self.x_u,
                 auth: self.auth,
                 kid: self.kid,
                 msg_1_seq,
@@ -94,7 +93,6 @@ impl Msg1Sender {
 /// Processes the second message.
 pub struct Msg2Receiver {
     secret: StaticSecret,
-    x_u: PublicKey,
     auth: [u8; 64],
     kid: Vec<u8>,
     msg_1_seq: Vec<u8>,
@@ -154,7 +152,6 @@ impl Msg2Receiver {
             v_kid_cpy,
             Msg2Verifier {
                 shared_secret,
-                x_u: self.x_u,
                 auth: self.auth,
                 kid: self.kid,
                 msg_1: self.msg_1,
@@ -170,7 +167,6 @@ impl Msg2Receiver {
 /// Verifies the second message.
 pub struct Msg2Verifier {
     shared_secret: SharedSecret,
-    x_u: PublicKey,
     auth: [u8; 64],
     kid: Vec<u8>,
     msg_1: Message1,
@@ -190,14 +186,13 @@ impl Msg2Verifier {
         // Build the COSE header map identifying the public authentication key
         // of V
         let id_cred_v = cose::build_id_cred_x(&self.v_kid)?;
-        // Build the COSE_Key containing V's ECDH public key
-        let cred_v = cose::serialize_cose_key(&self.msg_2.x_v)?;
+        // Build the COSE_Key containing V's public authentication key
+        let cred_v = cose::serialize_cose_key(v_public)?;
         // Verify the signed data from Party V
         cose::verify(&id_cred_v, &self.th_2, &cred_v, v_public, &self.v_sig)?;
 
         Ok(Msg3Sender {
             shared_secret: self.shared_secret,
-            x_u: self.x_u,
             auth: self.auth,
             kid: self.kid,
             msg_1: self.msg_1,
@@ -210,7 +205,6 @@ impl Msg2Verifier {
 /// Generates the third message and returns the OSCORE context.
 pub struct Msg3Sender {
     shared_secret: SharedSecret,
-    x_u: PublicKey,
     auth: [u8; 64],
     kid: Vec<u8>,
     msg_1: Message1,
@@ -234,8 +228,8 @@ impl Msg3Sender {
 
         // Build the COSE header map identifying the public authentication key
         let id_cred_u = cose::build_id_cred_x(&self.kid)?;
-        // Build the COSE_Key containing our ECDH public key
-        let cred_u = cose::serialize_cose_key(self.x_u.as_bytes())?;
+        // Build the COSE_Key containing our public authentication key
+        let cred_u = cose::serialize_cose_key(&self.auth[32..])?;
         // Compute TH_3
         let th_3 = util::compute_th_3(
             &self.th_2,
@@ -388,8 +382,8 @@ impl Msg2Sender {
 
         // Build the COSE header map identifying the public authentication key
         let id_cred_v = cose::build_id_cred_x(&self.kid)?;
-        // Build the COSE_Key containing our ECDH public key
-        let cred_v = cose::serialize_cose_key(self.x_v.as_bytes())?;
+        // Build the COSE_Key containing our public authentication key
+        let cred_v = cose::serialize_cose_key(&self.auth[32..])?;
         // Compute TH_2
         let th_2 = util::compute_th_2(
             self.msg_1_seq,
@@ -436,7 +430,6 @@ impl Msg2Sender {
             msg_2_seq,
             Msg3Receiver {
                 shared_secret: self.shared_secret,
-                msg_1: self.msg_1,
                 msg_2,
                 th_2,
             },
@@ -447,7 +440,6 @@ impl Msg2Sender {
 /// Processes the third message.
 pub struct Msg3Receiver {
     shared_secret: SharedSecret,
-    msg_1: Message1,
     msg_2: Message2,
     th_2: Vec<u8>,
 }
@@ -498,7 +490,6 @@ impl Msg3Receiver {
             u_kid_cpy,
             Msg3Verifier {
                 shared_secret: self.shared_secret,
-                msg_1: self.msg_1,
                 msg_3,
                 th_3,
                 u_kid,
@@ -511,7 +502,6 @@ impl Msg3Receiver {
 /// Verifies the third message and returns the OSCORE context.
 pub struct Msg3Verifier {
     shared_secret: SharedSecret,
-    msg_1: Message1,
     msg_3: Message3,
     th_3: Vec<u8>,
     u_kid: Vec<u8>,
@@ -529,8 +519,8 @@ impl Msg3Verifier {
         // Build the COSE header map identifying the public authentication key
         // of U
         let id_cred_u = cose::build_id_cred_x(&self.u_kid)?;
-        // Build the COSE_Key containing U's ECDH public key
-        let cred_u = cose::serialize_cose_key(&self.msg_1.x_u)?;
+        // Build the COSE_Key containing U's public authentication key
+        let cred_u = cose::serialize_cose_key(&u_public)?;
         // Verify the signed data from Party U
         cose::verify(&id_cred_u, &self.th_3, &cred_u, &u_public, &self.u_sig)?;
 
