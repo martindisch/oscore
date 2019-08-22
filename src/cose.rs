@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use ed25519_dalek::{Keypair, Signature};
-use serde_bytes::{ByteBuf, Bytes};
+use serde_bytes::Bytes;
 use sha2::Sha512;
 
 use crate::{cbor, Result};
@@ -92,47 +92,28 @@ pub fn build_kdf_context(
 /// An Octet Key Pair (OKP) `COSE_Key`.
 #[derive(Debug, PartialEq)]
 pub struct CoseKey {
+    kty: usize,
     crv: usize,
     x: Vec<u8>,
-    kty: usize,
-    kid: Vec<u8>,
 }
 
 /// Returns the CBOR encoded `COSE_Key` for the given data.
 ///
-/// This is specific to our use case where we only have X25519 public keys,
+/// This is specific to our use case where we only have Ed25519 public keys,
 /// which are Octet Key Pairs (OKP) in COSE and represented as a single
 /// x-coordinate.
-pub fn serialize_cose_key(x: &[u8], kid: &[u8]) -> Result<Vec<u8>> {
+pub fn serialize_cose_key(x: &[u8]) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
     // what we want to have as the actual bytes for the COSE_Key.
-    // (crv key, crv value, x-coordinate key, x-coordinate value,
-    //  kty key, kty value, kid key, kid value)
-    let raw_key = (-1, 4, -2, Bytes::new(x), 1, 1, 2, Bytes::new(kid));
+    // (kty key, kty value, crv key, crv value,
+    //  x-coordinate key, x-coordinate value)
+    let raw_key = (1, 1, -1, 6, -2, Bytes::new(x));
     // Get the byte representation of it
     let mut bytes = cbor::encode(raw_key)?;
     // This is a CBOR array, but we want a map
     cbor::array_to_map(&mut bytes)?;
 
     Ok(bytes)
-}
-
-/// Returns the `COSE_Key` structure deserialized from the given bytes.
-#[allow(dead_code)]
-pub fn deserialize_cose_key(mut bytes: Vec<u8>) -> Result<CoseKey> {
-    // Turn the CBOR map into an array that we can deserialize
-    cbor::map_to_array(&mut bytes)?;
-    // Try to deserialize into our raw format
-    let raw_key: (isize, usize, isize, ByteBuf, isize, usize, isize, ByteBuf) =
-        cbor::decode(&mut bytes)?;
-
-    // On success, just move the items into the "nice" key structure
-    Ok(CoseKey {
-        crv: raw_key.1,
-        x: raw_key.3.into_vec(),
-        kty: raw_key.5,
-        kid: raw_key.7.into_vec(),
-    })
 }
 
 /// Returns the COSE header map for the given `kid`.
@@ -247,31 +228,33 @@ mod tests {
         assert_eq!(&CONTEXT2[..], &context_bytes[..]);
     }
 
-    static CURVE: usize = 4;
-    static X: [u8; 4] = [0x00, 0x01, 0x02, 0x03];
-    static KTY: usize = 1;
-    static KID: [u8; 4] = [0x04, 0x05, 0x06, 0x07];
-    static KEY_BYTES: [u8; 17] = [
-        0xA4, 0x20, 0x04, 0x21, 0x44, 0x00, 0x01, 0x02, 0x03, 0x01, 0x01,
-        0x02, 0x44, 0x04, 0x05, 0x06, 0x07,
+    static AUTH_U_P: [u8; 32] = [
+        0x42, 0x4C, 0x75, 0x6A, 0xB7, 0x7C, 0xC6, 0xFD, 0xEC, 0xF0, 0xB3,
+        0xEC, 0xFC, 0xFF, 0xB7, 0x53, 0x10, 0xC0, 0x15, 0xBF, 0x5C, 0xBA,
+        0x2E, 0xC0, 0xA2, 0x36, 0xE6, 0x65, 0x0C, 0x8A, 0xB9, 0xC7,
+    ];
+    static CRED_U: [u8; 40] = [
+        0xA3, 0x01, 0x01, 0x20, 0x06, 0x21, 0x58, 0x20, 0x42, 0x4C, 0x75,
+        0x6A, 0xB7, 0x7C, 0xC6, 0xFD, 0xEC, 0xF0, 0xB3, 0xEC, 0xFC, 0xFF,
+        0xB7, 0x53, 0x10, 0xC0, 0x15, 0xBF, 0x5C, 0xBA, 0x2E, 0xC0, 0xA2,
+        0x36, 0xE6, 0x65, 0x0C, 0x8A, 0xB9, 0xC7,
+    ];
+    static AUTH_V_P: [u8; 32] = [
+        0x1B, 0x66, 0x1E, 0xE5, 0xD5, 0xEF, 0x16, 0x72, 0xA2, 0xD8, 0x77,
+        0xCD, 0x5B, 0xC2, 0x0F, 0x46, 0x30, 0xDC, 0x78, 0xA1, 0x14, 0xDE,
+        0x65, 0x9C, 0x7E, 0x50, 0x4D, 0x0F, 0x52, 0x9A, 0x6B, 0xD3,
+    ];
+    static CRED_V: [u8; 40] = [
+        0xA3, 0x01, 0x01, 0x20, 0x06, 0x21, 0x58, 0x20, 0x1B, 0x66, 0x1E,
+        0xE5, 0xD5, 0xEF, 0x16, 0x72, 0xA2, 0xD8, 0x77, 0xCD, 0x5B, 0xC2,
+        0x0F, 0x46, 0x30, 0xDC, 0x78, 0xA1, 0x14, 0xDE, 0x65, 0x9C, 0x7E,
+        0x50, 0x4D, 0x0F, 0x52, 0x9A, 0x6B, 0xD3,
     ];
 
     #[test]
     fn key_encode() {
-        assert_eq!(&KEY_BYTES[..], &serialize_cose_key(&X, &KID).unwrap()[..]);
-    }
-
-    #[test]
-    fn key_decode() {
-        let key = CoseKey {
-            crv: CURVE,
-            x: X.to_vec(),
-            kty: KTY,
-            kid: KID.to_vec(),
-        };
-        let bytes = KEY_BYTES.to_vec();
-
-        assert_eq!(key, deserialize_cose_key(bytes).unwrap());
+        assert_eq!(&CRED_U[..], &serialize_cose_key(&AUTH_U_P).unwrap()[..]);
+        assert_eq!(&CRED_V[..], &serialize_cose_key(&AUTH_V_P).unwrap()[..]);
     }
 
     static KID_U: [u8; 1] = [0xA2];
