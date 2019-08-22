@@ -149,17 +149,6 @@ pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/// Returns the `kid` from the COSE header map.
-#[allow(dead_code)]
-pub fn get_kid(mut id_cred_x: Vec<u8>) -> Result<Vec<u8>> {
-    // Turn the CBOR map into an array that we can deserialize
-    cbor::map_to_array(&mut id_cred_x)?;
-    // Try to deserialize into our raw format
-    let id_cred_x: (usize, ByteBuf) = cbor::decode(&mut id_cred_x)?;
-
-    Ok(id_cred_x.1.into_vec())
-}
-
 /// Returns the `COSE_Encrypt0` structure used as associated data in the AEAD.
 pub fn build_ad(th_i: &[u8]) -> Result<Vec<u8>> {
     cbor::encode(("Encrypt0", Bytes::new(&[]), Bytes::new(th_i)))
@@ -285,19 +274,17 @@ mod tests {
         assert_eq!(key, deserialize_cose_key(bytes).unwrap());
     }
 
-    static KID_2: [u8; 2] = [0x00, 0x01];
-    static ID_CRED_X_2: [u8; 5] = [0xA1, 0x04, 0x42, 0x00, 0x01];
+    static KID_U: [u8; 1] = [0xA2];
+    static ID_CRED_U: [u8; 4] = [0xA1, 0x04, 0x41, 0xA2];
+    static KID_V: [u8; 1] = [0xA3];
+    static ID_CRED_V: [u8; 4] = [0xA1, 0x04, 0x41, 0xA3];
 
     #[test]
     fn encode_id_cred_x() {
-        let bytes = build_id_cred_x(&KID_2).unwrap();
-        assert_eq!(&ID_CRED_X_2[..], &bytes[..]);
-    }
-
-    #[test]
-    fn decode_id_cred_x() {
-        let kid = get_kid(ID_CRED_X_2.to_vec()).unwrap();
-        assert_eq!(&KID_2[..], &kid[..]);
+        let bytes = build_id_cred_x(&KID_U).unwrap();
+        assert_eq!(&ID_CRED_U[..], &bytes[..]);
+        let bytes = build_id_cred_x(&KID_V).unwrap();
+        assert_eq!(&ID_CRED_V[..], &bytes[..]);
     }
 
     static ENCRYPT_0_TH: [u8; 3] = [0x01, 0x02, 0x03];
