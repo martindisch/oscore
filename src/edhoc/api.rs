@@ -727,11 +727,8 @@ mod tests {
 
         // Party U ------------------------------------------------------------
         match msg2_receiver.extract_peer_kid(msg2_bytes) {
-            Err(OwnOrPeerError::PeerError(_)) => {
-                panic!("Should have resulted in a CBOR error")
-            }
             Err(OwnOrPeerError::OwnError(b)) => assert_eq!(&CBOR_MSG, &b[..]),
-            Ok(_) => panic!("Should have resulted in a CBOR error"),
+            _ => panic!("Should have resulted in a CBOR error"),
         };
     }
 
@@ -759,10 +756,7 @@ mod tests {
             Err(OwnOrPeerError::PeerError(s)) => {
                 assert_eq!("Error processing CBOR", &s);
             }
-            Err(OwnOrPeerError::OwnError(_)) => {
-                panic!("Should have resulted in a peer error")
-            }
-            Ok(_) => panic!("Should have resulted in a peer error"),
+            _ => panic!("Should have resulted in a peer error"),
         };
     }
 }
