@@ -145,28 +145,7 @@ pub fn build_ad(th_i: &[u8]) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_data::*;
-
-    const ID_CRED_X: [u8; 5] = [0xA1, 0x04, 0x42, 0x11, 0x11];
-    const TH_I: [u8; 3] = [0x22, 0x22, 0x22];
-    const CRED_X: [u8; 4] = [0x55, 0x55, 0x55, 0x55];
-
-    const SIGNATURE: [u8; 64] = [
-        0xB1, 0xED, 0xFE, 0xB6, 0x75, 0x09, 0x42, 0x38, 0xE1, 0x39, 0xDB,
-        0xE0, 0xF1, 0xE6, 0xE8, 0xE3, 0x93, 0x1F, 0x60, 0xE0, 0x1C, 0xE9,
-        0x65, 0xF5, 0x31, 0xAB, 0x61, 0x4B, 0x96, 0x70, 0x85, 0xE2, 0xDF,
-        0x46, 0xA1, 0x6F, 0x45, 0xAA, 0x67, 0xF1, 0xC5, 0x2E, 0x31, 0xE7,
-        0x33, 0x97, 0x38, 0xC6, 0xD5, 0x6C, 0x85, 0x51, 0xC2, 0xCA, 0x22,
-        0x88, 0xE2, 0x10, 0x6D, 0xE0, 0x61, 0x1A, 0x87, 0x0B,
-    ];
-    const KEYPAIR: [u8; 64] = [
-        0xF4, 0x20, 0x6A, 0x9E, 0xFA, 0x0A, 0xF5, 0xEF, 0x1F, 0x66, 0x88,
-        0xBC, 0xAF, 0xDA, 0xF8, 0x16, 0x0C, 0xC5, 0x88, 0x54, 0x5C, 0x24,
-        0x08, 0xF1, 0x8C, 0xAF, 0x8C, 0x8F, 0xA6, 0xE7, 0x67, 0x75, 0xAA,
-        0x71, 0xD1, 0xFE, 0xB3, 0xD7, 0xD7, 0x8C, 0x14, 0x7F, 0xBD, 0xCA,
-        0xAD, 0x34, 0x67, 0x88, 0xC2, 0x44, 0x32, 0x3E, 0xC6, 0x4D, 0x9A,
-        0x85, 0x68, 0x6D, 0x4D, 0x06, 0xA9, 0x58, 0x6F, 0x20,
-    ];
+    use crate::test_util::*;
 
     #[test]
     fn to_be_signed() {
@@ -177,29 +156,41 @@ mod tests {
 
     #[test]
     fn signature_same() {
-        let signature = sign(&ID_CRED_X, &TH_I, &CRED_X, &KEYPAIR).unwrap();
-        assert_eq!(&SIGNATURE[..], &signature[..]);
+        let signature = sign(
+            &ID_CRED_V,
+            &TH_2,
+            &CRED_V,
+            &build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC),
+        )
+        .unwrap();
+        assert_eq!(&V_SIG[..], &signature[..]);
     }
 
     #[test]
     fn signature_verifies() {
-        let signature = sign(&ID_CRED_X, &TH_I, &CRED_X, &KEYPAIR).unwrap();
+        let signature = sign(
+            &ID_CRED_V,
+            &TH_2,
+            &CRED_V,
+            &build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC),
+        )
+        .unwrap();
         assert!(verify(
-            &ID_CRED_X,
-            &TH_I,
-            &CRED_X,
-            &KEYPAIR[32..],
+            &ID_CRED_V,
+            &TH_2,
+            &CRED_V,
+            &AUTH_V_PUBLIC,
             &signature
         )
         .is_ok());
 
-        let mut cred_x_changed = CRED_X.to_vec();
+        let mut cred_x_changed = CRED_V.to_vec();
         cred_x_changed[1] = 0x44;
         assert!(verify(
-            &ID_CRED_X,
-            &TH_I,
+            &ID_CRED_V,
+            &TH_2,
             &cred_x_changed,
-            &KEYPAIR[32..],
+            &AUTH_V_PUBLIC,
             &signature
         )
         .is_err());
@@ -233,8 +224,14 @@ mod tests {
 
     #[test]
     fn key_encode() {
-        assert_eq!(&CRED_U[..], &serialize_cose_key(&AUTH_U_P).unwrap()[..]);
-        assert_eq!(&CRED_V[..], &serialize_cose_key(&AUTH_V_P).unwrap()[..]);
+        assert_eq!(
+            &CRED_U[..],
+            &serialize_cose_key(&AUTH_U_PUBLIC).unwrap()[..]
+        );
+        assert_eq!(
+            &CRED_V[..],
+            &serialize_cose_key(&AUTH_V_PUBLIC).unwrap()[..]
+        );
     }
 
     #[test]

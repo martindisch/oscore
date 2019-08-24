@@ -394,7 +394,7 @@ pub fn aead_open(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_data::*;
+    use crate::test_util::*;
 
     const MSG2_X_V: [u8; 32] = [
         0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
