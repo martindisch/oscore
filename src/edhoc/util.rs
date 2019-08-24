@@ -577,41 +577,25 @@ mod tests {
         assert_eq!(ERR_MSG, &msg);
     }
 
-    const ALG: &str = "AES-CCM-16-64-128";
-    const LENGTH: usize = 128;
-    const OTHER: [u8; 32] = [
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x10,
-        0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x20, 0x21,
-        0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x30, 0x31,
-    ];
     const SECRET: [u8; 32] = [
         0x32, 0x0E, 0x38, 0xF7, 0xC5, 0x8D, 0x01, 0x0B, 0xB7, 0xA8, 0x1E,
         0x38, 0x34, 0x07, 0xDD, 0x59, 0xF4, 0xAE, 0x83, 0x7A, 0x0B, 0x5C,
         0xE7, 0xB7, 0x55, 0xCF, 0x79, 0x28, 0x3A, 0x95, 0xC2, 0x68,
     ];
-    const OKM: [u8; 16] = [
-        0x33, 0x57, 0xB9, 0x01, 0xED, 0x4C, 0xA3, 0x68, 0x4E, 0x3A, 0xC2,
-        0x95, 0x2B, 0x53, 0x9F, 0x98,
-    ];
-
     const EXPORTER_LABEL: &str = "OSCORE Master Salt";
     const EXPORTER_LENGTH: usize = 8;
     const EXPORTER_TH_4: [u8; 7] = [0x46, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05];
 
     #[test]
     fn key_derivation() {
-        let okm = edhoc_key_derivation(ALG, LENGTH, &OTHER, &SECRET).unwrap();
-        assert_eq!(&OKM[..], &okm[..]);
+        let k_2 =
+            edhoc_key_derivation("10", 128, &TH_2, &SHARED_SECRET).unwrap();
+        assert_eq!(&K_2, &k_2[..]);
 
-        let mut other = OTHER.to_vec();
-        other[1] = 0x42;
-        let okm = edhoc_key_derivation(ALG, LENGTH, &other, &SECRET).unwrap();
-        assert_ne!(&OKM[..], &okm[..]);
-
-        let mut secret = SECRET.to_vec();
-        secret[1] = 0x42;
-        let okm = edhoc_key_derivation(ALG, LENGTH, &OTHER, &secret).unwrap();
-        assert_ne!(&OKM[..], &okm[..]);
+        let iv_2 =
+            edhoc_key_derivation("IV-GENERATION", 104, &TH_2, &SHARED_SECRET)
+                .unwrap();
+        assert_eq!(&IV_2, &iv_2[..]);
     }
 
     #[test]
