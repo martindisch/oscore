@@ -560,6 +560,7 @@ fn as_deref<T: core::ops::Deref>(option: &Option<T>) -> Option<&T::Target> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::*;
 
     const REF_BYTES: [u8; 3] = [0x01, 0x02, 0x03];
 
@@ -748,5 +749,25 @@ mod tests {
             }
             _ => panic!("Should have resulted in a peer error"),
         };
+    }
+
+    /// This is here to test that the ECDH library we use complies with the
+    /// test vectors.
+    #[test]
+    fn shared_secret() {
+        let mut eph_u_private = [0; 32];
+        eph_u_private.copy_from_slice(&EPH_U_PRIVATE);
+        let u_priv = StaticSecret::from(eph_u_private);
+        let mut eph_v_private = [0; 32];
+        eph_v_private.copy_from_slice(&EPH_V_PRIVATE);
+        let v_priv = StaticSecret::from(eph_v_private);
+
+        let u_pub = PublicKey::from(&u_priv);
+        assert_eq!(&X_U, u_pub.as_bytes());
+        let v_pub = PublicKey::from(&v_priv);
+        assert_eq!(&X_V, v_pub.as_bytes());
+
+        assert_eq!(&SHARED_SECRET, u_priv.diffie_hellman(&v_pub).as_bytes());
+        assert_eq!(&SHARED_SECRET, v_priv.diffie_hellman(&u_pub).as_bytes());
     }
 }
