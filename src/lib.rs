@@ -7,6 +7,8 @@ mod cbor;
 mod cose;
 #[cfg_attr(tarpaulin, skip)]
 mod error;
+#[cfg(test)]
+mod test_data;
 
 pub mod edhoc;
 
