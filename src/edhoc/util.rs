@@ -323,23 +323,16 @@ pub fn build_plaintext(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items
     // Since ID_CRED_V contains a single kid parameter, take only the bstr of
     // it. Since the signature is raw bytes, wrap it in a bstr.
-    let seq = cbor::encode_sequence((Bytes::new(kid), Bytes::new(signature)))?;
-
-    // Return the sequence wrapped in a bstr
-    cbor::encode(Bytes::new(&seq))
+    cbor::encode_sequence((Bytes::new(kid), Bytes::new(signature)))
 }
 
 /// Extracts and returns the `kid` and signature from the plaintext of
 /// `message_i`.
-pub fn extract_plaintext(
-    mut plaintext: Vec<u8>,
-) -> Result<(Vec<u8>, Vec<u8>)> {
-    // Unwrap the CBOR sequence from the bstr
-    let seq: ByteBuf = cbor::decode(&mut plaintext)?;
+pub fn extract_plaintext(plaintext: Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)> {
     // Extract the kid and signature from the contained sequence
-    let mut temp = Vec::with_capacity(seq.len() + 1);
+    let mut temp = Vec::with_capacity(plaintext.len() + 1);
     let (kid, sig): (ByteBuf, ByteBuf) =
-        cbor::decode_sequence(&seq, 2, &mut temp)?;
+        cbor::decode_sequence(&plaintext, 2, &mut temp)?;
 
     Ok((kid.into_vec(), sig.into_vec()))
 }
@@ -675,22 +668,14 @@ mod tests {
         // assert_eq!(h(&TH_4_INPUT).unwrap(), t_h);
     }
 
-    const PLAINTEXT_KID: [u8; 15] = *b"bob@example.org";
-    const PLAINTEXT_SIG: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
-    const PLAINTEXT_2: [u8; 22] = [
-        0x55, 0x4F, 0x62, 0x6F, 0x62, 0x40, 0x65, 0x78, 0x61, 0x6D, 0x70,
-        0x6C, 0x65, 0x2E, 0x6F, 0x72, 0x67, 0x44, 0x01, 0x02, 0x03, 0x04,
-    ];
-
     #[test]
     fn plaintext() {
-        let plaintext =
-            build_plaintext(&PLAINTEXT_KID, &PLAINTEXT_SIG).unwrap();
-        assert_eq!(&PLAINTEXT_2[..], &plaintext[..]);
+        let plaintext = build_plaintext(&KID_V, &V_SIG).unwrap();
+        assert_eq!(&P_2[..], &plaintext[..]);
 
         let (kid, sig) = extract_plaintext(plaintext).unwrap();
-        assert_eq!(&PLAINTEXT_KID[..], &kid[..]);
-        assert_eq!(&PLAINTEXT_SIG[..], &sig[..]);
+        assert_eq!(&KID_V, &kid[..]);
+        assert_eq!(&V_SIG[..], &sig[..]);
     }
 
     const AEAD_SECRET_KEY: [u8; CCM_KEY_LEN] = [
