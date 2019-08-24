@@ -10,8 +10,8 @@ use crate::{cbor, Result};
 /// # Arguments
 /// * `id_cred_x` - The CBOR encoded header map identifying a public
 ///   authentication key, e.g. `{ 4 : h'1111' }`.
-/// * `th_i` - The transcript hash.
-/// * `cred_x` - Encoded `COSE_Key`.
+/// * `th_i` - The bstr wrapped transcript hash.
+/// * `cred_x` - CBOR encoded `COSE_Key`.
 /// * `keypair_bytes` - The ed25519 authentication key pair. First 32 bytes are
 ///   the secret key, the other 32 bytes the public key.
 pub fn sign(
@@ -33,8 +33,8 @@ pub fn sign(
 /// # Arguments
 /// * `id_cred_x` - The CBOR encoded header map identifying a public
 ///   authentication key, e.g. `{ 4 : h'1111' }`.
-/// * `th_i` - The transcript hash.
-/// * `cred_x` - Encoded `COSE_Key`.
+/// * `th_i` - The bstr wrapped transcript hash.
+/// * `cred_x` - CBOR encoded `COSE_Key`.
 /// * `public_key` - The ed25519 public key of the pair used for the signature.
 /// * `signature` - The ed25519 signature.
 pub fn verify(
@@ -61,11 +61,18 @@ fn build_to_be_signed(
     let sig_struct = (
         "Signature1",
         Bytes::new(id_cred_x), // protected
-        Bytes::new(th_i),      // external_aad
-        Bytes::new(cred_x),    // payload
+        0,                     // placeholder 1 (external_aad)
+        0,                     // placeholder 2 (payload)
     );
+    // Encode it to a CBOR array
+    let mut sig_arr = cbor::encode(&sig_struct)?;
+    // Remove the placeholder items
+    sig_arr.truncate(sig_arr.len() - 2);
+    // Insert the remaining two items that are already in their CBOR encoding
+    sig_arr.extend(th_i); // external_aad
+    sig_arr.extend(cred_x); // payload
 
-    cbor::encode(&sig_struct)
+    Ok(sig_arr)
 }
 
 /// Returns a CBOR encoded `COSE_KDF_Context`.
@@ -143,19 +150,14 @@ mod tests {
     const ID_CRED_X: [u8; 5] = [0xA1, 0x04, 0x42, 0x11, 0x11];
     const TH_I: [u8; 3] = [0x22, 0x22, 0x22];
     const CRED_X: [u8; 4] = [0x55, 0x55, 0x55, 0x55];
-    const M: [u8; 27] = [
-        0x84, 0x6a, 0x53, 0x69, 0x67, 0x6e, 0x61, 0x74, 0x75, 0x72, 0x65,
-        0x31, 0x45, 0xA1, 0x04, 0x42, 0x11, 0x11, 0x43, 0x22, 0x22, 0x22,
-        0x44, 0x55, 0x55, 0x55, 0x55,
-    ];
 
     const SIGNATURE: [u8; 64] = [
-        0x51, 0xA9, 0xD7, 0xCA, 0x97, 0x8E, 0x09, 0x41, 0x5A, 0xC3, 0x76,
-        0x28, 0x46, 0x27, 0x12, 0xAC, 0x9D, 0xA9, 0xBD, 0xF3, 0x68, 0x2F,
-        0xC4, 0x47, 0xB3, 0x06, 0x5E, 0x1B, 0x1E, 0x92, 0xAA, 0x4C, 0x3B,
-        0x03, 0x95, 0x02, 0x9D, 0x6C, 0xF9, 0xF7, 0xF6, 0x73, 0x4F, 0x7C,
-        0xEC, 0xE0, 0x3B, 0xAB, 0x71, 0xDB, 0x90, 0x2B, 0xC3, 0x9D, 0xA5,
-        0x1B, 0x8D, 0xB7, 0x34, 0xCD, 0xD9, 0x87, 0x99, 0x06,
+        0xB1, 0xED, 0xFE, 0xB6, 0x75, 0x09, 0x42, 0x38, 0xE1, 0x39, 0xDB,
+        0xE0, 0xF1, 0xE6, 0xE8, 0xE3, 0x93, 0x1F, 0x60, 0xE0, 0x1C, 0xE9,
+        0x65, 0xF5, 0x31, 0xAB, 0x61, 0x4B, 0x96, 0x70, 0x85, 0xE2, 0xDF,
+        0x46, 0xA1, 0x6F, 0x45, 0xAA, 0x67, 0xF1, 0xC5, 0x2E, 0x31, 0xE7,
+        0x33, 0x97, 0x38, 0xC6, 0xD5, 0x6C, 0x85, 0x51, 0xC2, 0xCA, 0x22,
+        0x88, 0xE2, 0x10, 0x6D, 0xE0, 0x61, 0x1A, 0x87, 0x0B,
     ];
     const KEYPAIR: [u8; 64] = [
         0xF4, 0x20, 0x6A, 0x9E, 0xFA, 0x0A, 0xF5, 0xEF, 0x1F, 0x66, 0x88,
@@ -169,8 +171,8 @@ mod tests {
     #[test]
     fn to_be_signed() {
         let to_be_signed =
-            build_to_be_signed(&ID_CRED_X, &TH_I, &CRED_X).unwrap();
-        assert_eq!(&M[..], &to_be_signed[..]);
+            build_to_be_signed(&ID_CRED_V, &TH_2, &CRED_V).unwrap();
+        assert_eq!(&M_V[..], &to_be_signed[..]);
     }
 
     #[test]
