@@ -80,7 +80,8 @@ fn build_to_be_signed(
 /// This is used as the info input for the HKDF-Expand step.
 ///
 /// # Arguments
-/// * `algorithm_id` - The algorithm name, e.g. AES-CCM-16-64-128.
+/// * `algorithm_id` - The algorithm name, e.g. "IV-GENERATION" or COSE number
+///   e.g. "10" for AES-CCM-16-64-128.
 /// * `key_data_length` - The desired key length in bits.
 /// * `other` - Typically a transcript hash.
 pub fn build_kdf_context(
@@ -88,12 +89,32 @@ pub fn build_kdf_context(
     key_data_length: usize,
     other: &[u8],
 ) -> Result<Vec<u8>> {
-    // (keyDataLength, protected, other)
-    let supp_pub_info = (key_data_length, Bytes::new(&[]), Bytes::new(other));
-    // (AlgorithmID, PartyUInfo, PartyVInfo, SuppPubInfo)
-    let cose_kdf_context = (algorithm_id, [(); 3], [(); 3], supp_pub_info);
+    // (keyDataLength, protected, placeholder (other))
+    let supp_pub_info = (key_data_length, Bytes::new(&[]), 0);
+    // It's the same code, but we need different branches  for the type system
+    // depending on whether we have a string or number as algorithm_id
+    let mut kdf_arr = match algorithm_id.parse::<usize>() {
+        // It's a number
+        Ok(algorithm_id) => {
+            // (AlgorithmID, PartyUInfo, PartyVInfo, SuppPubInfo)
+            let cose_kdf_context =
+                (algorithm_id, [(); 3], [(); 3], supp_pub_info);
+            cbor::encode(cose_kdf_context)?
+        }
+        // It's a string
+        Err(_) => {
+            // (AlgorithmID, PartyUInfo, PartyVInfo, SuppPubInfo)
+            let cose_kdf_context =
+                (algorithm_id, [(); 3], [(); 3], supp_pub_info);
+            cbor::encode(cose_kdf_context)?
+        }
+    };
+    // Remove the placeholder item
+    kdf_arr.pop();
+    // Insert the transcript hash, which is already in its CBOR encoding
+    kdf_arr.extend(other);
 
-    cbor::encode(cose_kdf_context)
+    Ok(kdf_arr)
 }
 
 /// An Octet Key Pair (OKP) `COSE_Key`.
@@ -196,30 +217,14 @@ mod tests {
         .is_err());
     }
 
-    const ALG1: &str = "IV-GENERATION";
-    const ALG2: &str = "AES-CCM-16-64-128";
-    const LEN1: usize = 104;
-    const LEN2: usize = 128;
-    const OTHER: [u8; 2] = [0xAA, 0xAA];
-    const CONTEXT1: [u8; 30] = [
-        0x84, 0x6D, 0x49, 0x56, 0x2D, 0x47, 0x45, 0x4E, 0x45, 0x52, 0x41,
-        0x54, 0x49, 0x4F, 0x4E, 0x83, 0xF6, 0xF6, 0xF6, 0x83, 0xF6, 0xF6,
-        0xF6, 0x83, 0x18, 0x68, 0x40, 0x42, 0xAA, 0xAA,
-    ];
-    const CONTEXT2: [u8; 34] = [
-        0x84, 0x71, 0x41, 0x45, 0x53, 0x2D, 0x43, 0x43, 0x4D, 0x2D, 0x31,
-        0x36, 0x2D, 0x36, 0x34, 0x2D, 0x31, 0x32, 0x38, 0x83, 0xF6, 0xF6,
-        0xF6, 0x83, 0xF6, 0xF6, 0xF6, 0x83, 0x18, 0x80, 0x40, 0x42, 0xAA,
-        0xAA,
-    ];
-
     #[test]
     fn context_generation() {
-        let context_bytes = build_kdf_context(ALG1, LEN1, &OTHER).unwrap();
-        assert_eq!(&CONTEXT1[..], &context_bytes[..]);
+        let context_bytes = build_kdf_context("10", 128, &TH_2).unwrap();
+        assert_eq!(&INFO_K_2[..], &context_bytes[..]);
 
-        let context_bytes = build_kdf_context(ALG2, LEN2, &OTHER).unwrap();
-        assert_eq!(&CONTEXT2[..], &context_bytes[..]);
+        let context_bytes =
+            build_kdf_context("IV-GENERATION", 104, &TH_2).unwrap();
+        assert_eq!(&INFO_IV_2[..], &context_bytes[..]);
     }
 
     #[test]

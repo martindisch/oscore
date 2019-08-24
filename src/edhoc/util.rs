@@ -204,7 +204,8 @@ pub fn fail_on_error_message(msg: &[u8]) -> Result<()> {
 /// The `EDHOC-Key-Derivation` function.
 ///
 /// # Arguments
-/// * `algorithm_id` - The algorithm name, e.g. AES-CCM-16-64-128.
+/// * `algorithm_id` - The algorithm name, e.g. "IV-GENERATION" or COSE number
+///   e.g. "10" for AES-CCM-16-64-128.
 /// * `key_data_length` - The desired key length in bits.
 /// * `other` - Typically a transcript hash.
 /// * `secret` - The ECDH shared secret to use as input keying material.
@@ -589,8 +590,8 @@ mod tests {
         0xE7, 0xB7, 0x55, 0xCF, 0x79, 0x28, 0x3A, 0x95, 0xC2, 0x68,
     ];
     const OKM: [u8; 16] = [
-        0x06, 0xA0, 0x53, 0x83, 0x03, 0xD8, 0x39, 0x5D, 0x1E, 0xFB, 0x90,
-        0x90, 0x88, 0x03, 0x67, 0x37,
+        0x33, 0x57, 0xB9, 0x01, 0xED, 0x4C, 0xA3, 0x68, 0x4E, 0x3A, 0xC2,
+        0x95, 0x2B, 0x53, 0x9F, 0x98,
     ];
 
     const EXPORTER_LABEL: &str = "OSCORE Master Salt";
