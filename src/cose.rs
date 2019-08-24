@@ -160,7 +160,14 @@ pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
 
 /// Returns the `COSE_Encrypt0` structure used as associated data in the AEAD.
 pub fn build_ad(th_i: &[u8]) -> Result<Vec<u8>> {
-    cbor::encode(("Encrypt0", Bytes::new(&[]), Bytes::new(th_i)))
+    // Create array with placeholder
+    let mut ad_arr = cbor::encode(("Encrypt0", Bytes::new(&[]), 0))?;
+    // Remove the placeholder
+    ad_arr.pop();
+    // Append the transcript hash, which is already CBOR encoded
+    ad_arr.extend(th_i);
+
+    Ok(ad_arr)
 }
 
 #[cfg(test)]
@@ -247,14 +254,8 @@ mod tests {
         assert_eq!(&ID_CRED_V[..], &bytes[..]);
     }
 
-    const ENCRYPT_0_TH: [u8; 3] = [0x01, 0x02, 0x03];
-    const ENCRYPT_0: [u8; 15] = [
-        0x83, 0x68, 0x45, 0x6e, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
-        0x43, 0x01, 0x02, 0x03,
-    ];
-
     #[test]
     fn encrypt_0() {
-        assert_eq!(&ENCRYPT_0[..], &build_ad(&ENCRYPT_0_TH).unwrap()[..]);
+        assert_eq!(&A_2[..], &build_ad(&TH_2).unwrap()[..]);
     }
 }
