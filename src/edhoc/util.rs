@@ -655,10 +655,15 @@ mod tests {
     fn plaintext() {
         let plaintext = build_plaintext(&KID_V, &V_SIG).unwrap();
         assert_eq!(&P_2[..], &plaintext[..]);
-
         let (kid, sig) = extract_plaintext(plaintext).unwrap();
         assert_eq!(&KID_V, &kid[..]);
         assert_eq!(&V_SIG[..], &sig[..]);
+
+        let plaintext = build_plaintext(&KID_U, &U_SIG).unwrap();
+        assert_eq!(&P_3[..], &plaintext[..]);
+        let (kid, sig) = extract_plaintext(plaintext).unwrap();
+        assert_eq!(&KID_U, &kid[..]);
+        assert_eq!(&U_SIG[..], &sig[..]);
     }
 
     #[test]
@@ -666,24 +671,27 @@ mod tests {
         // Check encryption
         let ct = aead_seal(&K_2, &IV_2, &P_2, &A_2).unwrap();
         assert_eq!(&C_2[..], &ct[..]);
-
         // Check decryption
         let pt = aead_open(&K_2, &IV_2, &C_2, &A_2).unwrap();
         assert_eq!(&P_2[..], &pt[..]);
-
         // Check verification fail on manipulated ciphertext
         let mut ct_manip = ct.clone();
         ct_manip[2] = 0x00;
         assert!(aead_open(&K_2, &IV_2, &ct_manip, &A_2).is_err());
-
         // Check verification fail on manipulated tag
         let mut ct_manip = ct.clone();
         ct_manip[P_2.len() + 4] = 0x00;
         assert!(aead_open(&K_2, &IV_2, &ct_manip, &A_2).is_err());
-
         // Check verification fail on wrong AD
         let mut ad_manip = A_2.to_vec();
         ad_manip[6] = 0x00;
         assert!(aead_open(&K_2, &IV_2, &C_2, &ad_manip).is_err());
+
+        // Check encryption
+        let ct = aead_seal(&K_3, &IV_3, &P_3, &A_3).unwrap();
+        assert_eq!(&C_3[..], &ct[..]);
+        // Check decryption
+        let pt = aead_open(&K_3, &IV_3, &C_3, &A_3).unwrap();
+        assert_eq!(&P_3[..], &pt[..]);
     }
 }

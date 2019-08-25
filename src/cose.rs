@@ -275,5 +275,7 @@ mod tests {
     #[test]
     fn encrypt_0() {
         assert_eq!(&A_2[..], &build_ad(&TH_2).unwrap()[..]);
+
+        assert_eq!(&A_3[..], &build_ad(&TH_3).unwrap()[..]);
     }
 }
