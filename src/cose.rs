@@ -250,6 +250,13 @@ mod tests {
         let context_bytes =
             build_kdf_context("IV-GENERATION", 104, &TH_3).unwrap();
         assert_eq!(&INFO_IV_3[..], &context_bytes[..]);
+
+        let context_bytes =
+            build_kdf_context("OSCORE Master Secret", 128, &TH_4).unwrap();
+        assert_eq!(&INFO_MASTER_SECRET[..], &context_bytes[..]);
+        let context_bytes =
+            build_kdf_context("OSCORE Master Salt", 64, &TH_4).unwrap();
+        assert_eq!(&INFO_MASTER_SALT[..], &context_bytes[..]);
     }
 
     #[test]

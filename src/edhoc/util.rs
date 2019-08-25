@@ -534,15 +534,6 @@ mod tests {
         assert_eq!(ERR_MSG, &msg);
     }
 
-    const SECRET: [u8; 32] = [
-        0x32, 0x0E, 0x38, 0xF7, 0xC5, 0x8D, 0x01, 0x0B, 0xB7, 0xA8, 0x1E,
-        0x38, 0x34, 0x07, 0xDD, 0x59, 0xF4, 0xAE, 0x83, 0x7A, 0x0B, 0x5C,
-        0xE7, 0xB7, 0x55, 0xCF, 0x79, 0x28, 0x3A, 0x95, 0xC2, 0x68,
-    ];
-    const EXPORTER_LABEL: &str = "OSCORE Master Salt";
-    const EXPORTER_LENGTH: usize = 8;
-    const EXPORTER_TH_4: [u8; 7] = [0x46, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05];
-
     #[test]
     fn key_derivation() {
         let k_2 =
@@ -560,27 +551,36 @@ mod tests {
             edhoc_key_derivation("IV-GENERATION", 104, &TH_3, &SHARED_SECRET)
                 .unwrap();
         assert_eq!(&IV_3, &iv_3[..]);
+
+        let master_secret = edhoc_key_derivation(
+            "OSCORE Master Secret",
+            128,
+            &TH_4,
+            &SHARED_SECRET,
+        )
+        .unwrap();
+        assert_eq!(&MASTER_SECRET, &master_secret[..]);
+        let master_salt = edhoc_key_derivation(
+            "OSCORE Master Salt",
+            64,
+            &TH_4,
+            &SHARED_SECRET,
+        )
+        .unwrap();
+        assert_eq!(&MASTER_SALT, &master_salt[..]);
     }
 
     #[test]
     fn exporter() {
-        let key = edhoc_exporter(
-            EXPORTER_LABEL,
-            EXPORTER_LENGTH,
-            &EXPORTER_TH_4,
-            &SECRET,
-        )
-        .unwrap();
-        assert_eq!(
-            &edhoc_key_derivation(
-                EXPORTER_LABEL,
-                8 * EXPORTER_LENGTH,
-                &EXPORTER_TH_4,
-                &SECRET
-            )
-            .unwrap()[..],
-            &key[..]
-        );
+        let secret =
+            edhoc_exporter("OSCORE Master Secret", 16, &TH_4, &SHARED_SECRET)
+                .unwrap();
+        assert_eq!(&MASTER_SECRET, &secret[..]);
+
+        let salt =
+            edhoc_exporter("OSCORE Master Salt", 8, &TH_4, &SHARED_SECRET)
+                .unwrap();
+        assert_eq!(&MASTER_SALT, &salt[..],);
     }
 
     const TH_2_INPUT_LONG: [u8; 76] = [
