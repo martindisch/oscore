@@ -126,7 +126,7 @@ impl Msg2Receiver {
 
         // Derive K_2
         let k_2 = util::edhoc_key_derivation(
-            &"ChaCha20/Poly1305",
+            &"10",
             util::CCM_KEY_LEN * 8,
             &th_2,
             shared_secret.as_bytes(),
@@ -241,7 +241,7 @@ impl Msg3Sender {
 
         // Derive K_3
         let k_3 = util::edhoc_key_derivation(
-            &"ChaCha20/Poly1305",
+            &"10",
             util::CCM_KEY_LEN * 8,
             &th_3,
             self.shared_secret.as_bytes(),
@@ -270,7 +270,7 @@ impl Msg3Sender {
         let th_4 = util::compute_th_4(&th_3, &msg_3.ciphertext)?;
         let master_secret = util::edhoc_exporter(
             "OSCORE Master Secret",
-            32,
+            util::CCM_KEY_LEN,
             &th_4,
             self.shared_secret.as_bytes(),
         )?;
@@ -396,7 +396,7 @@ impl Msg2Sender {
 
         // Derive K_2
         let k_2 = util::edhoc_key_derivation(
-            &"ChaCha20/Poly1305",
+            &"10",
             util::CCM_KEY_LEN * 8,
             &th_2,
             self.shared_secret.as_bytes(),
@@ -464,7 +464,7 @@ impl Msg3Receiver {
 
         // Derive K_3
         let k_3 = util::edhoc_key_derivation(
-            &"ChaCha20/Poly1305",
+            &"10",
             util::CCM_KEY_LEN * 8,
             &th_3,
             self.shared_secret.as_bytes(),
@@ -528,7 +528,7 @@ impl Msg3Verifier {
         let th_4 = util::compute_th_4(&self.th_3, &self.msg_3.ciphertext)?;
         let master_secret = util::edhoc_exporter(
             "OSCORE Master Secret",
-            32,
+            util::CCM_KEY_LEN,
             &th_4,
             self.shared_secret.as_bytes(),
         )?;
@@ -563,6 +563,16 @@ mod tests {
     use crate::test_util::*;
 
     const REF_BYTES: [u8; 3] = [0x01, 0x02, 0x03];
+    const SUITE_MSG: [u8; 27] = [
+        0x20, 0x78, 0x18, 0x43, 0x69, 0x70, 0x68, 0x65, 0x72, 0x20, 0x73,
+        0x75, 0x69, 0x74, 0x65, 0x20, 0x75, 0x6E, 0x73, 0x75, 0x70, 0x70,
+        0x6F, 0x72, 0x74, 0x65, 0x64,
+    ];
+    const CBOR_MSG: [u8; 23] = [
+        0x20, 0x75, 0x45, 0x72, 0x72, 0x6F, 0x72, 0x20, 0x70, 0x72, 0x6F,
+        0x63, 0x65, 0x73, 0x73, 0x69, 0x6E, 0x67, 0x20, 0x43, 0x42, 0x4F,
+        0x52,
+    ];
 
     #[test]
     fn deref() {
@@ -571,57 +581,30 @@ mod tests {
         assert_eq!(&REF_BYTES, derefed);
     }
 
-    const U_PRIV: [u8; 32] = [
-        144, 115, 162, 206, 225, 72, 94, 30, 253, 17, 9, 171, 183, 84, 94, 17,
-        170, 82, 95, 72, 77, 44, 124, 143, 102, 139, 156, 120, 63, 2, 27, 70,
-    ];
-    const U_C_U: [u8; 7] = *b"Party U";
-    const U_AUTH: [u8; 64] = [
-        0x76, 0x9E, 0x0B, 0xE0, 0xF4, 0x30, 0x9A, 0x6D, 0x6D, 0x6E, 0xC7,
-        0x8D, 0x61, 0xE0, 0xFB, 0xCF, 0x48, 0x3C, 0x8D, 0xE4, 0x2C, 0x39,
-        0x30, 0xD0, 0x4A, 0x4B, 0xA9, 0x17, 0x8F, 0x6C, 0xA7, 0x0F, 0xB3,
-        0x94, 0x7F, 0x71, 0xA5, 0xCC, 0xA4, 0xF1, 0xD2, 0xA3, 0x42, 0xAE,
-        0x62, 0x24, 0x17, 0x5E, 0x83, 0x77, 0x49, 0x34, 0x7E, 0x54, 0x21,
-        0x8C, 0x35, 0xED, 0x0C, 0xC8, 0x0A, 0x26, 0x69, 0x79,
-    ];
-    const U_PUBLIC: [u8; 32] = [
-        0xB3, 0x94, 0x7F, 0x71, 0xA5, 0xCC, 0xA4, 0xF1, 0xD2, 0xA3, 0x42,
-        0xAE, 0x62, 0x24, 0x17, 0x5E, 0x83, 0x77, 0x49, 0x34, 0x7E, 0x54,
-        0x21, 0x8C, 0x35, 0xED, 0x0C, 0xC8, 0x0A, 0x26, 0x69, 0x79,
-    ];
-    const U_KID: [u8; 17] = *b"alice@example.org";
-
-    const V_PRIV: [u8; 32] = [
-        16, 165, 169, 23, 227, 139, 247, 13, 53, 60, 173, 235, 46, 22, 199,
-        69, 54, 240, 59, 183, 80, 23, 70, 121, 195, 57, 176, 97, 255, 171,
-        154, 93,
-    ];
-    const V_C_V: [u8; 7] = *b"Party V";
-    const V_AUTH: [u8; 64] = [
-        0xBB, 0x5A, 0x16, 0x81, 0xBB, 0x9B, 0xC3, 0x12, 0x67, 0x8F, 0x53,
-        0xD3, 0x14, 0x7F, 0xFF, 0x83, 0xF9, 0x56, 0xDB, 0x1F, 0xC6, 0xF4,
-        0x35, 0xA8, 0xDF, 0xB6, 0xB1, 0x0A, 0xA7, 0x1E, 0xFA, 0x1C, 0x88,
-        0x3D, 0x9F, 0x20, 0xAF, 0x73, 0xF7, 0x8E, 0xD2, 0x94, 0x78, 0xE4,
-        0x16, 0x51, 0x4B, 0x88, 0x57, 0x19, 0x64, 0x3B, 0x63, 0xC5, 0x81,
-        0xFD, 0x8B, 0x57, 0xDD, 0x3A, 0xC8, 0x01, 0x1A, 0xC6,
-    ];
-    const V_PUBLIC: [u8; 32] = [
-        0x88, 0x3D, 0x9F, 0x20, 0xAF, 0x73, 0xF7, 0x8E, 0xD2, 0x94, 0x78,
-        0xE4, 0x16, 0x51, 0x4B, 0x88, 0x57, 0x19, 0x64, 0x3B, 0x63, 0xC5,
-        0x81, 0xFD, 0x8B, 0x57, 0xDD, 0x3A, 0xC8, 0x01, 0x1A, 0xC6,
-    ];
-    const V_KID: [u8; 15] = *b"bob@example.org";
-
-    fn successful_run(r#type: isize) {
+    fn successful_run(r#type: isize) -> (Vec<u8>, Vec<u8>) {
         // Party U ------------------------------------------------------------
-        let msg1_sender =
-            Msg1Sender::new(U_C_U.to_vec(), U_PRIV, U_AUTH, U_KID.to_vec());
+        let mut keypair_u = [0; 64];
+        keypair_u
+            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
+        let msg1_sender = Msg1Sender::new(
+            C_U.to_vec(),
+            EPH_U_PRIVATE,
+            keypair_u,
+            KID_U.to_vec(),
+        );
         let (msg1_bytes, msg2_receiver) =
             msg1_sender.generate_message_1(r#type).unwrap();
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver =
-            Msg1Receiver::new(V_C_V.to_vec(), V_PRIV, V_AUTH, V_KID.to_vec());
+        let mut keypair_v = [0; 64];
+        keypair_v
+            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
+        let msg1_receiver = Msg1Receiver::new(
+            C_V.to_vec(),
+            EPH_V_PRIVATE,
+            keypair_v,
+            KID_V.to_vec(),
+        );
         let msg2_sender = msg1_receiver.handle_message_1(msg1_bytes).unwrap();
         let (msg2_bytes, msg3_receiver) =
             msg2_sender.generate_message_2().unwrap();
@@ -629,7 +612,8 @@ mod tests {
         // Party U ------------------------------------------------------------
         let (_v_kid, msg2_verifier) =
             msg2_receiver.extract_peer_kid(msg2_bytes).unwrap();
-        let msg3_sender = msg2_verifier.verify_message_2(&V_PUBLIC).unwrap();
+        let msg3_sender =
+            msg2_verifier.verify_message_2(&AUTH_V_PUBLIC).unwrap();
         let (msg3_bytes, u_master_secret, u_master_salt) =
             msg3_sender.generate_message_3().unwrap();
 
@@ -637,63 +621,86 @@ mod tests {
         let (_u_kid, msg3_verifier) =
             msg3_receiver.extract_peer_kid(msg3_bytes).unwrap();
         let (v_master_secret, v_master_salt) =
-            msg3_verifier.verify_message_3(&U_PUBLIC).unwrap();
+            msg3_verifier.verify_message_3(&AUTH_U_PUBLIC).unwrap();
 
         // Verification -------------------------------------------------------
         assert_eq!(u_master_secret, v_master_secret);
         assert_eq!(u_master_salt, v_master_salt);
+
+        (u_master_secret, u_master_salt)
     }
 
     #[test]
     fn normal_run() {
+        // Using the same parameters as test vectors, should give same results
+        let (master_secret, master_salt) = successful_run(1);
+        assert_eq!(&MASTER_SECRET, &master_secret[..]);
+        assert_eq!(&MASTER_SALT, &master_salt[..]);
+
+        // These just need to end up successful
         successful_run(0);
-        successful_run(1);
         successful_run(2);
         successful_run(3);
     }
 
-    const SUITE_MSG: [u8; 27] = [
-        0x20, 0x78, 0x18, 0x43, 0x69, 0x70, 0x68, 0x65, 0x72, 0x20, 0x73,
-        0x75, 0x69, 0x74, 0x65, 0x20, 0x75, 0x6E, 0x73, 0x75, 0x70, 0x70,
-        0x6F, 0x72, 0x74, 0x65, 0x64,
-    ];
-
     #[test]
     fn unsupported_suite() {
         // Party U ------------------------------------------------------------
-        let msg1_sender =
-            Msg1Sender::new(U_C_U.to_vec(), U_PRIV, U_AUTH, U_KID.to_vec());
+        let mut keypair_u = [0; 64];
+        keypair_u
+            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
+        let msg1_sender = Msg1Sender::new(
+            C_U.to_vec(),
+            AUTH_U_PRIVATE,
+            keypair_u,
+            KID_U.to_vec(),
+        );
         let (mut msg1_bytes, _) = msg1_sender.generate_message_1(1).unwrap();
         // Change the suite
         msg1_bytes[1] = 0x01;
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver =
-            Msg1Receiver::new(V_C_V.to_vec(), V_PRIV, V_AUTH, V_KID.to_vec());
+        let mut keypair_v = [0; 64];
+        keypair_v
+            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
+        let msg1_receiver = Msg1Receiver::new(
+            C_V.to_vec(),
+            AUTH_V_PRIVATE,
+            keypair_v,
+            KID_V.to_vec(),
+        );
         let _ = match msg1_receiver.handle_message_1(msg1_bytes) {
             Err(OwnError(b)) => assert_eq!(&SUITE_MSG, &b[..]),
             Ok(_) => panic!("Should have resulted in a suite error"),
         };
     }
 
-    const CBOR_MSG: [u8; 23] = [
-        0x20, 0x75, 0x45, 0x72, 0x72, 0x6F, 0x72, 0x20, 0x70, 0x72, 0x6F,
-        0x63, 0x65, 0x73, 0x73, 0x69, 0x6E, 0x67, 0x20, 0x43, 0x42, 0x4F,
-        0x52,
-    ];
-
     #[test]
     fn only_own_error() {
         // Party U ------------------------------------------------------------
-        let msg1_sender =
-            Msg1Sender::new(U_C_U.to_vec(), U_PRIV, U_AUTH, U_KID.to_vec());
+        let mut keypair_u = [0; 64];
+        keypair_u
+            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
+        let msg1_sender = Msg1Sender::new(
+            C_U.to_vec(),
+            AUTH_U_PRIVATE,
+            keypair_u,
+            KID_U.to_vec(),
+        );
         let (mut msg1_bytes, _) = msg1_sender.generate_message_1(1).unwrap();
         // Garble the message
         msg1_bytes[0] = 0xFF;
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver =
-            Msg1Receiver::new(V_C_V.to_vec(), V_PRIV, V_AUTH, V_KID.to_vec());
+        let mut keypair_v = [0; 64];
+        keypair_v
+            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
+        let msg1_receiver = Msg1Receiver::new(
+            C_V.to_vec(),
+            AUTH_V_PRIVATE,
+            keypair_v,
+            KID_V.to_vec(),
+        );
         let _ = match msg1_receiver.handle_message_1(msg1_bytes) {
             Err(OwnError(b)) => assert_eq!(&CBOR_MSG, &b[..]),
             Ok(_) => panic!("Should have resulted in a CBOR error"),
@@ -703,14 +710,28 @@ mod tests {
     #[test]
     fn both_own_error() {
         // Party U ------------------------------------------------------------
-        let msg1_sender =
-            Msg1Sender::new(U_C_U.to_vec(), U_PRIV, U_AUTH, U_KID.to_vec());
+        let mut keypair_u = [0; 64];
+        keypair_u
+            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
+        let msg1_sender = Msg1Sender::new(
+            C_U.to_vec(),
+            AUTH_U_PRIVATE,
+            keypair_u,
+            KID_U.to_vec(),
+        );
         let (msg1_bytes, msg2_receiver) =
             msg1_sender.generate_message_1(1).unwrap();
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver =
-            Msg1Receiver::new(V_C_V.to_vec(), V_PRIV, V_AUTH, V_KID.to_vec());
+        let mut keypair_v = [0; 64];
+        keypair_v
+            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
+        let msg1_receiver = Msg1Receiver::new(
+            C_V.to_vec(),
+            AUTH_V_PRIVATE,
+            keypair_v,
+            KID_V.to_vec(),
+        );
         let msg2_sender = msg1_receiver.handle_message_1(msg1_bytes).unwrap();
         let (mut msg2_bytes, _) = msg2_sender.generate_message_2().unwrap();
         // Garble the message
@@ -726,16 +747,30 @@ mod tests {
     #[test]
     fn both_peer_error() {
         // Party U ------------------------------------------------------------
-        let msg1_sender =
-            Msg1Sender::new(U_C_U.to_vec(), U_PRIV, U_AUTH, U_KID.to_vec());
+        let mut keypair_u = [0; 64];
+        keypair_u
+            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
+        let msg1_sender = Msg1Sender::new(
+            C_U.to_vec(),
+            AUTH_U_PRIVATE,
+            keypair_u,
+            KID_U.to_vec(),
+        );
         let (mut msg1_bytes, msg2_receiver) =
             msg1_sender.generate_message_1(1).unwrap();
         // Garble the message
         msg1_bytes[0] = 0xFF;
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver =
-            Msg1Receiver::new(V_C_V.to_vec(), V_PRIV, V_AUTH, V_KID.to_vec());
+        let mut keypair_v = [0; 64];
+        keypair_v
+            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
+        let msg1_receiver = Msg1Receiver::new(
+            C_V.to_vec(),
+            AUTH_V_PRIVATE,
+            keypair_v,
+            KID_V.to_vec(),
+        );
         // Extract the error message to send
         let msg2_err_bytes = match msg1_receiver.handle_message_1(msg1_bytes) {
             Ok(_) => panic!("Should have resulted in a CBOR error"),
