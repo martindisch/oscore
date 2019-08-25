@@ -387,26 +387,6 @@ mod tests {
     use super::*;
     use crate::test_util::*;
 
-    const MSG3_CIPHERTEXT: [u8; 76] = [
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
-        0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15,
-        0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20,
-        0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A, 0x2B,
-        0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36,
-        0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D, 0x3E, 0x3F, 0x40, 0x41,
-        0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B,
-    ];
-    const MSG3_BYTES: [u8; 80] = [
-        0x41, 0xC4, 0x58, 0x4C, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
-        0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10, 0x11,
-        0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C,
-        0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
-        0x28, 0x29, 0x2A, 0x2B, 0x2C, 0x2D, 0x2E, 0x2F, 0x30, 0x31, 0x32,
-        0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A, 0x3B, 0x3C, 0x3D,
-        0x3E, 0x3F, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48,
-        0x49, 0x4A, 0x4B,
-    ];
-
     #[test]
     fn serialize_1() {
         let original = Message1 {
@@ -494,16 +474,16 @@ mod tests {
     fn serialize_3() {
         let mut original = Message3 {
             c_v: Some(C_V.to_vec()),
-            ciphertext: MSG3_CIPHERTEXT.to_vec(),
+            ciphertext: C_3.to_vec(),
         };
         assert_eq!(
-            &MSG3_BYTES[..],
+            &MESSAGE_3[..],
             &serialize_message_3(&original).unwrap()[..]
         );
 
         original.c_v = None;
         assert_eq!(
-            &MSG3_BYTES[2..],
+            &MESSAGE_3[2..],
             &serialize_message_3(&original).unwrap()[..]
         );
     }
@@ -512,12 +492,12 @@ mod tests {
     fn deserialize_3() {
         let mut original = Message3 {
             c_v: Some(C_V.to_vec()),
-            ciphertext: MSG3_CIPHERTEXT.to_vec(),
+            ciphertext: C_3.to_vec(),
         };
-        assert_eq!(original, deserialize_message_3(&MSG3_BYTES).unwrap());
+        assert_eq!(original, deserialize_message_3(&MESSAGE_3).unwrap());
 
         original.c_v = None;
-        assert_eq!(original, deserialize_message_3(&MSG3_BYTES[2..]).unwrap());
+        assert_eq!(original, deserialize_message_3(&MESSAGE_3[2..]).unwrap());
     }
 
     const ERR_MSG: &str = "Unicode: 助, 😀";
@@ -542,8 +522,8 @@ mod tests {
     fn err_catching() {
         // Don't fail when parsing something that's not an error message
         assert!(fail_on_error_message(&MESSAGE_1).is_ok());
-        let msg_2_bytes = cbor::encode(Bytes::new(&MSG3_BYTES)).unwrap();
-        assert!(fail_on_error_message(&msg_2_bytes).is_ok());
+        assert!(fail_on_error_message(&MESSAGE_2).is_ok());
+        assert!(fail_on_error_message(&MESSAGE_3).is_ok());
 
         // If it is an error message, give us the correct error variant
         let msg = match fail_on_error_message(&ERR_MSG_BYTES) {
