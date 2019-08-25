@@ -282,17 +282,14 @@ pub fn compute_th_3(
     c_v: Option<&[u8]>,
 ) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items
-    let seq = if c_v.is_some() {
+    let mut seq = Vec::new();
+    // Add the items that are always present
+    seq.extend(th_2);
+    seq.extend(cbor::encode(Bytes::new(ciphertext_2))?);
+    if c_v.is_some() {
         // Case where we have c_v
-        cbor::encode_sequence((
-            Bytes::new(th_2),
-            Bytes::new(ciphertext_2),
-            Bytes::new(c_v.unwrap()),
-        ))?
-    } else {
-        // Case where we don't
-        cbor::encode_sequence((Bytes::new(th_2), Bytes::new(ciphertext_2)))?
-    };
+        seq.extend(cbor::encode(Bytes::new(c_v.unwrap()))?);
+    }
 
     // Return the hash of this
     h(&seq)
@@ -612,6 +609,9 @@ mod tests {
     fn hash() {
         let bstr = h(&TH_2_INPUT).unwrap();
         assert_eq!(&TH_2[..], &bstr[..]);
+
+        let bstr = h(&TH_3_INPUT).unwrap();
+        assert_eq!(&TH_3[..], &bstr[..]);
     }
 
     #[test]
@@ -624,23 +624,13 @@ mod tests {
         assert_eq!(h(&TH_2_INPUT_LONG).unwrap(), t_h);
     }
 
-    const TH_3_TH_2: [u8; 2] = [0x01, 0x02];
-    const TH_3_CIPHERTEXT: [u8; 2] = [0x03, 0x04];
-    const TH_3_C_V: [u8; 1] = [0x05];
-    const TH_3_INPUT: [u8; 9] =
-        [0x48, 0x42, 0x01, 0x02, 0x42, 0x03, 0x04, 0x41, 0x05];
-    const TH_3_INPUT_SHORTER: [u8; 7] =
-        [0x46, 0x42, 0x01, 0x02, 0x42, 0x03, 0x04];
-
     #[test]
     fn th_3() {
-        // TODO: reinstate
-        // let t_h = compute_th_3(&TH_3_TH_2, &TH_3_CIPHERTEXT, Some(&TH_3_C_V))
-        //     .unwrap();
-        // assert_eq!(h(&TH_3_INPUT).unwrap(), t_h);
+        let t_h = compute_th_3(&TH_2, &C_2, Some(&C_V)).unwrap();
+        assert_eq!(h(&TH_3_INPUT).unwrap(), t_h);
 
-        // let t_h = compute_th_3(&TH_3_TH_2, &TH_3_CIPHERTEXT, None).unwrap();
-        // assert_eq!(h(&TH_3_INPUT_SHORTER).unwrap(), t_h);
+        let t_h = compute_th_3(&TH_2, &C_2, None).unwrap();
+        assert_eq!(h(&TH_3_INPUT[..TH_3_INPUT.len() - 2]).unwrap(), t_h);
     }
 
     const TH_4_TH_3: [u8; 2] = [0x01, 0x02];
