@@ -241,10 +241,15 @@ mod tests {
     fn context_generation() {
         let context_bytes = build_kdf_context("10", 128, &TH_2).unwrap();
         assert_eq!(&INFO_K_2[..], &context_bytes[..]);
-
         let context_bytes =
             build_kdf_context("IV-GENERATION", 104, &TH_2).unwrap();
         assert_eq!(&INFO_IV_2[..], &context_bytes[..]);
+
+        let context_bytes = build_kdf_context("10", 128, &TH_3).unwrap();
+        assert_eq!(&INFO_K_3[..], &context_bytes[..]);
+        let context_bytes =
+            build_kdf_context("IV-GENERATION", 104, &TH_3).unwrap();
+        assert_eq!(&INFO_IV_3[..], &context_bytes[..]);
     }
 
     #[test]

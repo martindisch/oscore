@@ -567,11 +567,18 @@ mod tests {
         let k_2 =
             edhoc_key_derivation("10", 128, &TH_2, &SHARED_SECRET).unwrap();
         assert_eq!(&K_2, &k_2[..]);
-
         let iv_2 =
             edhoc_key_derivation("IV-GENERATION", 104, &TH_2, &SHARED_SECRET)
                 .unwrap();
         assert_eq!(&IV_2, &iv_2[..]);
+
+        let k_3 =
+            edhoc_key_derivation("10", 128, &TH_3, &SHARED_SECRET).unwrap();
+        assert_eq!(&K_3, &k_3[..]);
+        let iv_3 =
+            edhoc_key_derivation("IV-GENERATION", 104, &TH_3, &SHARED_SECRET)
+                .unwrap();
+        assert_eq!(&IV_3, &iv_3[..]);
     }
 
     #[test]
