@@ -180,6 +180,10 @@ mod tests {
         let to_be_signed =
             build_to_be_signed(&ID_CRED_V, &TH_2, &CRED_V).unwrap();
         assert_eq!(&M_V[..], &to_be_signed[..]);
+
+        let to_be_signed =
+            build_to_be_signed(&ID_CRED_U, &TH_3, &CRED_U).unwrap();
+        assert_eq!(&M_U[..], &to_be_signed[..]);
     }
 
     #[test]
