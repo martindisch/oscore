@@ -298,8 +298,9 @@ pub fn compute_th_3(
 /// Calculates the final transcript hash used for the `EDHOC-Exporter`.
 pub fn compute_th_4(th_3: &[u8], ciphertext_3: &[u8]) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items
-    let seq =
-        cbor::encode_sequence((Bytes::new(th_3), Bytes::new(ciphertext_3)))?;
+    let mut seq = Vec::new();
+    seq.extend(th_3);
+    seq.extend(cbor::encode(Bytes::new(ciphertext_3))?);
 
     // Return the hash of this
     h(&seq)
@@ -599,6 +600,9 @@ mod tests {
 
         let bstr = h(&TH_3_INPUT).unwrap();
         assert_eq!(&TH_3[..], &bstr[..]);
+
+        let bstr = h(&TH_4_INPUT).unwrap();
+        assert_eq!(&TH_4[..], &bstr[..]);
     }
 
     #[test]
@@ -620,15 +624,10 @@ mod tests {
         assert_eq!(h(&TH_3_INPUT[..TH_3_INPUT.len() - 2]).unwrap(), t_h);
     }
 
-    const TH_4_TH_3: [u8; 2] = [0x01, 0x02];
-    const TH_4_CIPHERTEXT: [u8; 2] = [0x03, 0x04];
-    const TH_4_INPUT: [u8; 7] = [0x46, 0x42, 0x01, 0x02, 0x42, 0x03, 0x04];
-
     #[test]
     fn th_4() {
-        // TODO: reinstate
-        // let t_h = compute_th_4(&TH_4_TH_3, &TH_4_CIPHERTEXT).unwrap();
-        // assert_eq!(h(&TH_4_INPUT).unwrap(), t_h);
+        let t_h = compute_th_4(&TH_3, &C_3).unwrap();
+        assert_eq!(h(&TH_4_INPUT).unwrap(), t_h);
     }
 
     #[test]
