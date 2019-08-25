@@ -196,6 +196,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(&V_SIG[..], &signature[..]);
+
+        let signature = sign(
+            &ID_CRED_U,
+            &TH_3,
+            &CRED_U,
+            &build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC),
+        )
+        .unwrap();
+        assert_eq!(&U_SIG[..], &signature[..]);
     }
 
     #[test]
