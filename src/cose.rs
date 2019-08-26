@@ -173,7 +173,7 @@ pub fn build_ad(th_i: &[u8]) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::*;
+    use crate::test_vectors::*;
 
     #[test]
     fn to_be_signed() {
@@ -284,5 +284,12 @@ mod tests {
         assert_eq!(&A_2[..], &build_ad(&TH_2).unwrap()[..]);
 
         assert_eq!(&A_3[..], &build_ad(&TH_3).unwrap()[..]);
+    }
+
+    fn build_keypair(private: &[u8], public: &[u8]) -> Vec<u8> {
+        let mut keypair = private.to_vec();
+        keypair.extend(public);
+
+        keypair
     }
 }

@@ -8,7 +8,7 @@ mod cose;
 #[cfg_attr(tarpaulin, skip)]
 mod error;
 #[cfg(test)]
-mod test_util;
+mod test_vectors;
 
 pub mod edhoc;
 
