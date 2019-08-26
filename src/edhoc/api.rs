@@ -26,20 +26,25 @@ impl Msg1Sender {
     /// # Arguments
     /// * `c_u` - The chosen connection identifier.
     /// * `ecdh_secret` - The ECDH secret to use for this protocol run.
-    /// * `auth` - The ed25519 authentication key pair. First 32 bytes are the
-    ///   secret key, the other 32 bytes the public key.
-    /// * `kid` - The key ID by which the other party is able to retrieve the
-    ///   public key corresponding to `auth`.
+    /// * `auth_private` - The private ed25519 authentication key.
+    /// * `auth_public` - The public ed25519 authentication key.
+    /// * `kid` - The key ID by which the other party is able to retrieve
+    ///   `auth_public`.
     pub fn new(
         c_u: Vec<u8>,
         ecdh_secret: [u8; 32],
-        auth: [u8; 64],
+        auth_private: &[u8; 32],
+        auth_public: &[u8; 32],
         kid: Vec<u8>,
     ) -> Msg1Sender {
         // From the secret bytes, create the DH secret
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
         let x_u = PublicKey::from(&secret);
+        // Combine the authentication key pair for convenience
+        let mut auth = [0; 64];
+        auth[..32].copy_from_slice(auth_private);
+        auth[32..].copy_from_slice(auth_public);
 
         Msg1Sender {
             c_u,
@@ -302,20 +307,25 @@ impl Msg1Receiver {
     /// # Arguments
     /// * `c_v` - The chosen connection identifier.
     /// * `ecdh_secret` - The ECDH secret to use for this protocol run.
-    /// * `auth` - The ed25519 authentication key pair. First 32 bytes are the
-    ///   secret key, the other 32 bytes the public key.
-    /// * `kid` - The key ID by which the other party is able to retrieve the
-    ///   public key corresponding to `auth`.
+    /// * `auth_private` - The private ed25519 authentication key.
+    /// * `auth_public` - The public ed25519 authentication key.
+    /// * `kid` - The key ID by which the other party is able to retrieve
+    ///   `auth_public`.
     pub fn new(
         c_v: Vec<u8>,
         ecdh_secret: [u8; 32],
-        auth: [u8; 64],
+        auth_private: &[u8; 32],
+        auth_public: &[u8; 32],
         kid: Vec<u8>,
     ) -> Msg1Receiver {
         // From the secret bytes, create the DH secret
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
         let x_v = PublicKey::from(&secret);
+        // Combine the authentication key pair for convenience
+        let mut auth = [0; 64];
+        auth[..32].copy_from_slice(auth_private);
+        auth[32..].copy_from_slice(auth_public);
 
         Msg1Receiver {
             c_v,
@@ -583,26 +593,23 @@ mod tests {
 
     fn successful_run(r#type: isize) -> (Vec<u8>, Vec<u8>) {
         // Party U ------------------------------------------------------------
-        let mut keypair_u = [0; 64];
-        keypair_u
-            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
         let msg1_sender = Msg1Sender::new(
             C_U.to_vec(),
             EPH_U_PRIVATE,
-            keypair_u,
+            &AUTH_U_PRIVATE,
+            &AUTH_U_PUBLIC,
             KID_U.to_vec(),
         );
         let (msg1_bytes, msg2_receiver) =
             msg1_sender.generate_message_1(r#type).unwrap();
 
         // Party V ------------------------------------------------------------
-        let mut keypair_v = [0; 64];
-        keypair_v
-            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
+
         let msg1_receiver = Msg1Receiver::new(
             C_V.to_vec(),
             EPH_V_PRIVATE,
-            keypair_v,
+            &AUTH_V_PRIVATE,
+            &AUTH_V_PUBLIC,
             KID_V.to_vec(),
         );
         let msg2_sender = msg1_receiver.handle_message_1(msg1_bytes).unwrap();
@@ -646,13 +653,12 @@ mod tests {
     #[test]
     fn unsupported_suite() {
         // Party U ------------------------------------------------------------
-        let mut keypair_u = [0; 64];
-        keypair_u
-            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
+
         let msg1_sender = Msg1Sender::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
-            keypair_u,
+            &AUTH_U_PRIVATE,
+            &AUTH_U_PUBLIC,
             KID_U.to_vec(),
         );
         let (mut msg1_bytes, _) = msg1_sender.generate_message_1(1).unwrap();
@@ -660,13 +666,11 @@ mod tests {
         msg1_bytes[1] = 0x01;
 
         // Party V ------------------------------------------------------------
-        let mut keypair_v = [0; 64];
-        keypair_v
-            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
         let msg1_receiver = Msg1Receiver::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
-            keypair_v,
+            &AUTH_V_PRIVATE,
+            &AUTH_V_PUBLIC,
             KID_V.to_vec(),
         );
         let _ = match msg1_receiver.handle_message_1(msg1_bytes) {
@@ -678,13 +682,11 @@ mod tests {
     #[test]
     fn only_own_error() {
         // Party U ------------------------------------------------------------
-        let mut keypair_u = [0; 64];
-        keypair_u
-            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
         let msg1_sender = Msg1Sender::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
-            keypair_u,
+            &AUTH_U_PRIVATE,
+            &AUTH_U_PUBLIC,
             KID_U.to_vec(),
         );
         let (mut msg1_bytes, _) = msg1_sender.generate_message_1(1).unwrap();
@@ -692,13 +694,11 @@ mod tests {
         msg1_bytes[0] = 0xFF;
 
         // Party V ------------------------------------------------------------
-        let mut keypair_v = [0; 64];
-        keypair_v
-            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
         let msg1_receiver = Msg1Receiver::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
-            keypair_v,
+            &AUTH_V_PRIVATE,
+            &AUTH_V_PUBLIC,
             KID_V.to_vec(),
         );
         let _ = match msg1_receiver.handle_message_1(msg1_bytes) {
@@ -710,26 +710,22 @@ mod tests {
     #[test]
     fn both_own_error() {
         // Party U ------------------------------------------------------------
-        let mut keypair_u = [0; 64];
-        keypair_u
-            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
         let msg1_sender = Msg1Sender::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
-            keypair_u,
+            &AUTH_U_PRIVATE,
+            &AUTH_U_PUBLIC,
             KID_U.to_vec(),
         );
         let (msg1_bytes, msg2_receiver) =
             msg1_sender.generate_message_1(1).unwrap();
 
         // Party V ------------------------------------------------------------
-        let mut keypair_v = [0; 64];
-        keypair_v
-            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
         let msg1_receiver = Msg1Receiver::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
-            keypair_v,
+            &AUTH_V_PRIVATE,
+            &AUTH_V_PUBLIC,
             KID_V.to_vec(),
         );
         let msg2_sender = msg1_receiver.handle_message_1(msg1_bytes).unwrap();
@@ -747,13 +743,11 @@ mod tests {
     #[test]
     fn both_peer_error() {
         // Party U ------------------------------------------------------------
-        let mut keypair_u = [0; 64];
-        keypair_u
-            .copy_from_slice(&build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC));
         let msg1_sender = Msg1Sender::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
-            keypair_u,
+            &AUTH_U_PRIVATE,
+            &AUTH_U_PUBLIC,
             KID_U.to_vec(),
         );
         let (mut msg1_bytes, msg2_receiver) =
@@ -762,13 +756,11 @@ mod tests {
         msg1_bytes[0] = 0xFF;
 
         // Party V ------------------------------------------------------------
-        let mut keypair_v = [0; 64];
-        keypair_v
-            .copy_from_slice(&build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC));
         let msg1_receiver = Msg1Receiver::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
-            keypair_v,
+            &AUTH_V_PRIVATE,
+            &AUTH_V_PUBLIC,
             KID_V.to_vec(),
         );
         // Extract the error message to send
