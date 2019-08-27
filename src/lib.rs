@@ -10,6 +10,7 @@ mod error;
 #[cfg(test)]
 mod test_vectors;
 
+pub mod coap_message;
 pub mod edhoc;
 
 /// The result type for internal operations of this crate.
