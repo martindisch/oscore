@@ -13,8 +13,21 @@ serde = { version = "1.0.97", default-features = false, features = ["derive", "a
 serde_cbor = { version = "0.10.1", default-features = false, features = ["unsealed_read_write"] }
 serde_bytes = { version = "0.11.1", default-features = false, features = ["alloc"] }
 x25519-dalek = { version = "0.5.2", default-features = false, features = ["u32_backend"] }
-ed25519-dalek = { version = "0.9.1", default-features = false }
+ed25519-dalek = { version = "0.9.1", default-features = false, features = ["u32_backend"] }
 sha2 = { version = "0.8.0", default-features = false }
 aes-ccm = "0.2.1"
 hkdf = "0.8.0"
 digest = "0.8.1"
+
+[features]
+std = [
+    "serde/std",
+    "serde_cbor/std",
+    "serde_bytes/std",
+    "x25519-dalek/std",
+    # Add this back in once it doesn't cause problems with thread_rng
+    # "ed25519-dalek/std",
+    "sha2/std",
+    "hkdf/std",
+    "digest/std",
+]
