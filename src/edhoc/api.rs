@@ -570,8 +570,8 @@ fn as_deref<T: core::ops::Deref>(option: &Option<T>) -> Option<&T::Target> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::test_vectors::*;
     use super::*;
-    use crate::test_vectors::*;
 
     const REF_BYTES: [u8; 3] = [0x01, 0x02, 0x03];
     const SUITE_MSG: [u8; 27] = [

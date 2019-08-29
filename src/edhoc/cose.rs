@@ -172,8 +172,8 @@ pub fn build_ad(th_i: &[u8]) -> Result<Vec<u8>> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::test_vectors::*;
     use super::*;
-    use crate::test_vectors::*;
 
     #[test]
     fn to_be_signed() {

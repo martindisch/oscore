@@ -386,8 +386,8 @@ pub fn aead_open(
 
 #[cfg(test)]
 mod tests {
+    use super::super::test_vectors::*;
     use super::*;
-    use crate::test_vectors::*;
 
     const TH_2_INPUT_LONG: [u8; 76] = [
         0x01, 0x00, 0x58, 0x20, 0xB1, 0xA3, 0xE8, 0x94, 0x60, 0xE8, 0x8D,
