@@ -68,6 +68,7 @@
 //! ```
 
 mod api;
+mod cose;
 mod util;
 
 #[cfg_attr(tarpaulin, skip)]

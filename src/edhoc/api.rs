@@ -3,11 +3,12 @@ use core::result::Result;
 use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};
 
 use super::{
+    cose,
     error::{EarlyError, OwnError, OwnOrPeerError},
     util,
     util::{Message1, Message2, Message3},
 };
-use crate::{cose, error::Error};
+use crate::error::Error;
 
 // Party U constructs ---------------------------------------------------------
 
