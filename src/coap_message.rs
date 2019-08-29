@@ -1,12 +1,29 @@
 //! Trait and types that allow for interoperability with CoAP implementations.
+//!
+//! The idea is that an implementor using a particular CoAP implementation and
+//! this `oscore` crate will implement them for the CoAP implementation,
+//! allowing `oscore` to interact with the messages over this interface without
+//! knowing the specifics.
+//!
+//! Most likely, the required implementations are:
+//! * `CoapMessage` for the message type
+//! * Conversion of CoAP request/response codes of the library to and from
+//!   `CoapCode`
+//! * Conversion of CoAP option codes of the library to and from `CoapOption`
+//!
+//! In this scenario, both the CoAP implementation and the `oscore` crate are
+//! external dependencies and the orphan rule prevents directly implementing
+//! external traits on external types.
+//! So its necessary to either wrap the types with the newtype pattern, or
+//! fork the CoAP implementation and implement the required traits directly.
 
 use alloc::vec::Vec;
 
 /// CoAP method/response codes used by OSCORE.
 ///
 /// Only the ones we need to know because we set them for requests (`POST`) and
-/// responses (`CHANGED`) are listed here. The others are wrapped in `Other` and
-/// protected (E).
+/// responses (`CHANGED`) are listed here. The others are wrapped in `Other`
+/// and protected (E).
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum CoapCode {
     Post,
