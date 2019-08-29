@@ -9,6 +9,7 @@ mod error;
 
 pub mod coap_message;
 pub mod edhoc;
+pub mod oscore;
 
 /// The result type for internal operations of this crate.
 type Result<T> = core::result::Result<T, error::Error>;
