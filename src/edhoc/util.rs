@@ -224,7 +224,7 @@ pub fn edhoc_key_derivation(
     let info = cose::build_kdf_context(algorithm_id, key_data_length, other)?;
 
     // This is the extract step, resulting in the pseudorandom key (PRK)
-    let h = Hkdf::<Sha256>::new(salt, &ikm);
+    let h = Hkdf::<Sha256>::new(salt, ikm);
     // Expand the PRK to the desired length output keying material (OKM)
     let mut okm = vec![0; key_data_length / 8];
     h.expand(&info, &mut okm)?;
