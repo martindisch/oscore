@@ -41,7 +41,6 @@ applies to:
 - serde
 - serde_cbor, Copyright (c) 2015 Pyfisch
 - serde_bytes, Copyright (c) 2014 The Rust Project Developers
-- coap-rs, Copyright (c) 2014-2016 Yang Zhang
 - sha2, Copyright (c) 2006-2009 Graydon Hoare
         Copyright (c) 2009-2013 Mozilla Foundation
         Copyright (c) 2016 Artyom Pavlov
@@ -49,6 +48,7 @@ applies to:
 - hkdf, Copyright (c) 2015-2018 Vlad Filippov
         Copyright (c) 2018 RustCrypto Developers
 - digest, Copyright (c) 2017 Artyom Pavlov
+- coap, Copyright (c) 2014-2016 Yang Zhang
 -------------------------------------------------------------------------------
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
