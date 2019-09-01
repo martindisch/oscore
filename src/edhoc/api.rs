@@ -125,7 +125,7 @@ impl Msg2Receiver {
         // Compute TH_2
         let th_2 = util::compute_th_2(
             self.msg_1_seq,
-            as_deref(&msg_2.c_u),
+            crate::as_deref(&msg_2.c_u),
             &msg_2.x_v,
             &msg_2.c_v,
         )?;
@@ -240,7 +240,7 @@ impl Msg3Sender {
         let th_3 = util::compute_th_3(
             &self.th_2,
             &self.msg_2.ciphertext,
-            as_deref(&c_v),
+            crate::as_deref(&c_v),
         )?;
         // Sign it
         let sig = cose::sign(&id_cred_u, &th_3, &cred_u, &self.auth)?;
@@ -398,7 +398,7 @@ impl Msg2Sender {
         // Compute TH_2
         let th_2 = util::compute_th_2(
             self.msg_1_seq,
-            as_deref(&c_u),
+            crate::as_deref(&c_u),
             self.x_v.as_bytes(),
             &self.c_v,
         )?;
@@ -470,7 +470,7 @@ impl Msg3Receiver {
         let th_3 = util::compute_th_3(
             &self.th_2,
             &self.msg_2.ciphertext,
-            as_deref(&msg_3.c_v),
+            crate::as_deref(&msg_3.c_v),
         )?;
 
         // Derive K_3
@@ -556,24 +556,11 @@ impl Msg3Verifier {
 
 // Common functionality -------------------------------------------------------
 
-/// Converts from `&Option<T>` to `Option<&T::Target>`.
-///
-/// Leaves the original Option in-place, creating a new one with a reference
-/// to the original one, additionally coercing the contents via `Deref`.
-///
-/// This is extracted from the `inner_deref` feature of unstable Rust
-/// (https://github.com/rust-lang/rust/issues/50264) and can be removed, as
-/// soon as the feature becomes stable.
-fn as_deref<T: core::ops::Deref>(option: &Option<T>) -> Option<&T::Target> {
-    option.as_ref().map(|t| t.deref())
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::test_vectors::*;
     use super::*;
 
-    const REF_BYTES: [u8; 3] = [0x01, 0x02, 0x03];
     const SUITE_MSG: [u8; 27] = [
         0x20, 0x78, 0x18, 0x43, 0x69, 0x70, 0x68, 0x65, 0x72, 0x20, 0x73,
         0x75, 0x69, 0x74, 0x65, 0x20, 0x75, 0x6E, 0x73, 0x75, 0x70, 0x70,
@@ -584,13 +571,6 @@ mod tests {
         0x63, 0x65, 0x73, 0x73, 0x69, 0x6E, 0x67, 0x20, 0x43, 0x42, 0x4F,
         0x52,
     ];
-
-    #[test]
-    fn deref() {
-        let orig = Some(REF_BYTES.to_vec());
-        let derefed = as_deref(&orig).unwrap();
-        assert_eq!(&REF_BYTES, derefed);
-    }
 
     fn successful_run(r#type: isize) -> (Vec<u8>, Vec<u8>) {
         // Party U ------------------------------------------------------------
