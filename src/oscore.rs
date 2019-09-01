@@ -141,6 +141,16 @@ fn build_aad_array(request_kid: &[u8], request_piv: &[u8]) -> Result<Vec<u8>> {
     cbor::encode(arr)
 }
 
+/// Returns the AAD.
+fn build_aad(request_kid: &[u8], request_piv: &[u8]) -> Result<Vec<u8>> {
+    // First we need to construct the AAD array containing our parameters
+    let aad_arr = build_aad_array(request_kid, request_piv)?;
+    // Then we pack it into an Encrypt0 structure
+    let aad = ("Encrypt0", Bytes::new(&[]), Bytes::new(&aad_arr));
+    // And return the encoding of that
+    cbor::encode(aad)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,11 +186,19 @@ mod tests {
     const EXAMPLE_PIV: [u8; 1] = [0x25];
     const EXAMPLE_AAD_ARR: [u8; 9] =
         [0x85, 0x01, 0x81, 0x0A, 0x41, 0x00, 0x41, 0x25, 0x40];
+    const EXAMPLE_AAD: [u8; 21] = [
+        0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
+        0x49, 0x85, 0x01, 0x81, 0x0A, 0x41, 0x00, 0x41, 0x25, 0x40,
+    ];
 
     const VECTOR_KID: [u8; 0] = [];
     const VECTOR_PIV: [u8; 1] = [0x14];
     const VECTOR_AAD_ARR: [u8; 8] =
         [0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40];
+    const VECTOR_AAD: [u8; 20] = [
+        0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
+        0x48, 0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40,
+    ];
 
     #[test]
     fn info() {
@@ -241,5 +259,14 @@ mod tests {
         let vector_aad_arr =
             build_aad_array(&VECTOR_KID, &VECTOR_PIV).unwrap();
         assert_eq!(&VECTOR_AAD_ARR, &vector_aad_arr[..]);
+    }
+
+    #[test]
+    fn aad() {
+        let example_aad = build_aad(&EXAMPLE_KID, &EXAMPLE_PIV).unwrap();
+        assert_eq!(&EXAMPLE_AAD, &example_aad[..]);
+
+        let vector_aad = build_aad(&VECTOR_KID, &VECTOR_PIV).unwrap();
+        assert_eq!(&VECTOR_AAD, &vector_aad[..]);
     }
 }
