@@ -151,6 +151,55 @@ fn build_aad(request_kid: &[u8], request_piv: &[u8]) -> Result<Vec<u8>> {
     cbor::encode(aad)
 }
 
+/// Returns the value of the OSCORE option.
+fn build_oscore_option(kid: Option<&[u8]>, piv: Option<&[u8]>) -> Vec<u8> {
+    // Allocate memory for the flag byte and piv and kid
+    let mut option =
+        vec![0; 1 + piv.map_or(0, |p| p.len()) + kid.map_or(0, |k| k.len())];
+    // If we have neither kid nor piv, our option has no value
+    if option.len() == 1 {
+        option.pop();
+        return option;
+    }
+
+    if let Some(piv) = piv {
+        // Set the partial IV length (3 least significant bits of flag byte)
+        option[0] |= piv.len() as u8 & 0b0000_0111;
+        // Copy in the partial IV
+        option[1..piv.len() + 1].copy_from_slice(piv);
+    }
+
+    if let Some(kid) = kid {
+        // Set the kid flag
+        option[0] |= 0b0000_1000;
+        // Copy in the kid
+        option[1 + piv.map_or(0, |p| p.len())..].copy_from_slice(kid);
+    }
+
+    option
+}
+
+/// Returns the encoded `kid` and `piv` values, if present.
+fn extract_oscore_option(value: &[u8]) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
+    // Handle empty option
+    if value.is_empty() {
+        return (None, None);
+    }
+
+    // Unpack piv if present
+    let (piv, piv_len) = match value[0] & 0b0000_0111 {
+        0 => (None, 0),
+        n => (Some(Vec::from(&value[1..n as usize + 1])), n),
+    };
+    // Unpack kid if present
+    let kid = match value[0] & 0b0000_1000 {
+        0 => None,
+        _ => Some(Vec::from(&value[1 + piv_len as usize..])),
+    };
+
+    (kid, piv)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -190,7 +239,6 @@ mod tests {
         0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
         0x49, 0x85, 0x01, 0x81, 0x0A, 0x41, 0x00, 0x41, 0x25, 0x40,
     ];
-
     const VECTOR_KID: [u8; 0] = [];
     const VECTOR_PIV: [u8; 1] = [0x14];
     const VECTOR_AAD_ARR: [u8; 8] =
@@ -199,6 +247,19 @@ mod tests {
         0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
         0x48, 0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40,
     ];
+
+    const EX1_KID: Option<&[u8]> = Some(&[0x25]);
+    const EX1_PIV: Option<&[u8]> = Some(&[0x05]);
+    const EX1_OPTION: [u8; 3] = [0x09, 0x05, 0x25];
+    const EX2_KID: Option<&[u8]> = Some(&[]);
+    const EX2_PIV: Option<&[u8]> = Some(&[0x00]);
+    const EX2_OPTION: [u8; 2] = [0x09, 0x00];
+    const EX4_KID: Option<&[u8]> = None;
+    const EX4_PIV: Option<&[u8]> = None;
+    const EX4_OPTION: [u8; 0] = [];
+    const EX5_KID: Option<&[u8]> = None;
+    const EX5_PIV: Option<&[u8]> = Some(&[0x07]);
+    const EX5_OPTION: [u8; 2] = [0x01, 0x07];
 
     #[test]
     fn info() {
@@ -268,5 +329,32 @@ mod tests {
 
         let vector_aad = build_aad(&VECTOR_KID, &VECTOR_PIV).unwrap();
         assert_eq!(&VECTOR_AAD, &vector_aad[..]);
+    }
+
+    #[test]
+    fn option_encoding() {
+        assert_eq!(&EX1_OPTION, &build_oscore_option(EX1_KID, EX1_PIV)[..]);
+        assert_eq!(&EX2_OPTION, &build_oscore_option(EX2_KID, EX2_PIV)[..]);
+        assert_eq!(&EX4_OPTION, &build_oscore_option(EX4_KID, EX4_PIV)[..]);
+        assert_eq!(&EX5_OPTION, &build_oscore_option(EX5_KID, EX5_PIV)[..]);
+    }
+
+    #[test]
+    fn option_decoding() {
+        let (kid, piv) = extract_oscore_option(&EX1_OPTION);
+        assert_eq!(EX1_KID, crate::as_deref(&kid));
+        assert_eq!(EX1_PIV, crate::as_deref(&piv));
+
+        let (kid, piv) = extract_oscore_option(&EX2_OPTION);
+        assert_eq!(EX2_KID, crate::as_deref(&kid));
+        assert_eq!(EX2_PIV, crate::as_deref(&piv));
+
+        let (kid, piv) = extract_oscore_option(&EX4_OPTION);
+        assert_eq!(EX4_KID, crate::as_deref(&kid));
+        assert_eq!(EX4_PIV, crate::as_deref(&piv));
+
+        let (kid, piv) = extract_oscore_option(&EX5_OPTION);
+        assert_eq!(EX5_KID, crate::as_deref(&kid));
+        assert_eq!(EX5_PIV, crate::as_deref(&piv));
     }
 }
