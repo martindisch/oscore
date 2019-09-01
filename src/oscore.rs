@@ -166,7 +166,7 @@ fn build_oscore_option(kid: Option<&[u8]>, piv: Option<&[u8]>) -> Vec<u8> {
         // Set the partial IV length (3 least significant bits of flag byte)
         option[0] |= piv.len() as u8 & 0b0000_0111;
         // Copy in the partial IV
-        option[1..piv.len() + 1].copy_from_slice(piv);
+        option[1..=piv.len()].copy_from_slice(piv);
     }
 
     if let Some(kid) = kid {
@@ -191,8 +191,8 @@ fn extract_oscore_option(value: &[u8]) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
         0 => (None, 0),
         n => {
             // Check if we really received enough data
-            if value.len() >= n as usize + 1 {
-                (Some(Vec::from(&value[1..n as usize + 1])), n)
+            if value.len() > n as usize {
+                (Some(Vec::from(&value[1..=n as usize])), n)
             } else {
                 // If not, abort
                 return (None, None);
