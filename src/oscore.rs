@@ -189,7 +189,15 @@ fn extract_oscore_option(value: &[u8]) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
     // Unpack piv if present
     let (piv, piv_len) = match value[0] & 0b0000_0111 {
         0 => (None, 0),
-        n => (Some(Vec::from(&value[1..n as usize + 1])), n),
+        n => {
+            // Check if we really received enough data
+            if value.len() >= n as usize + 1 {
+                (Some(Vec::from(&value[1..n as usize + 1])), n)
+            } else {
+                // If not, abort
+                return (None, None);
+            }
+        }
     };
     // Unpack kid if present
     let kid = match value[0] & 0b0000_1000 {
@@ -260,6 +268,7 @@ mod tests {
     const EX5_KID: Option<&[u8]> = None;
     const EX5_PIV: Option<&[u8]> = Some(&[0x07]);
     const EX5_OPTION: [u8; 2] = [0x01, 0x07];
+    const CRASH_OPTION: [u8; 2] = [0b0000_1101, 0x01];
 
     #[test]
     fn info() {
@@ -356,5 +365,9 @@ mod tests {
         let (kid, piv) = extract_oscore_option(&EX5_OPTION);
         assert_eq!(EX5_KID, crate::as_deref(&kid));
         assert_eq!(EX5_PIV, crate::as_deref(&piv));
+
+        let (kid, piv) = extract_oscore_option(&CRASH_OPTION);
+        assert_eq!(None, kid);
+        assert_eq!(None, piv);
     }
 }
