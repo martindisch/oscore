@@ -1,8 +1,11 @@
 use alloc::vec::Vec;
+use core::result;
 use hkdf::Hkdf;
+use num_traits::FromPrimitive;
 use serde_bytes::Bytes;
 use sha2::Sha256;
 
+use crate::coap::{packet::Packet, CoapError, CoapOption};
 use crate::{cbor, Result};
 
 /// The common context part of the security context.
@@ -208,6 +211,45 @@ fn extract_oscore_option(value: &[u8]) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
     (kid, piv)
 }
 
+// TODO: Better integration with improved coap module in the future
+static CLASS_U: [usize; 4] = [3, 7, 35, 39];
+static UNSUPPORTED: [usize; 6] = [6, 23, 27, 28, 60, 258];
+
+/// Returns the plaintext (containing code, class E options and payload) based
+/// on the original CoAP message.
+fn build_plaintext(coap_msg: &[u8]) -> result::Result<Vec<u8>, CoapError> {
+    // Parse the CoAP message
+    let original = Packet::from_bytes(coap_msg)?;
+    // Initialize a new CoAP message, in which we'll store the protected parts
+    let mut inner = Packet::new();
+
+    // Set the code
+    inner.header.set_code(&original.header.get_code());
+
+    // Go over options, moving class E ones into the inner message
+    for (number, value_list) in original.options() {
+        // Abort on unimplemented optional features
+        if UNSUPPORTED.contains(number) {
+            // TODO: Error instead of panic
+            unimplemented!("Option {}", number);
+        }
+        // Skip class U options
+        if CLASS_U.contains(number) {
+            continue;
+        }
+
+        // At this point the option must be class E or undefined, so protect it
+        // TODO: Better integration with coap module
+        let option = CoapOption::from_usize(*number).unwrap();
+        inner.set_option(option, value_list.clone());
+    }
+
+    // Move the payload out of the original into the new one
+    inner.set_payload(original.payload);
+
+    Ok(inner.to_bytes()?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -269,6 +311,13 @@ mod tests {
     const EX5_PIV: Option<&[u8]> = Some(&[0x07]);
     const EX5_OPTION: [u8; 2] = [0x01, 0x07];
     const CRASH_OPTION: [u8; 2] = [0b0000_1101, 0x01];
+
+    const VECTOR_UNPROTECTED: [u8; 22] = [
+        0x44, 0x01, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
+        0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x83, 0x74, 0x76, 0x31,
+    ];
+    const INNER_MESSAGE: [u8; 8] =
+        [0x40, 0x01, 0x00, 0x00, 0xB3, 0x74, 0x76, 0x31];
 
     #[test]
     fn info() {
@@ -369,5 +418,11 @@ mod tests {
         let (kid, piv) = extract_oscore_option(&CRASH_OPTION);
         assert_eq!(None, kid);
         assert_eq!(None, piv);
+    }
+
+    #[test]
+    fn payload() {
+        let pt = build_plaintext(&VECTOR_UNPROTECTED).unwrap();
+        assert_eq!(&INNER_MESSAGE, &pt[..]);
     }
 }
