@@ -19,7 +19,7 @@ aes-ccm = "0.2.1"
 hkdf = "0.8.0"
 digest = "0.8.1"
 num-derive = "0.2.5"
-num-traits = "0.2.8"
+num-traits = { version = "0.2.8", default-features = false }
 
 [features]
 std = [
@@ -32,4 +32,5 @@ std = [
     "sha2/std",
     "hkdf/std",
     "digest/std",
+    "num-traits/std"
 ]
