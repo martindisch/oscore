@@ -4,6 +4,7 @@
 extern crate alloc;
 
 mod cbor;
+mod coap;
 #[cfg_attr(tarpaulin, skip)]
 mod error;
 

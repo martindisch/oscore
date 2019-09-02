@@ -49,6 +49,8 @@ applies to:
         Copyright (c) 2018 RustCrypto Developers
 - digest, Copyright (c) 2017 Artyom Pavlov
 - coap, Copyright (c) 2014-2016 Yang Zhang
+- num-derive, Copyright (c) 2014 The Rust Project Developers
+- num-traits, Copyright (c) 2014 The Rust Project Developers
 -------------------------------------------------------------------------------
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -80,6 +82,8 @@ applies to:
 - aes-ccm
 - hkdf
 - digest
+- num-derive
+- num-traits
 -------------------------------------------------------------------------------
 
                               Apache License

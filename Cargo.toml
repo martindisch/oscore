@@ -18,6 +18,8 @@ sha2 = { version = "0.8.0", default-features = false }
 aes-ccm = "0.2.1"
 hkdf = "0.8.0"
 digest = "0.8.1"
+num-derive = "0.2.5"
+num-traits = "0.2.8"
 
 [features]
 std = [
