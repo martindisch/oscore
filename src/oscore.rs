@@ -225,7 +225,6 @@ fn build_plaintext(coap_msg: &[u8]) -> result::Result<Vec<u8>, CoapError> {
 
     // Set the code
     inner.header.set_code(&original.header.get_code());
-
     // Go over options, moving class E ones into the inner message
     for (number, value_list) in original.options() {
         // Abort on unimplemented optional features
@@ -243,11 +242,18 @@ fn build_plaintext(coap_msg: &[u8]) -> result::Result<Vec<u8>, CoapError> {
         let option = CoapOption::from_usize(*number).unwrap();
         inner.set_option(option, value_list.clone());
     }
-
     // Move the payload out of the original into the new one
     inner.set_payload(original.payload);
 
-    Ok(inner.to_bytes()?)
+    // Convert the message to its byte representation
+    let mut inner_bytes = inner.to_bytes()?;
+    // Remove the message ID and the token (if it exists)
+    let tkl = inner.header.get_token_length();
+    inner_bytes.drain(2..4 + tkl as usize);
+    // Remove the first header byte
+    inner_bytes.remove(0);
+
+    Ok(inner_bytes)
 }
 
 #[cfg(test)]
@@ -316,8 +322,14 @@ mod tests {
         0x44, 0x01, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
         0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x83, 0x74, 0x76, 0x31,
     ];
-    const INNER_MESSAGE: [u8; 8] =
-        [0x40, 0x01, 0x00, 0x00, 0xB3, 0x74, 0x76, 0x31];
+    const INNER_MESSAGE: [u8; 5] = [0x01, 0xB3, 0x74, 0x76, 0x31];
+    const VECTOR_UNPROTECTED_PAYLOAD: [u8; 27] = [
+        0x44, 0x01, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
+        0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x83, 0x74, 0x76, 0x31,
+        0xFF, 0x00, 0x01, 0x02, 0x03,
+    ];
+    const INNER_MESSAGE_PAYLOAD: [u8; 10] =
+        [0x01, 0xB3, 0x74, 0x76, 0x31, 0xFF, 0x00, 0x01, 0x02, 0x03];
 
     #[test]
     fn info() {
@@ -424,5 +436,8 @@ mod tests {
     fn payload() {
         let pt = build_plaintext(&VECTOR_UNPROTECTED).unwrap();
         assert_eq!(&INNER_MESSAGE, &pt[..]);
+
+        let pt = build_plaintext(&VECTOR_UNPROTECTED_PAYLOAD).unwrap();
+        assert_eq!(&INNER_MESSAGE_PAYLOAD, &pt[..]);
     }
 }
