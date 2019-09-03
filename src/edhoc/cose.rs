@@ -70,7 +70,7 @@ fn build_to_be_signed(
     sig_arr.truncate(sig_arr.len() - 2);
     // Insert the remaining two items that are already in their CBOR encoding
     sig_arr.extend(th_i); // external_aad
-    sig_arr.extend(cred_x); // payload
+    sig_arr.extend(cbor::encode(Bytes::new(cred_x))?); // payload
 
     Ok(sig_arr)
 }
