@@ -1,3 +1,6 @@
+// TODO: remove
+#![allow(dead_code)]
+
 use alloc::{
     collections::{BTreeMap, LinkedList},
     vec::Vec,

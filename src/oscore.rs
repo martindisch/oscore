@@ -1,3 +1,6 @@
+// TODO: remove
+#![allow(dead_code)]
+
 use alloc::vec::Vec;
 use core::result;
 use hkdf::Hkdf;
