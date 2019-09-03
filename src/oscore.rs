@@ -2,13 +2,14 @@
 #![allow(dead_code)]
 
 use alloc::vec::Vec;
-use core::result;
 use hkdf::Hkdf;
 use num_traits::FromPrimitive;
 use serde_bytes::Bytes;
 use sha2::Sha256;
 
-use crate::coap::{packet::Packet, CoapError, CoapOption};
+use crate::coap::{
+    packet::Packet, CoapOption, MessageClass, RequestType, ResponseType,
+};
 use crate::{cbor, Result};
 
 /// The common context part of the security context.
@@ -92,6 +93,84 @@ impl SecurityContext {
             sender_context,
             recipient_context,
         })
+    }
+
+    /// Returns an OSCORE message based on the original CoAP message.
+    pub fn protect_message(
+        &self,
+        coap_msg: &[u8],
+        partial_iv: &[u8],
+    ) -> Result<Vec<u8>> {
+        // Parse the CoAP message TODO: figure out the error situation
+        let mut original = Packet::from_bytes(coap_msg).unwrap();
+        // Initialize a new CoAP message to store the protected parts
+        let mut inner = Packet::new();
+
+        // Move the code into the inner message
+        inner.header.code = original.header.code;
+        original.header.code = match original.header.code {
+            // All requests get POST
+            MessageClass::Request(_) => {
+                MessageClass::Request(RequestType::Post)
+            }
+            // All responses get Changed
+            MessageClass::Response(_) => {
+                MessageClass::Response(ResponseType::Changed)
+            }
+            MessageClass::Empty => MessageClass::Empty,
+            MessageClass::Reserved => MessageClass::Reserved,
+        };
+        // Store which options we remove from the outer message in this
+        let mut moved_options = vec![];
+        // Go over options, moving class E ones into the inner message
+        for (number, value_list) in original.options() {
+            // Abort on unimplemented optional features
+            if UNSUPPORTED.contains(number) {
+                // TODO: Error instead of panic
+                unimplemented!("Option {}", number);
+            }
+            // Skip class U options
+            if CLASS_U.contains(number) {
+                continue;
+            }
+
+            // At this point the option is class E or undefined, so protect it
+            // TODO: Better integration with coap module
+            let option = CoapOption::from_usize(*number).unwrap();
+            // Add it to the inner message
+            inner.set_option(option, value_list.clone());
+            // Remember it's been moved
+            moved_options.push(option);
+        }
+        // Remove the moved options from the original
+        for option in moved_options {
+            original.clear_option(option);
+        }
+        // Move the payload out of the original into the new one
+        inner.set_payload(original.payload);
+
+        // Convert the message to its byte representation TODO: error handling
+        let mut inner_bytes = inner.to_bytes().unwrap();
+        // Remove the message ID and the token (if it exists)
+        let tkl = inner.header.get_token_length();
+        inner_bytes.drain(2..4 + tkl as usize);
+        // Remove the first header byte
+        inner_bytes.remove(0);
+
+        // Set the inner message as the new payload TODO: encryption & stuff
+        original.payload = inner_bytes;
+        // Add the OSCORE option
+        original.add_option(
+            CoapOption::Oscore,
+            build_oscore_option(
+                Some(&self.sender_context.sender_id),
+                // TODO: proper PIV
+                Some(partial_iv),
+            ),
+        );
+
+        // TODO: error handling
+        Ok(original.to_bytes().unwrap())
     }
 }
 
@@ -218,47 +297,6 @@ fn extract_oscore_option(value: &[u8]) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
 static CLASS_U: [usize; 4] = [3, 7, 35, 39];
 static UNSUPPORTED: [usize; 6] = [6, 23, 27, 28, 60, 258];
 
-/// Returns the plaintext (containing code, class E options and payload) based
-/// on the original CoAP message.
-fn build_plaintext(coap_msg: &[u8]) -> result::Result<Vec<u8>, CoapError> {
-    // Parse the CoAP message
-    let original = Packet::from_bytes(coap_msg)?;
-    // Initialize a new CoAP message, in which we'll store the protected parts
-    let mut inner = Packet::new();
-
-    // Set the code
-    inner.header.set_code(&original.header.get_code());
-    // Go over options, moving class E ones into the inner message
-    for (number, value_list) in original.options() {
-        // Abort on unimplemented optional features
-        if UNSUPPORTED.contains(number) {
-            // TODO: Error instead of panic
-            unimplemented!("Option {}", number);
-        }
-        // Skip class U options
-        if CLASS_U.contains(number) {
-            continue;
-        }
-
-        // At this point the option must be class E or undefined, so protect it
-        // TODO: Better integration with coap module
-        let option = CoapOption::from_usize(*number).unwrap();
-        inner.set_option(option, value_list.clone());
-    }
-    // Move the payload out of the original into the new one
-    inner.set_payload(original.payload);
-
-    // Convert the message to its byte representation
-    let mut inner_bytes = inner.to_bytes()?;
-    // Remove the message ID and the token (if it exists)
-    let tkl = inner.header.get_token_length();
-    inner_bytes.drain(2..4 + tkl as usize);
-    // Remove the first header byte
-    inner_bytes.remove(0);
-
-    Ok(inner_bytes)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -298,11 +336,10 @@ mod tests {
         0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
         0x49, 0x85, 0x01, 0x81, 0x0A, 0x41, 0x00, 0x41, 0x25, 0x40,
     ];
-    const VECTOR_KID: [u8; 0] = [];
-    const VECTOR_PIV: [u8; 1] = [0x14];
-    const VECTOR_AAD_ARR: [u8; 8] =
-        [0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40];
-    const VECTOR_AAD: [u8; 20] = [
+    const KID: [u8; 0] = [];
+    const PIV: [u8; 1] = [0x14];
+    const AAD_ARR: [u8; 8] = [0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40];
+    const AAD: [u8; 20] = [
         0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
         0x48, 0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40,
     ];
@@ -321,18 +358,21 @@ mod tests {
     const EX5_OPTION: [u8; 2] = [0x01, 0x07];
     const CRASH_OPTION: [u8; 2] = [0b0000_1101, 0x01];
 
-    const VECTOR_UNPROTECTED: [u8; 22] = [
+    const UNPROTECTED: [u8; 22] = [
         0x44, 0x01, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
         0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x83, 0x74, 0x76, 0x31,
     ];
-    const INNER_MESSAGE: [u8; 5] = [0x01, 0xB3, 0x74, 0x76, 0x31];
-    const VECTOR_UNPROTECTED_PAYLOAD: [u8; 27] = [
-        0x44, 0x01, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
-        0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x83, 0x74, 0x76, 0x31,
-        0xFF, 0x00, 0x01, 0x02, 0x03,
+    const PROTECTED: [u8; 35] = [
+        0x44, 0x02, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
+        0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x62, 0x09, 0x14, 0xFF,
+        0x61, 0x2F, 0x10, 0x92, 0xF1, 0x77, 0x6F, 0x1C, 0x16, 0x68, 0xB3,
+        0x82, 0x5E,
     ];
-    const INNER_MESSAGE_PAYLOAD: [u8; 10] =
-        [0x01, 0xB3, 0x74, 0x76, 0x31, 0xFF, 0x00, 0x01, 0x02, 0x03];
+    const TEMP_PROTECTED: [u8; 27] = [
+        0x44, 0x02, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
+        0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x62, 0x09, 0x14, 0xFF,
+        0x01, 0xB3, 0x74, 0x76, 0x31,
+    ];
 
     #[test]
     fn info() {
@@ -390,9 +430,8 @@ mod tests {
             build_aad_array(&EXAMPLE_KID, &EXAMPLE_PIV).unwrap();
         assert_eq!(&EXAMPLE_AAD_ARR, &example_aad_arr[..]);
 
-        let vector_aad_arr =
-            build_aad_array(&VECTOR_KID, &VECTOR_PIV).unwrap();
-        assert_eq!(&VECTOR_AAD_ARR, &vector_aad_arr[..]);
+        let vector_aad_arr = build_aad_array(&KID, &PIV).unwrap();
+        assert_eq!(&AAD_ARR, &vector_aad_arr[..]);
     }
 
     #[test]
@@ -400,8 +439,8 @@ mod tests {
         let example_aad = build_aad(&EXAMPLE_KID, &EXAMPLE_PIV).unwrap();
         assert_eq!(&EXAMPLE_AAD, &example_aad[..]);
 
-        let vector_aad = build_aad(&VECTOR_KID, &VECTOR_PIV).unwrap();
-        assert_eq!(&VECTOR_AAD, &vector_aad[..]);
+        let vector_aad = build_aad(&KID, &PIV).unwrap();
+        assert_eq!(&AAD, &vector_aad[..]);
     }
 
     #[test]
@@ -436,11 +475,19 @@ mod tests {
     }
 
     #[test]
-    fn payload() {
-        let pt = build_plaintext(&VECTOR_UNPROTECTED).unwrap();
-        assert_eq!(&INNER_MESSAGE, &pt[..]);
-
-        let pt = build_plaintext(&VECTOR_UNPROTECTED_PAYLOAD).unwrap();
-        assert_eq!(&INNER_MESSAGE_PAYLOAD, &pt[..]);
+    fn protection() {
+        let security_context = SecurityContext::new(
+            MASTER_SECRET.to_vec(),
+            MASTER_SALT.to_vec(),
+            SENDER_ID.to_vec(),
+            RECIPIENT_ID.to_vec(),
+        )
+        .unwrap();
+        assert_eq!(
+            &TEMP_PROTECTED[..],
+            &security_context
+                .protect_message(&UNPROTECTED, &PIV)
+                .unwrap()[..]
+        );
     }
 }
