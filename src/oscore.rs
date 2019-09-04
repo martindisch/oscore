@@ -105,6 +105,20 @@ impl SecurityContext {
         })
     }
 
+    /// Returns the byte representation of the partial IV.
+    pub fn get_piv(&self) -> Vec<u8> {
+        // Convert the sender sequence number to its byte representation
+        let bytes = self.sender_context.sender_sequence_number.to_be_bytes();
+        // Find the index of the first byte that is not zero
+        let first_nonzero = bytes.iter().position(|&x| x != 0);
+        match first_nonzero {
+            // If there is one, skip leading zero bytes and return the others
+            Some(n) => bytes[n..].to_vec(),
+            // If there isn't, we simply return 0
+            None => vec![0x00],
+        }
+    }
+
     /// Returns an OSCORE message based on the original CoAP message.
     pub fn protect_message(
         &self,
@@ -548,6 +562,24 @@ mod tests {
             RES_NONCE_LONG_PIV,
             compute_nonce(RES_PIV_NUM, &RES_RECIPIENT_ID_LONG, &COMMON_IV)
         );
+    }
+
+    #[test]
+    fn piv_transform() {
+        let mut ctx = SecurityContext::new(
+            MASTER_SECRET.to_vec(),
+            MASTER_SALT.to_vec(),
+            SENDER_ID.to_vec(),
+            RECIPIENT_ID.to_vec(),
+        )
+        .unwrap();
+        assert_eq!([0], ctx.get_piv()[..]);
+
+        ctx.set_sender_sequence_number(0xFF);
+        assert_eq!([0xFF], ctx.get_piv()[..]);
+
+        ctx.set_sender_sequence_number(0xFF + 1);
+        assert_eq!([0x01, 0x00], ctx.get_piv()[..]);
     }
 
     #[test]
