@@ -12,6 +12,8 @@ use crate::coap::{
 };
 use crate::{cbor, Result};
 
+const NONCE_LEN: usize = 13;
+
 /// The common context part of the security context.
 struct CommonContext {
     master_secret: Vec<u8>,
@@ -293,6 +295,33 @@ fn extract_oscore_option(value: &[u8]) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
     (kid, piv)
 }
 
+/// Returns the nonce for the AEAD.
+fn compute_nonce(
+    piv: u64,
+    mut id_piv: &[u8],
+    common_iv: &[u8; NONCE_LEN],
+) -> [u8; NONCE_LEN] {
+    // Since id_piv could be longer than it should, trim it if necessary
+    if id_piv.len() > NONCE_LEN - 6 {
+        id_piv = &id_piv[id_piv.len() - (NONCE_LEN - 6)..]
+    }
+
+    let mut nonce = [0; NONCE_LEN];
+    // Left-pad the Partial IV (PIV) with zeros to exactly 5 bytes
+    nonce[NONCE_LEN - 5..].copy_from_slice(&piv.to_be_bytes()[3..]);
+    // Left-pad ID_PIV with zeros to exactly nonce length minus 6 bytes
+    nonce[1 + NONCE_LEN - 6 - id_piv.len()..NONCE_LEN - 5]
+        .copy_from_slice(&id_piv);
+    // Add the size of the ID_PIV (a single byte S)
+    nonce[0] = id_piv.len() as u8;
+    // XOR with common IV
+    for (b1, b2) in nonce.iter_mut().zip(common_iv.iter()) {
+        *b1 ^= b2;
+    }
+
+    nonce
+}
+
 // TODO: Better integration with improved coap module in the future
 static CLASS_U: [usize; 4] = [3, 7, 35, 39];
 static UNSUPPORTED: [usize; 6] = [6, 23, 27, 28, 60, 258];
@@ -300,6 +329,8 @@ static UNSUPPORTED: [usize; 6] = [6, 23, 27, 28, 60, 258];
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // RFC 8613 test vectors --------------------------------------------------
 
     const MASTER_SECRET: [u8; 16] = [
         0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
@@ -336,13 +367,17 @@ mod tests {
         0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
         0x49, 0x85, 0x01, 0x81, 0x0A, 0x41, 0x00, 0x41, 0x25, 0x40,
     ];
-    const KID: [u8; 0] = [];
-    const PIV: [u8; 1] = [0x14];
-    const AAD_ARR: [u8; 8] = [0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40];
-    const AAD: [u8; 20] = [
+    const REQ_KID: [u8; 0] = [];
+    const REQ_PIV: [u8; 1] = [0x14];
+    const REQ_PIV_NUM: u64 = 0x14;
+    const REQ_AAD_ARR: [u8; 8] =
+        [0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40];
+    const REQ_AAD: [u8; 20] = [
         0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
         0x48, 0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40,
     ];
+    const RES_PIV: [u8; 1] = [0x00];
+    const RES_PIV_NUM: u64 = 0x00;
 
     const EX1_KID: Option<&[u8]> = Some(&[0x25]);
     const EX1_PIV: Option<&[u8]> = Some(&[0x05]);
@@ -373,6 +408,23 @@ mod tests {
         0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x62, 0x09, 0x14, 0xFF,
         0x01, 0xB3, 0x74, 0x76, 0x31,
     ];
+    const REQ_NONCE: [u8; 13] = [
+        0x46, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x68, 0xEE, 0xFB, 0x54,
+        0x98, 0x68,
+    ];
+    const RES_NONCE: [u8; 13] = [
+        0x47, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x69, 0xEE, 0xFB, 0x54,
+        0x98, 0x7C,
+    ];
+
+    // Custom test vectors ----------------------------------------------------
+
+    const RES_NONCE_LONG_PIV: [u8; 13] = [
+        0x41, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x69, 0xEE, 0xFB, 0x54,
+        0x98, 0x7C,
+    ];
+    const RES_RECIPIENT_ID_LONG: [u8; 10] =
+        [0x01, 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01];
 
     #[test]
     fn info() {
@@ -430,8 +482,8 @@ mod tests {
             build_aad_array(&EXAMPLE_KID, &EXAMPLE_PIV).unwrap();
         assert_eq!(&EXAMPLE_AAD_ARR, &example_aad_arr[..]);
 
-        let vector_aad_arr = build_aad_array(&KID, &PIV).unwrap();
-        assert_eq!(&AAD_ARR, &vector_aad_arr[..]);
+        let vector_aad_arr = build_aad_array(&REQ_KID, &REQ_PIV).unwrap();
+        assert_eq!(&REQ_AAD_ARR, &vector_aad_arr[..]);
     }
 
     #[test]
@@ -439,8 +491,8 @@ mod tests {
         let example_aad = build_aad(&EXAMPLE_KID, &EXAMPLE_PIV).unwrap();
         assert_eq!(&EXAMPLE_AAD, &example_aad[..]);
 
-        let vector_aad = build_aad(&KID, &PIV).unwrap();
-        assert_eq!(&AAD, &vector_aad[..]);
+        let vector_aad = build_aad(&REQ_KID, &REQ_PIV).unwrap();
+        assert_eq!(&REQ_AAD, &vector_aad[..]);
     }
 
     #[test]
@@ -475,6 +527,22 @@ mod tests {
     }
 
     #[test]
+    fn nonce() {
+        assert_eq!(
+            REQ_NONCE,
+            compute_nonce(REQ_PIV_NUM, &SENDER_ID, &COMMON_IV)
+        );
+        assert_eq!(
+            RES_NONCE,
+            compute_nonce(RES_PIV_NUM, &RECIPIENT_ID, &COMMON_IV)
+        );
+        assert_eq!(
+            RES_NONCE_LONG_PIV,
+            compute_nonce(RES_PIV_NUM, &RES_RECIPIENT_ID_LONG, &COMMON_IV)
+        );
+    }
+
+    #[test]
     fn protection() {
         let security_context = SecurityContext::new(
             MASTER_SECRET.to_vec(),
@@ -486,7 +554,7 @@ mod tests {
         assert_eq!(
             &TEMP_PROTECTED[..],
             &security_context
-                .protect_message(&UNPROTECTED, &PIV)
+                .protect_message(&UNPROTECTED, &REQ_PIV)
                 .unwrap()[..]
         );
     }
