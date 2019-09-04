@@ -12,26 +12,28 @@ use crate::coap::{
 };
 use crate::{cbor, Result};
 
+const KEY_LEN: usize = 16;
 const NONCE_LEN: usize = 13;
+const MAC_LEN: usize = 8;
 
 /// The common context part of the security context.
 struct CommonContext {
     master_secret: Vec<u8>,
     master_salt: Vec<u8>,
-    common_iv: Vec<u8>,
+    common_iv: [u8; NONCE_LEN],
 }
 
 /// The sender context part of the security context.
 struct SenderContext {
     sender_id: Vec<u8>,
-    sender_key: Vec<u8>,
+    sender_key: [u8; KEY_LEN],
     sender_sequence_number: u64,
 }
 
 /// The recipient context part of the security context.
 struct RecipientContext {
     recipient_id: Vec<u8>,
-    recipient_key: Vec<u8>,
+    recipient_key: [u8; KEY_LEN],
     // We're assuming a reliable transport and therefore only store the last
     // received partial IV for simplicity
     replay_window: u64,
@@ -53,24 +55,30 @@ impl SecurityContext {
         recipient_id: Vec<u8>,
     ) -> Result<SecurityContext> {
         // Derive the keys and IV
-        let sender_key = hkdf(
+        let sender_key_vec = hkdf(
             &master_secret,
             &master_salt,
             &build_info(&sender_id, "Key", 16)?,
             16,
         )?;
-        let recipient_key = hkdf(
+        let recipient_key_vec = hkdf(
             &master_secret,
             &master_salt,
             &build_info(&recipient_id, "Key", 16)?,
             16,
         )?;
-        let common_iv = hkdf(
+        let common_iv_vec = hkdf(
             &master_secret,
             &master_salt,
             &build_info(&[], "IV", 13)?,
             13,
         )?;
+        let mut sender_key = [0; KEY_LEN];
+        sender_key.copy_from_slice(&sender_key_vec);
+        let mut recipient_key = [0; KEY_LEN];
+        recipient_key.copy_from_slice(&recipient_key_vec);
+        let mut common_iv = [0; NONCE_LEN];
+        common_iv.copy_from_slice(&common_iv_vec);
 
         // Build the subcontexts
         let common_context = CommonContext {
