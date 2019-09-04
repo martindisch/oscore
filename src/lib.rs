@@ -9,7 +9,6 @@ mod coap;
 #[cfg_attr(tarpaulin, skip)]
 mod error;
 
-pub mod coap_message;
 pub mod edhoc;
 pub mod oscore;
 
