@@ -1,6 +1,7 @@
 // TODO: remove
 #![allow(dead_code)]
 
+use aes_ccm::CcmMode;
 use alloc::vec::Vec;
 use hkdf::Hkdf;
 use num_traits::FromPrimitive;
@@ -181,8 +182,20 @@ impl SecurityContext {
         // Remove the first header byte
         inner_bytes.remove(0);
 
-        // Set the inner message as the new payload TODO: encryption & stuff
-        original.payload = inner_bytes;
+        // Encrypt the payload
+        let nonce = compute_nonce(
+            self.sender_context.sender_sequence_number,
+            &self.sender_context.sender_id,
+            &self.common_context.common_iv,
+        );
+        let ccm =
+            CcmMode::new(&self.sender_context.sender_key, nonce, MAC_LEN)?;
+        let aad = build_aad(&self.sender_context.sender_id, &self.get_piv())?;
+        let mut ciphertext_buf = vec![0; inner_bytes.len() + MAC_LEN];
+        ccm.generate_encrypt(&mut ciphertext_buf, &aad, &inner_bytes)?;
+
+        // Set the ciphertext as the new payload
+        original.payload = ciphertext_buf;
         // Add the OSCORE option
         original.add_option(
             CoapOption::Oscore,
@@ -195,6 +208,11 @@ impl SecurityContext {
 
         // TODO: error handling
         Ok(original.to_bytes().unwrap())
+    }
+
+    #[cfg(test)]
+    pub fn set_sender_sequence_number(&mut self, n: u64) {
+        self.sender_context.sender_sequence_number = n;
     }
 }
 
@@ -425,11 +443,6 @@ mod tests {
         0x61, 0x2F, 0x10, 0x92, 0xF1, 0x77, 0x6F, 0x1C, 0x16, 0x68, 0xB3,
         0x82, 0x5E,
     ];
-    const TEMP_PROTECTED: [u8; 27] = [
-        0x44, 0x02, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
-        0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x62, 0x09, 0x14, 0xFF,
-        0x01, 0xB3, 0x74, 0x76, 0x31,
-    ];
     const REQ_NONCE: [u8; 13] = [
         0x46, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x68, 0xEE, 0xFB, 0x54,
         0x98, 0x68,
@@ -584,15 +597,16 @@ mod tests {
 
     #[test]
     fn protection() {
-        let security_context = SecurityContext::new(
+        let mut security_context = SecurityContext::new(
             MASTER_SECRET.to_vec(),
             MASTER_SALT.to_vec(),
             SENDER_ID.to_vec(),
             RECIPIENT_ID.to_vec(),
         )
         .unwrap();
+        security_context.set_sender_sequence_number(REQ_PIV_NUM);
         assert_eq!(
-            &TEMP_PROTECTED[..],
+            &PROTECTED[..],
             &security_context
                 .protect_message(&UNPROTECTED, &REQ_PIV)
                 .unwrap()[..]
