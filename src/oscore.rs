@@ -450,19 +450,19 @@ mod tests {
     ];
     const MASTER_SALT: [u8; 8] =
         [0x9E, 0x7C, 0xA9, 0x22, 0x23, 0x78, 0x63, 0x40];
-    const SENDER_ID: [u8; 0] = [];
-    const RECIPIENT_ID: [u8; 1] = [0x01];
-    const INFO_SENDER_KEY: [u8; 9] =
+    const CLIENT_ID: [u8; 0] = [];
+    const SERVER_ID: [u8; 1] = [0x01];
+    const INFO_CLIENT_KEY: [u8; 9] =
         [0x85, 0x40, 0xF6, 0x0A, 0x63, 0x4B, 0x65, 0x79, 0x10];
-    const INFO_RECIPIENT_KEY: [u8; 10] =
+    const INFO_SERVER_KEY: [u8; 10] =
         [0x85, 0x41, 0x01, 0xF6, 0x0A, 0x63, 0x4B, 0x65, 0x79, 0x10];
     const INFO_COMMON_IV: [u8; 8] =
         [0x85, 0x40, 0xF6, 0x0A, 0x62, 0x49, 0x56, 0x0D];
-    const SENDER_KEY: [u8; 16] = [
+    const CLIENT_KEY: [u8; 16] = [
         0xF0, 0x91, 0x0E, 0xD7, 0x29, 0x5E, 0x6A, 0xD4, 0xB5, 0x4F, 0xC7,
         0x93, 0x15, 0x43, 0x02, 0xFF,
     ];
-    const RECIPIENT_KEY: [u8; 16] = [
+    const SERVER_KEY: [u8; 16] = [
         0xFF, 0xB1, 0x4E, 0x09, 0x3C, 0x94, 0xC9, 0xCA, 0xC9, 0x47, 0x16,
         0x48, 0xB4, 0xF9, 0x87, 0x10,
     ];
@@ -470,11 +470,11 @@ mod tests {
         0x46, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x68, 0xEE, 0xFB, 0x54,
         0x98, 0x7C,
     ];
-    const SENDER_NONCE: [u8; 13] = [
+    const CLIENT_NONCE: [u8; 13] = [
         0x46, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x68, 0xEE, 0xFB, 0x54,
         0x98, 0x68,
     ];
-    const RECIPIENT_NONCE: [u8; 13] = [
+    const SERVER_NONCE: [u8; 13] = [
         0x47, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x69, 0xEE, 0xFB, 0x54,
         0x98, 0x7C,
     ];
@@ -526,20 +526,20 @@ mod tests {
     // Custom test vectors ----------------------------------------------------
 
     const CRASH_OPTION: [u8; 2] = [0b0000_1101, 0x01];
-    const RECIPIENT_NONCE_LONG_PIV: [u8; 13] = [
+    const SERVER_NONCE_LONG_PIV: [u8; 13] = [
         0x41, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x69, 0xEE, 0xFB, 0x54,
         0x98, 0x7C,
     ];
-    const RECIPIENT_ID_LONG: [u8; 10] =
+    const SERVER_ID_LONG: [u8; 10] =
         [0x01, 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01];
 
     #[test]
     fn info() {
-        let i_sender = build_info(&SENDER_ID, "Key", 16).unwrap();
-        assert_eq!(&INFO_SENDER_KEY, &i_sender[..]);
+        let i_sender = build_info(&CLIENT_ID, "Key", 16).unwrap();
+        assert_eq!(&INFO_CLIENT_KEY, &i_sender[..]);
 
-        let i_recipient = build_info(&RECIPIENT_ID, "Key", 16).unwrap();
-        assert_eq!(&INFO_RECIPIENT_KEY, &i_recipient[..]);
+        let i_recipient = build_info(&SERVER_ID, "Key", 16).unwrap();
+        assert_eq!(&INFO_SERVER_KEY, &i_recipient[..]);
 
         let i_iv = build_info(&[], "IV", 13).unwrap();
         assert_eq!(&INFO_COMMON_IV, &i_iv[..]);
@@ -550,8 +550,8 @@ mod tests {
         let security_context = SecurityContext::new(
             MASTER_SECRET.to_vec(),
             MASTER_SALT.to_vec(),
-            SENDER_ID.to_vec(),
-            RECIPIENT_ID.to_vec(),
+            CLIENT_ID.to_vec(),
+            SERVER_ID.to_vec(),
         )
         .unwrap();
 
@@ -565,19 +565,19 @@ mod tests {
         );
         assert_eq!(&COMMON_IV, &security_context.common_context.common_iv[..]);
 
-        assert_eq!(&SENDER_ID, &security_context.sender_context.sender_id[..]);
+        assert_eq!(&CLIENT_ID, &security_context.sender_context.sender_id[..]);
         assert_eq!(
-            &SENDER_KEY,
+            &CLIENT_KEY,
             &security_context.sender_context.sender_key[..]
         );
         assert_eq!(0, security_context.sender_context.sender_sequence_number);
 
         assert_eq!(
-            &RECIPIENT_ID,
+            &SERVER_ID,
             &security_context.recipient_context.recipient_id[..]
         );
         assert_eq!(
-            &RECIPIENT_KEY,
+            &SERVER_KEY,
             &security_context.recipient_context.recipient_key[..]
         );
         assert_eq!(0, security_context.recipient_context.replay_window);
@@ -589,7 +589,7 @@ mod tests {
             build_aad_array(&EXAMPLE_KID, &EXAMPLE_PIV).unwrap();
         assert_eq!(&EXAMPLE_AAD_ARR, &example_aad_arr[..]);
 
-        let v4_aad_arr = build_aad_array(&SENDER_ID, &REQ_PIV).unwrap();
+        let v4_aad_arr = build_aad_array(&CLIENT_ID, &REQ_PIV).unwrap();
         assert_eq!(&REQ_AAD_ARR, &v4_aad_arr[..]);
     }
 
@@ -598,7 +598,7 @@ mod tests {
         let example_aad = build_aad(&EXAMPLE_KID, &EXAMPLE_PIV).unwrap();
         assert_eq!(&EXAMPLE_AAD, &example_aad[..]);
 
-        let v4_aad = build_aad(&SENDER_ID, &REQ_PIV).unwrap();
+        let v4_aad = build_aad(&CLIENT_ID, &REQ_PIV).unwrap();
         assert_eq!(&REQ_AAD, &v4_aad[..]);
     }
 
@@ -636,16 +636,16 @@ mod tests {
     #[test]
     fn nonce() {
         assert_eq!(
-            SENDER_NONCE,
-            compute_nonce(REQ_SSN, &SENDER_ID, &COMMON_IV)
+            CLIENT_NONCE,
+            compute_nonce(REQ_SSN, &CLIENT_ID, &COMMON_IV)
         );
         assert_eq!(
-            RECIPIENT_NONCE,
-            compute_nonce(RES_SSN, &RECIPIENT_ID, &COMMON_IV)
+            SERVER_NONCE,
+            compute_nonce(RES_SSN, &SERVER_ID, &COMMON_IV)
         );
         assert_eq!(
-            RECIPIENT_NONCE_LONG_PIV,
-            compute_nonce(RES_SSN, &RECIPIENT_ID_LONG, &COMMON_IV)
+            SERVER_NONCE_LONG_PIV,
+            compute_nonce(RES_SSN, &SERVER_ID_LONG, &COMMON_IV)
         );
     }
 
@@ -654,8 +654,8 @@ mod tests {
         let mut ctx = SecurityContext::new(
             MASTER_SECRET.to_vec(),
             MASTER_SALT.to_vec(),
-            SENDER_ID.to_vec(),
-            RECIPIENT_ID.to_vec(),
+            CLIENT_ID.to_vec(),
+            SERVER_ID.to_vec(),
         )
         .unwrap();
         assert_eq!([0], ctx.get_piv()[..]);
@@ -672,8 +672,8 @@ mod tests {
         let mut req_security_context = SecurityContext::new(
             MASTER_SECRET.to_vec(),
             MASTER_SALT.to_vec(),
-            SENDER_ID.to_vec(),
-            RECIPIENT_ID.to_vec(),
+            CLIENT_ID.to_vec(),
+            SERVER_ID.to_vec(),
         )
         .unwrap();
         req_security_context.set_sender_sequence_number(REQ_SSN);
@@ -687,8 +687,8 @@ mod tests {
         let mut res_security_context = SecurityContext::new(
             MASTER_SECRET.to_vec(),
             MASTER_SALT.to_vec(),
-            RECIPIENT_ID.to_vec(),
-            SENDER_ID.to_vec(),
+            SERVER_ID.to_vec(),
+            CLIENT_ID.to_vec(),
         )
         .unwrap();
         assert_eq!(
@@ -696,7 +696,7 @@ mod tests {
             &res_security_context
                 .protect_message(
                     &RES_UNPROTECTED,
-                    Some(&SENDER_ID),
+                    Some(&CLIENT_ID),
                     Some(&REQ_PIV),
                     false
                 )
