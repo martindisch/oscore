@@ -135,11 +135,16 @@ impl SecurityContext {
         request_piv: Option<&[u8]>,
         reuse_piv: bool,
     ) -> Result<Vec<u8>> {
+        // Compute the AAD
+        let aad = build_aad(
+            request_kid.unwrap_or(&self.sender_context.sender_id),
+            request_piv.unwrap_or(&self.get_piv()),
+        )?;
+
         // Parse the CoAP message TODO: figure out the error situation
         let mut original = Packet::from_bytes(coap_msg).unwrap();
         // Initialize a new CoAP message to store the protected parts
         let mut inner = Packet::new();
-
         // Move the code into the inner message
         inner.header.code = original.header.code;
         // Replace the outer code
@@ -181,7 +186,6 @@ impl SecurityContext {
         }
         // Move the payload out of the original into the new one
         inner.set_payload(original.payload);
-
         // Convert the message to its byte representation TODO: error handling
         let mut inner_bytes = inner.to_bytes().unwrap();
         // Remove the message ID and the token (if it exists)
@@ -192,15 +196,8 @@ impl SecurityContext {
 
         // Decide on the content of the OSCORE option and the nonce
         let (nonce, option_value) = if is_response && reuse_piv {
-            (
-                compute_nonce(
-                    temp_convert(request_piv.unwrap()),
-                    &self.recipient_context.recipient_id,
-                    &self.common_context.common_iv,
-                ),
-                build_oscore_option(None, request_piv),
-            )
-        } else if is_response {
+            // We're sending a response and reusing the request's piv:
+            // Same nonce, empty OSCORE option since no change
             (
                 compute_nonce(
                     temp_convert(request_piv.unwrap()),
@@ -209,8 +206,23 @@ impl SecurityContext {
                 ),
                 build_oscore_option(None, None),
             )
+        } else if is_response {
+            // We're sending a response but not reusing the request's piv:
+            // Build nonce from own sender context, transmit piv but no kid
+            let res = (
+                compute_nonce(
+                    self.sender_context.sender_sequence_number,
+                    &self.sender_context.sender_id,
+                    &self.common_context.common_iv,
+                ),
+                build_oscore_option(None, Some(&self.get_piv())),
+            );
+            self.sender_context.sender_sequence_number += 1;
+            res
         } else {
-            (
+            // We're sending a request:
+            // Build nonce from own sender context, transmit piv & kid
+            let res = (
                 compute_nonce(
                     self.sender_context.sender_sequence_number,
                     &self.sender_context.sender_id,
@@ -220,16 +232,14 @@ impl SecurityContext {
                     Some(&self.sender_context.sender_id),
                     Some(&self.get_piv()),
                 ),
-            )
+            );
+            self.sender_context.sender_sequence_number += 1;
+            res
         };
 
         // Encrypt the payload
         let ccm =
             CcmMode::new(&self.sender_context.sender_key, nonce, MAC_LEN)?;
-        let aad = build_aad(
-            request_kid.unwrap_or(&self.sender_context.sender_id),
-            request_piv.unwrap_or(&self.get_piv()),
-        )?;
         let mut ciphertext_buf = vec![0; inner_bytes.len() + MAC_LEN];
         ccm.generate_encrypt(&mut ciphertext_buf, &aad, &inner_bytes)?;
         // Set the ciphertext as the new payload
@@ -237,11 +247,6 @@ impl SecurityContext {
 
         // Add the OSCORE option
         original.add_option(CoapOption::Oscore, option_value);
-
-        // Increment the sender sequence number if necessary
-        if !reuse_piv {
-            self.sender_context.sender_sequence_number += 1;
-        }
 
         // TODO: error handling
         Ok(original.to_bytes().unwrap())
@@ -694,6 +699,25 @@ mod tests {
         assert_eq!(
             &RES_PROTECTED[..],
             &res_security_context
+                .protect_message(
+                    &RES_UNPROTECTED,
+                    Some(&CLIENT_ID),
+                    Some(&REQ_PIV),
+                    true
+                )
+                .unwrap()[..]
+        );
+
+        let mut res_piv_security_context = SecurityContext::new(
+            MASTER_SECRET.to_vec(),
+            MASTER_SALT.to_vec(),
+            SERVER_ID.to_vec(),
+            CLIENT_ID.to_vec(),
+        )
+        .unwrap();
+        assert_eq!(
+            &RES_PIV_PROTECTED[..],
+            &res_piv_security_context
                 .protect_message(
                     &RES_UNPROTECTED,
                     Some(&CLIENT_ID),
