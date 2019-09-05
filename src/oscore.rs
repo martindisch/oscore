@@ -121,10 +121,19 @@ impl SecurityContext {
     }
 
     /// Returns an OSCORE message based on the original CoAP message.
+    ///
+    /// # Arguments
+    /// * `coap_msg` - The original CoAP message to protect.
+    /// * `request_kid` - The request's `kid` if this is a response.
+    /// * `request_piv` - The request's `piv` if this is a response.
+    /// * `reuse_piv` - Whether the request's `piv` should be reused. Otherwise
+    ///   the own `sender_sequence_number` will be used.
     pub fn protect_message(
-        &self,
+        &mut self,
         coap_msg: &[u8],
-        partial_iv: &[u8],
+        request_kid: Option<&[u8]>,
+        request_piv: Option<&[u8]>,
+        reuse_piv: bool,
     ) -> Result<Vec<u8>> {
         // Parse the CoAP message TODO: figure out the error situation
         let mut original = Packet::from_bytes(coap_msg).unwrap();
@@ -133,17 +142,16 @@ impl SecurityContext {
 
         // Move the code into the inner message
         inner.header.code = original.header.code;
+        // Replace the outer code
+        let mut is_response = false;
         original.header.code = match original.header.code {
-            // All requests get POST
-            MessageClass::Request(_) => {
-                MessageClass::Request(RequestType::Post)
-            }
             // All responses get Changed
             MessageClass::Response(_) => {
+                is_response = true;
                 MessageClass::Response(ResponseType::Changed)
             }
-            MessageClass::Empty => MessageClass::Empty,
-            MessageClass::Reserved => MessageClass::Reserved,
+            // All requests (and unknown + reserved) get POST
+            _ => MessageClass::Request(RequestType::Post),
         };
         // Store which options we remove from the outer message in this
         let mut moved_options = vec![];
@@ -182,29 +190,58 @@ impl SecurityContext {
         // Remove the first header byte
         inner_bytes.remove(0);
 
+        // Decide on the content of the OSCORE option and the nonce
+        let (nonce, option_value) = if is_response && reuse_piv {
+            (
+                compute_nonce(
+                    temp_convert(request_piv.unwrap()),
+                    &self.recipient_context.recipient_id,
+                    &self.common_context.common_iv,
+                ),
+                build_oscore_option(None, request_piv),
+            )
+        } else if is_response {
+            (
+                compute_nonce(
+                    temp_convert(request_piv.unwrap()),
+                    &self.recipient_context.recipient_id,
+                    &self.common_context.common_iv,
+                ),
+                build_oscore_option(None, None),
+            )
+        } else {
+            (
+                compute_nonce(
+                    self.sender_context.sender_sequence_number,
+                    &self.sender_context.sender_id,
+                    &self.common_context.common_iv,
+                ),
+                build_oscore_option(
+                    Some(&self.sender_context.sender_id),
+                    Some(&self.get_piv()),
+                ),
+            )
+        };
+
         // Encrypt the payload
-        let nonce = compute_nonce(
-            self.sender_context.sender_sequence_number,
-            &self.sender_context.sender_id,
-            &self.common_context.common_iv,
-        );
         let ccm =
             CcmMode::new(&self.sender_context.sender_key, nonce, MAC_LEN)?;
-        let aad = build_aad(&self.sender_context.sender_id, &self.get_piv())?;
+        let aad = build_aad(
+            request_kid.unwrap_or(&self.sender_context.sender_id),
+            request_piv.unwrap_or(&self.get_piv()),
+        )?;
         let mut ciphertext_buf = vec![0; inner_bytes.len() + MAC_LEN];
         ccm.generate_encrypt(&mut ciphertext_buf, &aad, &inner_bytes)?;
-
         // Set the ciphertext as the new payload
         original.payload = ciphertext_buf;
+
         // Add the OSCORE option
-        original.add_option(
-            CoapOption::Oscore,
-            build_oscore_option(
-                Some(&self.sender_context.sender_id),
-                // TODO: proper PIV
-                Some(partial_iv),
-            ),
-        );
+        original.add_option(CoapOption::Oscore, option_value);
+
+        // Increment the sender sequence number if necessary
+        if !reuse_piv {
+            self.sender_context.sender_sequence_number += 1;
+        }
 
         // TODO: error handling
         Ok(original.to_bytes().unwrap())
@@ -214,6 +251,13 @@ impl SecurityContext {
     pub fn set_sender_sequence_number(&mut self, n: u64) {
         self.sender_context.sender_sequence_number = n;
     }
+}
+
+fn temp_convert(num: &[u8]) -> u64 {
+    let mut t = [0; 8];
+    t[8 - num.len()..].copy_from_slice(num);
+
+    u64::from_be_bytes(t)
 }
 
 /// Returns the CBOR encoded `info` structure.
@@ -636,7 +680,26 @@ mod tests {
         assert_eq!(
             &REQ_PROTECTED[..],
             &req_security_context
-                .protect_message(&REQ_UNPROTECTED, &REQ_PIV)
+                .protect_message(&REQ_UNPROTECTED, None, None, false)
+                .unwrap()[..]
+        );
+
+        let mut res_security_context = SecurityContext::new(
+            MASTER_SECRET.to_vec(),
+            MASTER_SALT.to_vec(),
+            RECIPIENT_ID.to_vec(),
+            SENDER_ID.to_vec(),
+        )
+        .unwrap();
+        assert_eq!(
+            &RES_PROTECTED[..],
+            &res_security_context
+                .protect_message(
+                    &RES_UNPROTECTED,
+                    Some(&SENDER_ID),
+                    Some(&REQ_PIV),
+                    false
+                )
                 .unwrap()[..]
         );
     }
