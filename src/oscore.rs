@@ -370,7 +370,35 @@ static UNSUPPORTED: [usize; 6] = [6, 23, 27, 28, 60, 258];
 mod tests {
     use super::*;
 
-    // RFC 8613 test vectors --------------------------------------------------
+    // RFC 8613 test vectors & examples ---------------------------------------
+
+    // AAD example
+
+    const EXAMPLE_KID: [u8; 1] = [0x00];
+    const EXAMPLE_PIV: [u8; 1] = [0x25];
+    const EXAMPLE_AAD_ARR: [u8; 9] =
+        [0x85, 0x01, 0x81, 0x0A, 0x41, 0x00, 0x41, 0x25, 0x40];
+    const EXAMPLE_AAD: [u8; 21] = [
+        0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
+        0x49, 0x85, 0x01, 0x81, 0x0A, 0x41, 0x00, 0x41, 0x25, 0x40,
+    ];
+
+    // COSE compression (OSCORE option) examples
+
+    const EX1_KID: Option<&[u8]> = Some(&[0x25]);
+    const EX1_PIV: Option<&[u8]> = Some(&[0x05]);
+    const EX1_OPTION: [u8; 3] = [0x09, 0x05, 0x25];
+    const EX2_KID: Option<&[u8]> = Some(&[]);
+    const EX2_PIV: Option<&[u8]> = Some(&[0x00]);
+    const EX2_OPTION: [u8; 2] = [0x09, 0x00];
+    const EX4_KID: Option<&[u8]> = None;
+    const EX4_PIV: Option<&[u8]> = None;
+    const EX4_OPTION: [u8; 0] = [];
+    const EX5_KID: Option<&[u8]> = None;
+    const EX5_PIV: Option<&[u8]> = Some(&[0x07]);
+    const EX5_OPTION: [u8; 2] = [0x01, 0x07];
+
+    // Test vector 1
 
     const MASTER_SECRET: [u8; 16] = [
         0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B,
@@ -398,67 +426,67 @@ mod tests {
         0x46, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x68, 0xEE, 0xFB, 0x54,
         0x98, 0x7C,
     ];
-
-    const EXAMPLE_KID: [u8; 1] = [0x00];
-    const EXAMPLE_PIV: [u8; 1] = [0x25];
-    const EXAMPLE_AAD_ARR: [u8; 9] =
-        [0x85, 0x01, 0x81, 0x0A, 0x41, 0x00, 0x41, 0x25, 0x40];
-    const EXAMPLE_AAD: [u8; 21] = [
-        0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
-        0x49, 0x85, 0x01, 0x81, 0x0A, 0x41, 0x00, 0x41, 0x25, 0x40,
+    const SENDER_NONCE: [u8; 13] = [
+        0x46, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x68, 0xEE, 0xFB, 0x54,
+        0x98, 0x68,
     ];
-    const REQ_KID: [u8; 0] = [];
+    const RECIPIENT_NONCE: [u8; 13] = [
+        0x47, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x69, 0xEE, 0xFB, 0x54,
+        0x98, 0x7C,
+    ];
+
+    // Test vector 4 (uses context from test vector 1)
+
+    const REQ_UNPROTECTED: [u8; 22] = [
+        0x44, 0x01, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
+        0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x83, 0x74, 0x76, 0x31,
+    ];
+    const REQ_SSN: u64 = 20;
     const REQ_PIV: [u8; 1] = [0x14];
-    const REQ_PIV_NUM: u64 = 0x14;
     const REQ_AAD_ARR: [u8; 8] =
         [0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40];
     const REQ_AAD: [u8; 20] = [
         0x83, 0x68, 0x45, 0x6E, 0x63, 0x72, 0x79, 0x70, 0x74, 0x30, 0x40,
         0x48, 0x85, 0x01, 0x81, 0x0A, 0x40, 0x41, 0x14, 0x40,
     ];
-    const RES_PIV: [u8; 1] = [0x00];
-    const RES_PIV_NUM: u64 = 0x00;
-
-    const EX1_KID: Option<&[u8]> = Some(&[0x25]);
-    const EX1_PIV: Option<&[u8]> = Some(&[0x05]);
-    const EX1_OPTION: [u8; 3] = [0x09, 0x05, 0x25];
-    const EX2_KID: Option<&[u8]> = Some(&[]);
-    const EX2_PIV: Option<&[u8]> = Some(&[0x00]);
-    const EX2_OPTION: [u8; 2] = [0x09, 0x00];
-    const EX4_KID: Option<&[u8]> = None;
-    const EX4_PIV: Option<&[u8]> = None;
-    const EX4_OPTION: [u8; 0] = [];
-    const EX5_KID: Option<&[u8]> = None;
-    const EX5_PIV: Option<&[u8]> = Some(&[0x07]);
-    const EX5_OPTION: [u8; 2] = [0x01, 0x07];
-    const CRASH_OPTION: [u8; 2] = [0b0000_1101, 0x01];
-
-    const UNPROTECTED: [u8; 22] = [
-        0x44, 0x01, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
-        0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x83, 0x74, 0x76, 0x31,
-    ];
-    const PROTECTED: [u8; 35] = [
+    const REQ_PROTECTED: [u8; 35] = [
         0x44, 0x02, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x39, 0x6C, 0x6F,
         0x63, 0x61, 0x6C, 0x68, 0x6F, 0x73, 0x74, 0x62, 0x09, 0x14, 0xFF,
         0x61, 0x2F, 0x10, 0x92, 0xF1, 0x77, 0x6F, 0x1C, 0x16, 0x68, 0xB3,
         0x82, 0x5E,
     ];
-    const REQ_NONCE: [u8; 13] = [
-        0x46, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x68, 0xEE, 0xFB, 0x54,
-        0x98, 0x68,
+
+    // Test vector 7 (uses context from test vector 1 & parts from vector 4)
+
+    const RES_UNPROTECTED: [u8; 21] = [
+        0x64, 0x45, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0xFF, 0x48, 0x65,
+        0x6C, 0x6C, 0x6F, 0x20, 0x57, 0x6F, 0x72, 0x6C, 0x64, 0x21,
     ];
-    const RES_NONCE: [u8; 13] = [
-        0x47, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x69, 0xEE, 0xFB, 0x54,
-        0x98, 0x7C,
+    const RES_SSN: u64 = 0;
+    const RES_PROTECTED: [u8; 32] = [
+        0x64, 0x44, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x90, 0xFF, 0xDB,
+        0xAA, 0xD1, 0xE9, 0xA7, 0xE7, 0xB2, 0xA8, 0x13, 0xD3, 0xC3, 0x15,
+        0x24, 0x37, 0x83, 0x03, 0xCD, 0xAF, 0xAE, 0x11, 0x91, 0x06,
+    ];
+
+    // Test vector 8 (like test vector 7, but with PIV)
+
+    const RES_PIV: [u8; 1] = [0x00];
+    const RES_PIV_PROTECTED: [u8; 34] = [
+        0x64, 0x44, 0x5D, 0x1F, 0x00, 0x00, 0x39, 0x74, 0x92, 0x01, 0x00,
+        0xFF, 0x4D, 0x4C, 0x13, 0x66, 0x93, 0x84, 0xB6, 0x73, 0x54, 0xB2,
+        0xB6, 0x17, 0x5F, 0xF4, 0xB8, 0x65, 0x8C, 0x66, 0x6A, 0x6C, 0xF8,
+        0x8E,
     ];
 
     // Custom test vectors ----------------------------------------------------
 
-    const RES_NONCE_LONG_PIV: [u8; 13] = [
+    const CRASH_OPTION: [u8; 2] = [0b0000_1101, 0x01];
+    const RECIPIENT_NONCE_LONG_PIV: [u8; 13] = [
         0x41, 0x22, 0xD4, 0xDD, 0x6D, 0x94, 0x41, 0x69, 0xEE, 0xFB, 0x54,
         0x98, 0x7C,
     ];
-    const RES_RECIPIENT_ID_LONG: [u8; 10] =
+    const RECIPIENT_ID_LONG: [u8; 10] =
         [0x01, 0x02, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01];
 
     #[test]
@@ -517,8 +545,8 @@ mod tests {
             build_aad_array(&EXAMPLE_KID, &EXAMPLE_PIV).unwrap();
         assert_eq!(&EXAMPLE_AAD_ARR, &example_aad_arr[..]);
 
-        let vector_aad_arr = build_aad_array(&REQ_KID, &REQ_PIV).unwrap();
-        assert_eq!(&REQ_AAD_ARR, &vector_aad_arr[..]);
+        let v4_aad_arr = build_aad_array(&SENDER_ID, &REQ_PIV).unwrap();
+        assert_eq!(&REQ_AAD_ARR, &v4_aad_arr[..]);
     }
 
     #[test]
@@ -526,8 +554,8 @@ mod tests {
         let example_aad = build_aad(&EXAMPLE_KID, &EXAMPLE_PIV).unwrap();
         assert_eq!(&EXAMPLE_AAD, &example_aad[..]);
 
-        let vector_aad = build_aad(&REQ_KID, &REQ_PIV).unwrap();
-        assert_eq!(&REQ_AAD, &vector_aad[..]);
+        let v4_aad = build_aad(&SENDER_ID, &REQ_PIV).unwrap();
+        assert_eq!(&REQ_AAD, &v4_aad[..]);
     }
 
     #[test]
@@ -564,16 +592,16 @@ mod tests {
     #[test]
     fn nonce() {
         assert_eq!(
-            REQ_NONCE,
-            compute_nonce(REQ_PIV_NUM, &SENDER_ID, &COMMON_IV)
+            SENDER_NONCE,
+            compute_nonce(REQ_SSN, &SENDER_ID, &COMMON_IV)
         );
         assert_eq!(
-            RES_NONCE,
-            compute_nonce(RES_PIV_NUM, &RECIPIENT_ID, &COMMON_IV)
+            RECIPIENT_NONCE,
+            compute_nonce(RES_SSN, &RECIPIENT_ID, &COMMON_IV)
         );
         assert_eq!(
-            RES_NONCE_LONG_PIV,
-            compute_nonce(RES_PIV_NUM, &RES_RECIPIENT_ID_LONG, &COMMON_IV)
+            RECIPIENT_NONCE_LONG_PIV,
+            compute_nonce(RES_SSN, &RECIPIENT_ID_LONG, &COMMON_IV)
         );
     }
 
@@ -597,18 +625,18 @@ mod tests {
 
     #[test]
     fn protection() {
-        let mut security_context = SecurityContext::new(
+        let mut req_security_context = SecurityContext::new(
             MASTER_SECRET.to_vec(),
             MASTER_SALT.to_vec(),
             SENDER_ID.to_vec(),
             RECIPIENT_ID.to_vec(),
         )
         .unwrap();
-        security_context.set_sender_sequence_number(REQ_PIV_NUM);
+        req_security_context.set_sender_sequence_number(REQ_SSN);
         assert_eq!(
-            &PROTECTED[..],
-            &security_context
-                .protect_message(&UNPROTECTED, &REQ_PIV)
+            &REQ_PROTECTED[..],
+            &req_security_context
+                .protect_message(&REQ_UNPROTECTED, &REQ_PIV)
                 .unwrap()[..]
         );
     }
