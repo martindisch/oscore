@@ -22,6 +22,10 @@ pub enum Error {
     UnsupportedSuite,
     /// Wraps errors from `coap`.
     Coap(coap::CoapError),
+    /// CoAP request doesn't contain OSCORE option.
+    NoOscoreOption,
+    /// CoAP request doesn't have kid or piv.
+    NoKidPiv,
     /// Wraps a received EDHOC error message.
     Edhoc(String),
 }
@@ -68,6 +72,12 @@ impl fmt::Display for Error {
             Error::Aead(e) => write!(f, "AEAD error: {}", e),
             Error::UnsupportedSuite => write!(f, "Cipher suite unsupported"),
             Error::Coap(e) => write!(f, "CoAP error: {}", e),
+            Error::NoOscoreOption => {
+                write!(f, "CoAP request doesn't contain OSCORE option")
+            }
+            Error::NoKidPiv => {
+                write!(f, "CoAP request doesn't have kid or piv")
+            }
             Error::Edhoc(e) => write!(f, "EDHOC error message: {}", e),
         }
     }

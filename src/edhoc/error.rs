@@ -49,10 +49,10 @@ impl From<Error> for OwnOrPeerError {
             Error::UnsupportedSuite => {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_SUITE))
             }
-            Error::Coap(_) => OwnOrPeerError::OwnError(
-                util::build_error_message(ERR_IMPOSSIBLE),
-            ),
             Error::Edhoc(msg) => OwnOrPeerError::PeerError(msg),
+            _ => OwnOrPeerError::OwnError(util::build_error_message(
+                ERR_IMPOSSIBLE,
+            )),
         }
     }
 }

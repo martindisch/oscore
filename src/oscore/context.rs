@@ -6,7 +6,7 @@ use super::util;
 use crate::coap::{
     packet::Packet, CoapOption, MessageClass, RequestType, ResponseType,
 };
-use crate::Result;
+use crate::{error::Error, Result};
 
 /// The common context part of the security context.
 struct CommonContext {
@@ -146,18 +146,18 @@ impl SecurityContext {
         // Store piv for this execution
         let piv = self.get_piv();
 
-        // Parse the request TODO: figure out the error situation
         let request = Packet::from_bytes(request)?;
         // Extract the kid and piv from the OSCORE option
-        // TODO: error
         let option = request
             .get_option(CoapOption::Oscore)
-            .unwrap()
+            .ok_or(Error::NoOscoreOption)?
             .front()
-            .unwrap();
+            .ok_or(Error::NoOscoreOption)?;
         let (request_kid, request_piv) = util::extract_oscore_option(option);
-        let (request_kid, request_piv) =
-            (request_kid.unwrap(), request_piv.unwrap());
+        let (request_kid, request_piv) = (
+            request_kid.ok_or(Error::NoKidPiv)?,
+            request_piv.ok_or(Error::NoKidPiv)?,
+        );
 
         // Compute the AAD
         let aad = util::build_aad(&request_kid, &request_piv)?;
