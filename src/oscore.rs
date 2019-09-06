@@ -125,12 +125,14 @@ impl SecurityContext {
     /// # Arguments
     /// * `coap_msg` - The original CoAP message to protect.
     pub fn protect_request(&mut self, coap_msg: &[u8]) -> Result<Vec<u8>> {
+        // Store piv for this execution
+        let piv = self.get_piv();
         // Compute the AAD
-        let aad = build_aad(&self.sender_context.sender_id, &self.get_piv())?;
+        let aad = build_aad(&self.sender_context.sender_id, &piv)?;
 
         // Build nonce from own sender context
         let nonce = compute_nonce(
-            self.sender_context.sender_sequence_number,
+            &piv,
             &self.sender_context.sender_id,
             &self.common_context.common_iv,
         );
@@ -138,7 +140,7 @@ impl SecurityContext {
         // Encode the kid and piv in the OSCORE option
         let option = build_oscore_option(
             Some(&self.sender_context.sender_id),
-            Some(&self.get_piv()),
+            Some(&piv),
         );
         self.sender_context.sender_sequence_number += 1;
 
@@ -161,6 +163,8 @@ impl SecurityContext {
         request_piv: &[u8],
         reuse_piv: bool,
     ) -> Result<Vec<u8>> {
+        // Store piv for this execution
+        let piv = self.get_piv();
         // Compute the AAD
         let aad = build_aad(request_kid, request_piv)?;
 
@@ -170,7 +174,7 @@ impl SecurityContext {
             // Same nonce, empty OSCORE option since there's no change
             (
                 compute_nonce(
-                    temp_convert(request_piv),
+                    request_piv,
                     &self.recipient_context.recipient_id,
                     &self.common_context.common_iv,
                 ),
@@ -181,11 +185,11 @@ impl SecurityContext {
             // Build nonce from own sender context, transmit piv but no kid
             let result = (
                 compute_nonce(
-                    self.sender_context.sender_sequence_number,
+                    &piv,
                     &self.sender_context.sender_id,
                     &self.common_context.common_iv,
                 ),
-                build_oscore_option(None, Some(&self.get_piv())),
+                build_oscore_option(None, Some(&piv)),
             );
             // Since we used our sender context, increment the sequence number
             self.sender_context.sender_sequence_number += 1;
@@ -284,13 +288,6 @@ impl SecurityContext {
     pub fn set_sender_sequence_number(&mut self, n: u64) {
         self.sender_context.sender_sequence_number = n;
     }
-}
-
-fn temp_convert(num: &[u8]) -> u64 {
-    let mut t = [0; 8];
-    t[8 - num.len()..].copy_from_slice(num);
-
-    u64::from_be_bytes(t)
 }
 
 /// Returns the CBOR encoded `info` structure.
@@ -414,7 +411,7 @@ fn extract_oscore_option(value: &[u8]) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
 
 /// Returns the nonce for the AEAD.
 fn compute_nonce(
-    piv: u64,
+    mut piv: &[u8],
     mut id_piv: &[u8],
     common_iv: &[u8; NONCE_LEN],
 ) -> [u8; NONCE_LEN] {
@@ -422,10 +419,14 @@ fn compute_nonce(
     if id_piv.len() > NONCE_LEN - 6 {
         id_piv = &id_piv[id_piv.len() - (NONCE_LEN - 6)..]
     }
+    // Same for the piv itself
+    if piv.len() > 5 {
+        piv = &piv[piv.len() - 5..];
+    }
 
     let mut nonce = [0; NONCE_LEN];
     // Left-pad the Partial IV (PIV) with zeros to exactly 5 bytes
-    nonce[NONCE_LEN - 5..].copy_from_slice(&piv.to_be_bytes()[3..]);
+    nonce[NONCE_LEN - piv.len()..].copy_from_slice(&piv);
     // Left-pad ID_PIV with zeros to exactly nonce length minus 6 bytes
     nonce[1 + NONCE_LEN - 6 - id_piv.len()..NONCE_LEN - 5]
         .copy_from_slice(&id_piv);
@@ -670,15 +671,15 @@ mod tests {
     fn nonce() {
         assert_eq!(
             CLIENT_NONCE,
-            compute_nonce(REQ_SSN, &CLIENT_ID, &COMMON_IV)
+            compute_nonce(&REQ_PIV, &CLIENT_ID, &COMMON_IV)
         );
         assert_eq!(
             SERVER_NONCE,
-            compute_nonce(RES_SSN, &SERVER_ID, &COMMON_IV)
+            compute_nonce(&RES_PIV, &SERVER_ID, &COMMON_IV)
         );
         assert_eq!(
             SERVER_NONCE_LONG_PIV,
-            compute_nonce(RES_SSN, &SERVER_ID_LONG, &COMMON_IV)
+            compute_nonce(&RES_PIV, &SERVER_ID_LONG, &COMMON_IV)
         );
     }
 
