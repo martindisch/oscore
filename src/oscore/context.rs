@@ -147,7 +147,7 @@ impl SecurityContext {
         let piv = self.get_piv();
 
         // Parse the request TODO: figure out the error situation
-        let request = Packet::from_bytes(request).unwrap();
+        let request = Packet::from_bytes(request)?;
         // Extract the kid and piv from the OSCORE option
         // TODO: error
         let option = request
@@ -209,7 +209,7 @@ impl SecurityContext {
         option: Vec<u8>,
     ) -> Result<Vec<u8>> {
         // Parse the CoAP message TODO: figure out the error situation
-        let mut original = Packet::from_bytes(coap_msg).unwrap();
+        let mut original = Packet::from_bytes(coap_msg)?;
         // Initialize a new CoAP message to store the protected parts
         let mut inner = Packet::new();
 
@@ -256,7 +256,7 @@ impl SecurityContext {
         inner.set_payload(original.payload);
         // Convert the inner message to its byte representation
         // TODO: error handling
-        let mut inner_bytes = inner.to_bytes().unwrap();
+        let mut inner_bytes = inner.to_bytes()?;
         // Remove the message ID and the token (if it exists)
         let tkl = inner.header.get_token_length();
         inner_bytes.drain(2..4 + tkl as usize);
@@ -278,7 +278,7 @@ impl SecurityContext {
         original.add_option(CoapOption::Oscore, option);
 
         // TODO: error handling
-        Ok(original.to_bytes().unwrap())
+        Ok(original.to_bytes()?)
     }
 
     /// Returns the byte representation of the partial IV.

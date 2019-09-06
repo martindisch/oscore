@@ -1,5 +1,6 @@
 //! The errors of the crate.
 
+use crate::coap;
 use alloc::string::String;
 use core::fmt;
 
@@ -19,6 +20,8 @@ pub enum Error {
     Aead(aes_ccm::Error),
     /// Using an unsupported cipher suite.
     UnsupportedSuite,
+    /// Wraps errors from `coap`.
+    Coap(coap::CoapError),
     /// Wraps a received EDHOC error message.
     Edhoc(String),
 }
@@ -47,6 +50,12 @@ impl From<aes_ccm::Error> for Error {
     }
 }
 
+impl From<coap::CoapError> for Error {
+    fn from(e: coap::CoapError) -> Error {
+        Error::Coap(e)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -58,6 +67,7 @@ impl fmt::Display for Error {
             Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
             Error::Aead(e) => write!(f, "AEAD error: {}", e),
             Error::UnsupportedSuite => write!(f, "Cipher suite unsupported"),
+            Error::Coap(e) => write!(f, "CoAP error: {}", e),
             Error::Edhoc(e) => write!(f, "EDHOC error message: {}", e),
         }
     }

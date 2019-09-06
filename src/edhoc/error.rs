@@ -10,6 +10,7 @@ static ERR_ED25519: &str = "Error processing signature";
 static ERR_HKDF: &str = "Error using HKDF";
 static ERR_AEAD: &str = "Error using AEAD";
 static ERR_SUITE: &str = "Cipher suite unsupported";
+static ERR_IMPOSSIBLE: &str = "This error can't happen ;-)";
 
 /// The error type for operations that process a message from the other party
 /// and may fail if the message is an error message (in which case the protocol
@@ -48,6 +49,9 @@ impl From<Error> for OwnOrPeerError {
             Error::UnsupportedSuite => {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_SUITE))
             }
+            Error::Coap(_) => OwnOrPeerError::OwnError(
+                util::build_error_message(ERR_IMPOSSIBLE),
+            ),
             Error::Edhoc(msg) => OwnOrPeerError::PeerError(msg),
         }
     }
