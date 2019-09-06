@@ -106,27 +106,14 @@ impl SecurityContext {
         })
     }
 
-    /// Returns the byte representation of the partial IV.
-    pub fn get_piv(&self) -> Vec<u8> {
-        // Convert the sender sequence number to its byte representation
-        let bytes = self.sender_context.sender_sequence_number.to_be_bytes();
-        // Find the index of the first byte that is not zero
-        let first_nonzero = bytes.iter().position(|&x| x != 0);
-        match first_nonzero {
-            // If there is one, skip leading zero bytes and return the others
-            Some(n) => bytes[n..].to_vec(),
-            // If there isn't, we simply return 0
-            None => vec![0x00],
-        }
-    }
-
     /// Returns an OSCORE message based on the original CoAP request.
     ///
     /// # Arguments
-    /// * `coap_msg` - The original CoAP message to protect.
+    /// * `coap_msg` - The original CoAP request to protect.
     pub fn protect_request(&mut self, coap_msg: &[u8]) -> Result<Vec<u8>> {
         // Store piv for this execution
         let piv = self.get_piv();
+
         // Compute the AAD
         let aad = build_aad(&self.sender_context.sender_id, &piv)?;
 
@@ -136,7 +123,6 @@ impl SecurityContext {
             &self.sender_context.sender_id,
             &self.common_context.common_iv,
         );
-
         // Encode the kid and piv in the OSCORE option
         let option = build_oscore_option(
             Some(&self.sender_context.sender_id),
@@ -151,22 +137,35 @@ impl SecurityContext {
     /// Returns an OSCORE message based on the original CoAP response.
     ///
     /// # Arguments
-    /// * `coap_msg` - The original CoAP message to protect.
-    /// * `request_kid` - The request's `kid`.
-    /// * `request_piv` - The request's `piv`.
+    /// * `coap_msg` - The original CoAP response to protect.
+    /// * `request` - The OSCORE request to which we respond. Necessary to
+    ///   extract `kid` and `piv` values.
     /// * `reuse_piv` - Whether the request's `piv` should be reused. Otherwise
     ///   the own `sender_sequence_number` will be used.
     pub fn protect_response(
         &mut self,
         coap_msg: &[u8],
-        request_kid: &[u8],
-        request_piv: &[u8],
+        request: &[u8],
         reuse_piv: bool,
     ) -> Result<Vec<u8>> {
         // Store piv for this execution
         let piv = self.get_piv();
+
+        // Parse the request TODO: figure out the error situation
+        let request = Packet::from_bytes(request).unwrap();
+        // Extract the kid and piv from the OSCORE option
+        // TODO: error
+        let option = request
+            .get_option(CoapOption::Oscore)
+            .unwrap()
+            .front()
+            .unwrap();
+        let (request_kid, request_piv) = extract_oscore_option(option);
+        let (request_kid, request_piv) =
+            (request_kid.unwrap(), request_piv.unwrap());
+
         // Compute the AAD
-        let aad = build_aad(request_kid, request_piv)?;
+        let aad = build_aad(&request_kid, &request_piv)?;
 
         // Decide on the nonce and option value
         let (nonce, option) = if reuse_piv {
@@ -174,7 +173,7 @@ impl SecurityContext {
             // Same nonce, empty OSCORE option since there's no change
             (
                 compute_nonce(
-                    request_piv,
+                    &request_piv,
                     &self.recipient_context.recipient_id,
                     &self.common_context.common_iv,
                 ),
@@ -282,6 +281,20 @@ impl SecurityContext {
 
         // TODO: error handling
         Ok(original.to_bytes().unwrap())
+    }
+
+    /// Returns the byte representation of the partial IV.
+    fn get_piv(&self) -> Vec<u8> {
+        // Convert the sender sequence number to its byte representation
+        let bytes = self.sender_context.sender_sequence_number.to_be_bytes();
+        // Find the index of the first byte that is not zero
+        let first_nonzero = bytes.iter().position(|&x| x != 0);
+        match first_nonzero {
+            // If there is one, skip leading zero bytes and return the others
+            Some(n) => bytes[n..].to_vec(),
+            // If there isn't, we simply return 0
+            None => vec![0x00],
+        }
     }
 
     #[cfg(test)]
@@ -728,7 +741,7 @@ mod tests {
         assert_eq!(
             &RES_PROTECTED[..],
             &res_security_context
-                .protect_response(&RES_UNPROTECTED, &CLIENT_ID, &REQ_PIV, true)
+                .protect_response(&RES_UNPROTECTED, &REQ_PROTECTED, true)
                 .unwrap()[..]
         );
 
@@ -742,12 +755,7 @@ mod tests {
         assert_eq!(
             &RES_PIV_PROTECTED[..],
             &res_piv_security_context
-                .protect_response(
-                    &RES_UNPROTECTED,
-                    &CLIENT_ID,
-                    &REQ_PIV,
-                    false
-                )
+                .protect_response(&RES_UNPROTECTED, &REQ_PROTECTED, false)
                 .unwrap()[..]
         );
     }
