@@ -1,11 +1,11 @@
 use aes_ccm::CcmMode;
 use alloc::vec::Vec;
+use coap_lite::{
+    packet::Packet, CoapOption, MessageClass, RequestType, ResponseType,
+};
 use num_traits::FromPrimitive;
 
 use super::util;
-use crate::coap::{
-    packet::Packet, CoapOption, MessageClass, RequestType, ResponseType,
-};
 use crate::{error::Error, Result};
 
 /// The common context part of the security context.
