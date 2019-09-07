@@ -1,7 +1,7 @@
 //! The errors of the crate.
 
 use alloc::string::String;
-use coap_lite;
+use coap_lite::error as coap;
 use core::fmt;
 
 /// The catch-all error type for this crate, mostly just wrapping errors from
@@ -21,7 +21,7 @@ pub enum Error {
     /// Using an unsupported cipher suite.
     UnsupportedSuite,
     /// Wraps errors from `coap_lite`.
-    Coap(coap_lite::CoapError),
+    Coap(coap::CoapError),
     /// CoAP request doesn't contain OSCORE option.
     NoOscoreOption,
     /// CoAP request doesn't have kid or piv.
@@ -54,8 +54,8 @@ impl From<aes_ccm::Error> for Error {
     }
 }
 
-impl From<coap_lite::CoapError> for Error {
-    fn from(e: coap_lite::CoapError) -> Error {
+impl From<coap::CoapError> for Error {
+    fn from(e: coap::CoapError) -> Error {
         Error::Coap(e)
     }
 }

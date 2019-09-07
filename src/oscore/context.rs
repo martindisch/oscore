@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use coap_lite::{
     packet::Packet, CoapOption, MessageClass, RequestType, ResponseType,
 };
-use num_traits::FromPrimitive;
+use core::convert::TryFrom;
 
 use super::util;
 use crate::{error::Error, Result};
@@ -241,7 +241,7 @@ impl SecurityContext {
 
             // At this point the option is class E or undefined, so protect it
             // TODO: Better integration with coap module
-            let option = CoapOption::from_usize(*number).unwrap();
+            let option = CoapOption::try_from(*number).unwrap();
             // Add it to the inner message
             inner.set_option(option, value_list.clone());
             // Remember it's been moved
