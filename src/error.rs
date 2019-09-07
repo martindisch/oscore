@@ -21,7 +21,7 @@ pub enum Error {
     /// Using an unsupported cipher suite.
     UnsupportedSuite,
     /// Wraps errors from `coap_lite`.
-    Coap(coap::CoapError),
+    Coap(coap::MessageError),
     /// CoAP request doesn't contain OSCORE option.
     NoOscoreOption,
     /// CoAP request doesn't have kid or piv.
@@ -54,8 +54,8 @@ impl From<aes_ccm::Error> for Error {
     }
 }
 
-impl From<coap::CoapError> for Error {
-    fn from(e: coap::CoapError) -> Error {
+impl From<coap::MessageError> for Error {
+    fn from(e: coap::MessageError) -> Error {
         Error::Coap(e)
     }
 }

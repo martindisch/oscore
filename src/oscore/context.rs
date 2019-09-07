@@ -1,8 +1,6 @@
 use aes_ccm::CcmMode;
 use alloc::vec::Vec;
-use coap_lite::{
-    packet::Packet, CoapOption, MessageClass, RequestType, ResponseType,
-};
+use coap_lite::{CoapOption, MessageClass, Packet, RequestType, ResponseType};
 use core::convert::TryFrom;
 
 use super::util;
