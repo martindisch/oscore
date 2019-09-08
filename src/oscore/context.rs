@@ -251,7 +251,7 @@ impl SecurityContext {
         }
 
         // Move the payload out of the original into the new one
-        inner.set_payload(original.payload);
+        inner.payload = original.payload;
         // Convert the inner message to its byte representation
         // TODO: error handling
         let mut inner_bytes = inner.to_bytes()?;
