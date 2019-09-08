@@ -6,6 +6,7 @@ use core::fmt;
 
 /// The catch-all error type for this crate, mostly just wrapping errors from
 /// various libraries.
+// TODO: Derive PartialEq as soon as serde_cbor does for its error type
 #[derive(Debug)]
 pub enum Error {
     /// Wraps errors from `serde_cbor`.

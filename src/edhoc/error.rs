@@ -16,7 +16,7 @@ static ERR_SUITE: &str = "Cipher suite unsupported";
 /// needs to be aborted), or if a failure happened while processing, in which
 /// case an EDHOC error message is generated that needs to be transmitted to
 /// the other party, prior to aborting the protocol.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum OwnOrPeerError {
     /// This variant wraps an error message that was received from the other
     /// party. On receiving this error, abort the protocol.
@@ -70,7 +70,7 @@ impl fmt::Display for OwnOrPeerError {
 /// The error type for operations that may fail and produce an EDHOC error
 /// message, which needs to be sent to the other party prior to aborting the
 /// protocol.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct OwnError(pub alloc::vec::Vec<u8>);
 
 impl From<Error> for OwnError {
@@ -101,6 +101,7 @@ impl fmt::Display for OwnError {
 
 /// The error type for operations that may fail before any messages have been
 /// sent, which means the protocol can be aborted without any further action.
+// TODO: Derive PartialEq, as soon as Error does (depends on serde_cbor)
 #[derive(Debug)]
 pub struct EarlyError(pub Error);
 
