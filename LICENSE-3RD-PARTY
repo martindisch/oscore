@@ -48,7 +48,6 @@ applies to:
 - hkdf, Copyright (c) 2015-2018 Vlad Filippov
         Copyright (c) 2018 RustCrypto Developers
 - digest, Copyright (c) 2017 Artyom Pavlov
-- coap, Copyright (c) 2014-2016 Yang Zhang
 - coap-lite, Copyright (c) 2019 Martin Disch
 -------------------------------------------------------------------------------
 
