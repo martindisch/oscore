@@ -1,6 +1,8 @@
 //! The errors of the `edhoc` module.
 
 use core::fmt;
+#[cfg(feature = "std")]
+use std::error;
 
 use super::util;
 use crate::error::Error;
@@ -67,6 +69,13 @@ impl fmt::Display for OwnOrPeerError {
     }
 }
 
+#[cfg(feature = "std")]
+impl error::Error for OwnOrPeerError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        None
+    }
+}
+
 /// The error type for operations that may fail and produce an EDHOC error
 /// message, which needs to be sent to the other party prior to aborting the
 /// protocol.
@@ -98,6 +107,12 @@ impl fmt::Display for OwnError {
         write!(f, "Generated EDHOC error message: {:?}", &self.0)
     }
 }
+#[cfg(feature = "std")]
+impl error::Error for OwnError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        None
+    }
+}
 
 /// The error type for operations that may fail before any messages have been
 /// sent, which means the protocol can be aborted without any further action.
@@ -114,5 +129,12 @@ impl From<Error> for EarlyError {
 impl fmt::Display for EarlyError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Encountered early error: {}", &self.0)
+    }
+}
+
+#[cfg(feature = "std")]
+impl error::Error for EarlyError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        Some(&self.0)
     }
 }

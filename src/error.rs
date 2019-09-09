@@ -3,6 +3,8 @@
 use alloc::string::String;
 use coap_lite::error as coap;
 use core::fmt;
+#[cfg(feature = "std")]
+use std::error;
 
 /// The catch-all error type for this crate, mostly just wrapping errors from
 /// various libraries.
@@ -80,6 +82,20 @@ impl fmt::Display for Error {
                 write!(f, "CoAP request doesn't have kid or piv")
             }
             Error::Edhoc(e) => write!(f, "EDHOC error message: {}", e),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl error::Error for Error {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            Error::Cbor(e) => Some(e),
+            Error::Hkdf(e) => Some(e),
+            Error::Aead(e) => Some(e),
+            Error::Coap(e) => Some(e),
+            // Other errors that don't implement the Error trait
+            _ => None,
         }
     }
 }
