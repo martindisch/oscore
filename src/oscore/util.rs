@@ -164,6 +164,19 @@ pub fn compute_nonce(
     nonce
 }
 
+/// Returns the `piv` as a u64.
+pub fn piv_to_u64(mut piv: &[u8]) -> u64 {
+    // Trim piv if it's too long
+    if piv.len() > 8 {
+        piv = &piv[piv.len() - 8..];
+    }
+    // Copy piv into an appropriately sized array
+    let mut piv_arr = [0; 8];
+    piv_arr[8 - piv.len()..].copy_from_slice(piv);
+
+    u64::from_be_bytes(piv_arr)
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_vectors::*;
@@ -245,5 +258,17 @@ mod tests {
             SERVER_NONCE_LONG_PIV,
             compute_nonce(&RES_PIV, &SERVER_ID_LONG, &COMMON_IV)
         );
+    }
+
+    #[test]
+    fn piv_transform() {
+        let piv = [0x00];
+        assert_eq!(0, piv_to_u64(&piv));
+
+        let piv = [0x01, 0x02];
+        assert_eq!(258, piv_to_u64(&piv));
+
+        let piv = [0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01];
+        assert_eq!(1, piv_to_u64(&piv));
     }
 }

@@ -1,7 +1,7 @@
 use aes_ccm::CcmMode;
 use alloc::vec::Vec;
 use coap_lite::{CoapOption, MessageClass, Packet, RequestType, ResponseType};
-use core::convert::TryFrom;
+use core::convert::{TryFrom, TryInto};
 
 use super::util;
 use crate::{error::Error, Result};
@@ -206,7 +206,7 @@ impl SecurityContext {
         nonce: [u8; util::NONCE_LEN],
         option: Vec<u8>,
     ) -> Result<Vec<u8>> {
-        // Parse the CoAP message TODO: figure out the error situation
+        // Parse the CoAP message
         let mut original = Packet::from_bytes(coap_msg)?;
         // Initialize a new CoAP message to store the protected parts
         let mut inner = Packet::new();
@@ -238,7 +238,7 @@ impl SecurityContext {
             }
 
             // At this point the option is class E or undefined, so protect it
-            // TODO: Better integration with coap module
+            // TODO: Better integration with coap module, error handling
             let option = CoapOption::try_from(*number).unwrap();
             // Add it to the inner message
             inner.set_option(option, value_list.clone());
@@ -253,7 +253,6 @@ impl SecurityContext {
         // Move the payload out of the original into the new one
         inner.payload = original.payload;
         // Convert the inner message to its byte representation
-        // TODO: error handling
         let mut inner_bytes = inner.to_bytes()?;
         // Remove the message ID and the token (if it exists)
         let tkl = inner.header.get_token_length();
@@ -275,7 +274,98 @@ impl SecurityContext {
         // Add the OSCORE option
         original.add_option(CoapOption::Oscore, option);
 
-        // TODO: error handling
+        Ok(original.to_bytes()?)
+    }
+
+    /// Returns the original CoAP request protected in the OSCORE message.
+    ///
+    /// # Arguments
+    /// * `oscore_msg` - The OSCORE message protecting the CoAP request.
+    fn unprotect_request(&mut self, oscore_msg: &[u8]) -> Result<Vec<u8>> {
+        // Parse the CoAP message
+        let mut original = Packet::from_bytes(oscore_msg)?;
+
+        // Extract the kid and piv from the OSCORE option
+        let option = original
+            .get_option(CoapOption::Oscore)
+            .ok_or(Error::NoOscoreOption)?
+            .front()
+            .ok_or(Error::NoOscoreOption)?;
+        let (request_kid, request_piv) = util::extract_oscore_option(option);
+        let (request_kid, request_piv) = (
+            request_kid.ok_or(Error::NoKidPiv)?,
+            request_piv.ok_or(Error::NoKidPiv)?,
+        );
+
+        // Store which options we remove from the outer message in this
+        let mut to_discard = vec![];
+        // Go over options, remembering class E ones to discard
+        for (number, _) in original.options() {
+            // Abort on unimplemented optional features
+            if UNSUPPORTED.contains(number) {
+                // TODO: Error instead of panic
+                unimplemented!("Option {}", number);
+            }
+            // Skip class U options
+            if CLASS_U.contains(number) {
+                continue;
+            }
+
+            // At this point the option is class E or undefined, so discard it
+            // TODO: Better integration with coap module, error handling
+            let option = CoapOption::try_from(*number).unwrap();
+            to_discard.push(option);
+        }
+        // Discard class E options
+        for option in to_discard {
+            original.clear_option(option);
+        }
+
+        // Verify that the partial IV has not been received before
+        if self.recipient_context.replay_window
+            == util::piv_to_u64(&request_piv)
+        {
+            return Err(Error::ReplayDetected);
+        }
+
+        // Compute the AAD
+        let aad = util::build_aad(&request_kid, &request_piv)?;
+
+        // Compute the nonce
+        let nonce = util::compute_nonce(
+            &request_piv,
+            &self.recipient_context.recipient_id,
+            &self.common_context.common_iv,
+        );
+
+        // Decrypt the payload
+        let ccm = CcmMode::new(
+            &self.recipient_context.recipient_key,
+            nonce,
+            util::MAC_LEN,
+        )?;
+        let mut plaintext_buf =
+            vec![0; original.payload.len() - util::MAC_LEN];
+        ccm.decrypt_verify(&mut plaintext_buf, &aad, &original.payload)?;
+
+        // Build a CoAP message from the bytes of the plaintext, which contain
+        // the code, class E options and the payload
+        // [ver_t_tkl, code, message_id, message_id]
+        let mut inner = vec![0x40, plaintext_buf[0], 0x00, 0x00];
+        inner.extend(&plaintext_buf[1..]);
+        // Parse the CoAP message
+        let inner = Packet::from_bytes(&inner)?;
+        // Set the code from the inner message
+        original.header.code = inner.header.code;
+        // Set the options from the inner message
+        for (number, value_list) in inner.options() {
+            // TODO: error handling
+            original
+                .set_option((*number).try_into().unwrap(), value_list.clone());
+        }
+        // Set the payload from the inner message
+        original.payload = inner.payload;
+
         Ok(original.to_bytes()?)
     }
 
@@ -402,6 +492,23 @@ mod tests {
             &RES_PIV_PROTECTED[..],
             &res_piv_security_context
                 .protect_response(&RES_UNPROTECTED, &REQ_PROTECTED, false)
+                .unwrap()[..]
+        );
+    }
+
+    #[test]
+    fn unprotection() {
+        let mut req_security_context = SecurityContext::new(
+            MASTER_SECRET.to_vec(),
+            MASTER_SALT.to_vec(),
+            SERVER_ID.to_vec(),
+            CLIENT_ID.to_vec(),
+        )
+        .unwrap();
+        assert_eq!(
+            &REQ_UNPROTECTED[..],
+            &req_security_context
+                .unprotect_request(&REQ_PROTECTED)
                 .unwrap()[..]
         );
     }

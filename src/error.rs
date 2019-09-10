@@ -23,14 +23,16 @@ pub enum Error {
     Aead(aes_ccm::Error),
     /// Using an unsupported cipher suite.
     UnsupportedSuite,
+    /// Wraps a received EDHOC error message.
+    Edhoc(String),
     /// Wraps errors from `coap_lite`.
     Coap(coap::MessageError),
     /// CoAP request doesn't contain OSCORE option.
     NoOscoreOption,
     /// CoAP request doesn't have kid or piv.
     NoKidPiv,
-    /// Wraps a received EDHOC error message.
-    Edhoc(String),
+    /// This message has been received already.
+    ReplayDetected,
 }
 
 impl From<serde_cbor::Error> for Error {
@@ -74,6 +76,7 @@ impl fmt::Display for Error {
             Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
             Error::Aead(e) => write!(f, "AEAD error: {}", e),
             Error::UnsupportedSuite => write!(f, "Cipher suite unsupported"),
+            Error::Edhoc(e) => write!(f, "EDHOC error message: {}", e),
             Error::Coap(e) => write!(f, "CoAP error: {}", e),
             Error::NoOscoreOption => {
                 write!(f, "CoAP request doesn't contain OSCORE option")
@@ -81,7 +84,9 @@ impl fmt::Display for Error {
             Error::NoKidPiv => {
                 write!(f, "CoAP request doesn't have kid or piv")
             }
-            Error::Edhoc(e) => write!(f, "EDHOC error message: {}", e),
+            Error::ReplayDetected => {
+                write!(f, "This message has been received already")
+            }
         }
     }
 }
