@@ -1,9 +1,10 @@
 use alloc::vec::Vec;
+use coap_lite::{CoapOption, Packet};
 use hkdf::Hkdf;
 use serde_bytes::Bytes;
 use sha2::Sha256;
 
-use crate::{cbor, Result};
+use crate::{cbor, error::Error, Result};
 
 pub const KEY_LEN: usize = 16;
 pub const NONCE_LEN: usize = 13;
@@ -102,10 +103,21 @@ pub fn build_oscore_option(kid: Option<&[u8]>, piv: Option<&[u8]>) -> Vec<u8> {
     option
 }
 
-/// Returns the encoded `kid` and `piv` values, if present.
-pub fn extract_oscore_option(
-    value: &[u8],
-) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
+/// Returns the `kid` and `piv` values from the message, if present.
+pub fn extract_kid_piv(
+    message: &Packet,
+) -> Result<(Option<Vec<u8>>, Option<Vec<u8>>)> {
+    let option_value = message
+        .get_option(CoapOption::Oscore)
+        .ok_or(Error::NoOscoreOption)?
+        .front()
+        .ok_or(Error::NoOscoreOption)?;
+
+    Ok(extract_oscore_option(option_value))
+}
+
+/// Returns the encoded `kid` and `piv` values from the option, if present.
+fn extract_oscore_option(value: &[u8]) -> (Option<Vec<u8>>, Option<Vec<u8>>) {
     // Handle empty option
     if value.is_empty() {
         return (None, None);

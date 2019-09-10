@@ -144,14 +144,11 @@ impl SecurityContext {
         // Store piv for this execution
         let piv = self.get_piv();
 
+        // Parse the request to which we respond
         let request = Packet::from_bytes(request)?;
-        // Extract the kid and piv from the OSCORE option
-        let option = request
-            .get_option(CoapOption::Oscore)
-            .ok_or(Error::NoOscoreOption)?
-            .front()
-            .ok_or(Error::NoOscoreOption)?;
-        let (request_kid, request_piv) = util::extract_oscore_option(option);
+        // Extract the kid and piv from its OSCORE option
+        let (request_kid, request_piv) = util::extract_kid_piv(&request)?;
+        // This is a request, so they need to be present
         let (request_kid, request_piv) = (
             request_kid.ok_or(Error::NoKidPiv)?,
             request_piv.ok_or(Error::NoKidPiv)?,
@@ -285,12 +282,8 @@ impl SecurityContext {
         // Parse the CoAP message
         let original = Packet::from_bytes(oscore_msg)?;
         // Extract the kid and piv from the OSCORE option
-        let option = original
-            .get_option(CoapOption::Oscore)
-            .ok_or(Error::NoOscoreOption)?
-            .front()
-            .ok_or(Error::NoOscoreOption)?;
-        let (request_kid, request_piv) = util::extract_oscore_option(option);
+        let (request_kid, request_piv) = util::extract_kid_piv(&original)?;
+        // This is a request, so they need to be present
         let (request_kid, request_piv) = (
             request_kid.ok_or(Error::NoKidPiv)?,
             request_piv.ok_or(Error::NoKidPiv)?,
@@ -324,12 +317,7 @@ impl SecurityContext {
         // Parse the CoAP message
         let original = Packet::from_bytes(oscore_msg)?;
         // Attempt to extract the piv from the OSCORE option
-        let option = original
-            .get_option(CoapOption::Oscore)
-            .ok_or(Error::NoOscoreOption)?
-            .front()
-            .ok_or(Error::NoOscoreOption)?;
-        let (_, request_piv) = util::extract_oscore_option(option);
+        let (_, request_piv) = util::extract_kid_piv(&original)?;
         // If we don't reuse the request's piv, extract it from the response
         let (kid, piv) = match request_piv {
             // Using the sender's kid & piv
