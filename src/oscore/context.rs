@@ -26,7 +26,7 @@ struct RecipientContext {
     recipient_key: [u8; util::KEY_LEN],
     // We're assuming a reliable transport and therefore only store the last
     // received partial IV for simplicity
-    replay_window: u64,
+    replay_window: Option<u64>,
 }
 
 /// The security context.
@@ -88,7 +88,7 @@ impl SecurityContext {
         let recipient_context = RecipientContext {
             recipient_id,
             recipient_key,
-            replay_window: 0,
+            replay_window: None,
         };
 
         // Combine them to the final thing
@@ -297,11 +297,7 @@ impl SecurityContext {
         );
 
         // Verify that the partial IV has not been received before
-        if self.recipient_context.replay_window
-            == util::piv_to_u64(&request_piv)
-        {
-            return Err(Error::ReplayDetected);
-        }
+        self.check_and_remember(&request_piv)?;
 
         // Compute the AAD
         let aad = util::build_aad(&request_kid, &request_piv)?;
@@ -422,6 +418,21 @@ impl SecurityContext {
         Ok(original.to_bytes()?)
     }
 
+    /// Throws an error if the `piv` has been received before and adds it to
+    /// the replay window.
+    fn check_and_remember(&mut self, piv: &[u8]) -> Result<()> {
+        let piv_64 = util::piv_to_u64(&piv);
+        if let Some(previous) = self.recipient_context.replay_window {
+            if previous == piv_64 {
+                return Err(Error::ReplayDetected);
+            }
+        }
+        // Remember it
+        self.recipient_context.replay_window = Some(piv_64);
+
+        Ok(())
+    }
+
     /// Returns the byte representation of the partial IV.
     fn get_piv(&self) -> Vec<u8> {
         util::format_piv(self.sender_context.sender_sequence_number)
@@ -478,7 +489,7 @@ mod tests {
             &SERVER_KEY,
             &security_context.recipient_context.recipient_key[..]
         );
-        assert_eq!(0, security_context.recipient_context.replay_window);
+        assert_eq!(None, security_context.recipient_context.replay_window);
     }
 
     #[test]
@@ -557,5 +568,23 @@ mod tests {
                 .unprotect_response(&RES_PIV_PROTECTED)
                 .unwrap()[..]
         );
+    }
+
+    #[test]
+    fn replay() {
+        let mut req_security_context = SecurityContext::new(
+            MASTER_SECRET.to_vec(),
+            MASTER_SALT.to_vec(),
+            SERVER_ID.to_vec(),
+            CLIENT_ID.to_vec(),
+        )
+        .unwrap();
+
+        assert!(req_security_context
+            .unprotect_request(&REQ_PROTECTED)
+            .is_ok());
+        assert!(req_security_context
+            .unprotect_request(&REQ_PROTECTED)
+            .is_err())
     }
 }
