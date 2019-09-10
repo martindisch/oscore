@@ -177,6 +177,20 @@ pub fn piv_to_u64(mut piv: &[u8]) -> u64 {
     u64::from_be_bytes(piv_arr)
 }
 
+/// Returns the `piv` in its correct format (no leading zero bytes).
+pub fn format_piv(piv: u64) -> Vec<u8> {
+    // Convert the sender sequence number to its byte representation
+    let bytes = piv.to_be_bytes();
+    // Find the index of the first byte that is not zero
+    let first_nonzero = bytes.iter().position(|&x| x != 0);
+    match first_nonzero {
+        // If there is one, skip leading zero bytes and return the others
+        Some(n) => bytes[n..].to_vec(),
+        // If there isn't, we simply return 0
+        None => vec![0x00],
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::test_vectors::*;
@@ -270,5 +284,12 @@ mod tests {
 
         let piv = [0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01];
         assert_eq!(1, piv_to_u64(&piv));
+    }
+
+    #[test]
+    fn piv_format() {
+        assert_eq!([0], format_piv(0)[..]);
+        assert_eq!([0xFF], format_piv(0xFF)[..]);
+        assert_eq!([0x01, 0x00], format_piv(0xFF + 1)[..]);
     }
 }
