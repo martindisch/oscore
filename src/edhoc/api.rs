@@ -348,6 +348,7 @@ impl Msg1Receiver {
         let msg_1 = util::deserialize_message_1(&msg_1_seq)?;
         // Verify that the selected suite is supported
         if msg_1.suite != 0 {
+            #[allow(clippy::try_err)]
             Err(Error::UnsupportedSuite)?;
         }
         // Use U's public key to generate the ephemeral shared secret
