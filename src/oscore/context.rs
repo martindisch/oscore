@@ -369,6 +369,91 @@ impl SecurityContext {
         Ok(original.to_bytes()?)
     }
 
+    /// Returns the original CoAP response protected in the OSCORE message.
+    ///
+    /// # Arguments
+    /// * `oscore_msg` - The OSCORE message protecting the CoAP response.
+    fn unprotect_response(&mut self, oscore_msg: &[u8]) -> Result<Vec<u8>> {
+        // Parse the CoAP message
+        let mut original = Packet::from_bytes(oscore_msg)?;
+
+        let option = original
+            .get_option(CoapOption::Oscore)
+            .ok_or(Error::NoOscoreOption)?
+            .front()
+            .ok_or(Error::NoOscoreOption)?;
+        let (_, request_piv) = util::extract_oscore_option(option);
+        // If we don't reuse the request's piv, extract it from the response
+        let (kid, piv) = match request_piv {
+            Some(piv) => (&self.recipient_context.recipient_id, piv),
+            None => (&self.sender_context.sender_id, self.get_last_piv()),
+        };
+
+        // Store which options we remove from the outer message in this
+        let mut to_discard = vec![];
+        // Go over options, remembering class E ones to discard
+        for (number, _) in original.options() {
+            // Abort on unimplemented optional features
+            if UNSUPPORTED.contains(number) {
+                // TODO: Error instead of panic
+                unimplemented!("Option {}", number);
+            }
+            // Skip class U options
+            if CLASS_U.contains(number) {
+                continue;
+            }
+
+            // At this point the option is class E or undefined, so discard it
+            // TODO: Better integration with coap module, error handling
+            let option = CoapOption::try_from(*number).unwrap();
+            to_discard.push(option);
+        }
+        // Discard class E options
+        for option in to_discard {
+            original.clear_option(option);
+        }
+
+        // Compute the AAD
+        let aad = util::build_aad(
+            &self.sender_context.sender_id,
+            &self.get_last_piv(),
+        )?;
+
+        // Compute the nonce
+        let nonce =
+            util::compute_nonce(&piv, &kid, &self.common_context.common_iv);
+
+        // Decrypt the payload
+        let ccm = CcmMode::new(
+            &self.recipient_context.recipient_key,
+            nonce,
+            util::MAC_LEN,
+        )?;
+        let mut plaintext_buf =
+            vec![0; original.payload.len() - util::MAC_LEN];
+        ccm.decrypt_verify(&mut plaintext_buf, &aad, &original.payload)?;
+
+        // Build a CoAP message from the bytes of the plaintext, which contain
+        // the code, class E options and the payload
+        // [ver_t_tkl, code, message_id, message_id]
+        let mut inner = vec![0x40, plaintext_buf[0], 0x00, 0x00];
+        inner.extend(&plaintext_buf[1..]);
+        // Parse the CoAP message
+        let inner = Packet::from_bytes(&inner)?;
+        // Set the code from the inner message
+        original.header.code = inner.header.code;
+        // Set the options from the inner message
+        for (number, value_list) in inner.options() {
+            // TODO: error handling
+            original
+                .set_option((*number).try_into().unwrap(), value_list.clone());
+        }
+        // Set the payload from the inner message
+        original.payload = inner.payload;
+
+        Ok(original.to_bytes()?)
+    }
+
     /// Returns the byte representation of the partial IV.
     fn get_piv(&self) -> Vec<u8> {
         util::format_piv(self.sender_context.sender_sequence_number)
@@ -458,17 +543,11 @@ mod tests {
                 .protect_response(&RES_UNPROTECTED, &REQ_PROTECTED, true)
                 .unwrap()[..]
         );
-
-        let mut res_piv_security_context = SecurityContext::new(
-            MASTER_SECRET.to_vec(),
-            MASTER_SALT.to_vec(),
-            SERVER_ID.to_vec(),
-            CLIENT_ID.to_vec(),
-        )
-        .unwrap();
+        // No need to reinitialize the security context, because the previous
+        // protection didn't increment the sender sequence number
         assert_eq!(
             &RES_PIV_PROTECTED[..],
-            &res_piv_security_context
+            &res_security_context
                 .protect_response(&RES_UNPROTECTED, &REQ_PROTECTED, false)
                 .unwrap()[..]
         );
@@ -487,6 +566,27 @@ mod tests {
             &REQ_UNPROTECTED[..],
             &req_security_context
                 .unprotect_request(&REQ_PROTECTED)
+                .unwrap()[..]
+        );
+
+        let mut res_security_context = SecurityContext::new(
+            MASTER_SECRET.to_vec(),
+            MASTER_SALT.to_vec(),
+            CLIENT_ID.to_vec(),
+            SERVER_ID.to_vec(),
+        )
+        .unwrap();
+        res_security_context.set_sender_sequence_number(REQ_SSN + 1);
+        assert_eq!(
+            &RES_UNPROTECTED[..],
+            &res_security_context
+                .unprotect_response(&RES_PROTECTED)
+                .unwrap()[..]
+        );
+        assert_eq!(
+            &RES_UNPROTECTED[..],
+            &res_security_context
+                .unprotect_response(&RES_PIV_PROTECTED)
                 .unwrap()[..]
         );
     }
