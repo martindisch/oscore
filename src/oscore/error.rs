@@ -1,5 +1,3 @@
-//! The errors of the crate.
-
 use coap_lite::error as coap;
 use core::fmt;
 #[cfg(feature = "std")]
@@ -7,7 +5,7 @@ use std::error;
 
 use crate::cbor;
 
-/// The catch-all error type for this crate, mostly just wrapping errors from
+/// The catch-all error type for this module, mostly just wrapping errors from
 /// various libraries.
 // TODO: Derive PartialEq as soon as cbor does for its error type
 #[derive(Debug)]

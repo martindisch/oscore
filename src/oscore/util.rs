@@ -4,7 +4,9 @@ use hkdf::Hkdf;
 use serde_bytes::Bytes;
 use sha2::Sha256;
 
-use crate::{cbor, error::Error, Result};
+use crate::cbor;
+
+use super::{error::Error, Result};
 
 pub const KEY_LEN: usize = 16;
 pub const NONCE_LEN: usize = 13;

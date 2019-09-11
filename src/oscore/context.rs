@@ -3,8 +3,7 @@ use alloc::vec::Vec;
 use coap_lite::{CoapOption, MessageClass, Packet, RequestType, ResponseType};
 use core::convert::{TryFrom, TryInto};
 
-use super::util;
-use crate::{error::Error, Result};
+use super::{error::Error, util, Result};
 
 /// The common context part of the security context.
 struct CommonContext {
