@@ -20,7 +20,7 @@ pub fn build_info(id: &[u8], r#type: &str, l: usize) -> Result<Vec<u8>> {
     // (id, id_context, alg_aead, type, L)
     let info = (Bytes::new(id), (), 10, r#type, l);
     // Return the CBOR encoded version of that
-    cbor::encode(info)
+    Ok(cbor::encode(info)?)
 }
 
 /// Returns the derived key/IV for this `info` structure.
@@ -62,7 +62,7 @@ pub fn build_aad_array(
         Bytes::new(&[]),
     );
     // Return the CBOR encoded version of that
-    cbor::encode(arr)
+    Ok(cbor::encode(arr)?)
 }
 
 /// Returns the AAD.
@@ -72,7 +72,7 @@ pub fn build_aad(request_kid: &[u8], request_piv: &[u8]) -> Result<Vec<u8>> {
     // Then we pack it into an Encrypt0 structure
     let aad = ("Encrypt0", Bytes::new(&[]), Bytes::new(&aad_arr));
     // And return the encoding of that
-    cbor::encode(aad)
+    Ok(cbor::encode(aad)?)
 }
 
 /// Returns the value of the OSCORE option.

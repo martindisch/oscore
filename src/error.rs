@@ -6,15 +6,15 @@ use core::fmt;
 #[cfg(feature = "std")]
 use std::error;
 
+use crate::cbor;
+
 /// The catch-all error type for this crate, mostly just wrapping errors from
 /// various libraries.
-// TODO: Derive PartialEq as soon as serde_cbor does for its error type
+// TODO: Derive PartialEq as soon as cbor does for its error type
 #[derive(Debug)]
 pub enum Error {
-    /// Wraps errors from `serde_cbor`.
-    Cbor(serde_cbor::Error),
-    /// Tried to encode/decode CBOR sequence of more than 23 items.
-    TooManyItems,
+    /// Wraps errors from the `cbor` module.
+    Cbor(cbor::CborError),
     /// Wraps errors from `ed25519_dalek`.
     Ed25519(ed25519_dalek::SignatureError),
     /// Wraps errors from `hkdf`.
@@ -35,8 +35,8 @@ pub enum Error {
     ReplayDetected,
 }
 
-impl From<serde_cbor::Error> for Error {
-    fn from(e: serde_cbor::Error) -> Error {
+impl From<cbor::CborError> for Error {
+    fn from(e: cbor::CborError) -> Error {
         Error::Cbor(e)
     }
 }
@@ -69,9 +69,6 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Cbor(e) => write!(f, "CBOR error: {}", e),
-            Error::TooManyItems => {
-                write!(f, "Can't decode CBOR sequence of more than 23 items")
-            }
             Error::Ed25519(e) => write!(f, "Signature error: {}", e),
             Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
             Error::Aead(e) => write!(f, "AEAD error: {}", e),

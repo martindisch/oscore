@@ -62,7 +62,7 @@ pub struct Message2 {
 
 /// Serializes EDHOC `message_2`.
 pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
-    if msg.c_u.is_some() {
+    Ok(if msg.c_u.is_some() {
         // Case where we have U's connection identifier
         cbor::encode_sequence((
             Bytes::new(msg.c_u.as_ref().unwrap()),
@@ -77,7 +77,7 @@ pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
             Bytes::new(&msg.c_v),
             Bytes::new(&msg.ciphertext),
         ))
-    }
+    }?)
 }
 
 /// Deserializes EDHOC `message_2`.
@@ -120,7 +120,7 @@ pub struct Message3 {
 
 /// Serializes EDHOC `message_3`.
 pub fn serialize_message_3(msg: &Message3) -> Result<Vec<u8>> {
-    if msg.c_v.is_some() {
+    Ok(if msg.c_v.is_some() {
         // Case where we have V's connection identifier
         cbor::encode_sequence((
             Bytes::new(msg.c_v.as_ref().unwrap()),
@@ -131,7 +131,7 @@ pub fn serialize_message_3(msg: &Message3) -> Result<Vec<u8>> {
         // Since we have a single element (the ciphertext), there's no need
         // to use the sequence encoder.
         cbor::encode(Bytes::new(&msg.ciphertext))
-    }
+    }?)
 }
 
 /// Deserializes EDHOC `message_3`.
@@ -314,7 +314,7 @@ fn h(seq: &[u8]) -> Result<Vec<u8>> {
     let hash: [u8; 32] = sha256.fixed_result().into();
 
     // Return the bstr encoding
-    cbor::encode(Bytes::new(&hash))
+    Ok(cbor::encode(Bytes::new(&hash))?)
 }
 
 /// Returns the CBOR bstr making up the plaintext of `message_i`.
@@ -322,7 +322,10 @@ pub fn build_plaintext(kid: &[u8], signature: &[u8]) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items
     // Since ID_CRED_V contains a single kid parameter, take only the bstr of
     // it. Since the signature is raw bytes, wrap it in a bstr.
-    cbor::encode_sequence((Bytes::new(kid), Bytes::new(signature)))
+    Ok(cbor::encode_sequence((
+        Bytes::new(kid),
+        Bytes::new(signature),
+    ))?)
 }
 
 /// Extracts and returns the `kid` and signature from the plaintext of

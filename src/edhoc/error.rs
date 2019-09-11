@@ -35,9 +35,6 @@ impl From<Error> for OwnOrPeerError {
             Error::Cbor(_) => {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_CBOR))
             }
-            Error::TooManyItems => {
-                OwnOrPeerError::OwnError(util::build_error_message(ERR_CBOR))
-            }
             Error::Ed25519(_) => OwnOrPeerError::OwnError(
                 util::build_error_message(ERR_ED25519),
             ),
@@ -86,9 +83,6 @@ impl From<Error> for OwnError {
     fn from(e: Error) -> OwnError {
         match e {
             Error::Cbor(_) => OwnError(util::build_error_message(ERR_CBOR)),
-            Error::TooManyItems => {
-                OwnError(util::build_error_message(ERR_CBOR))
-            }
             Error::Ed25519(_) => {
                 OwnError(util::build_error_message(ERR_ED25519))
             }
@@ -116,7 +110,7 @@ impl error::Error for OwnError {
 
 /// The error type for operations that may fail before any messages have been
 /// sent, which means the protocol can be aborted without any further action.
-// TODO: Derive PartialEq, as soon as Error does (depends on serde_cbor)
+// TODO: Derive PartialEq, as soon as Error does (depends on cbor)
 #[derive(Debug)]
 pub struct EarlyError(pub Error);
 

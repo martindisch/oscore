@@ -1,9 +1,16 @@
+//! Helpful functionality around the `serde_cbor` crate.
+
 use alloc::vec::Vec;
 use core::{cmp, result};
 use serde::Serialize;
 use serde_cbor::{de, ser::Write, Serializer};
 
-use crate::{error::Error, Result};
+#[cfg_attr(tarpaulin, skip)]
+mod error;
+pub use error::CborError;
+
+/// The result type for the `cbor` module.
+pub type Result<T> = core::result::Result<T, CborError>;
 
 /// Implements the `Write` trait from `serde_cbor` using a `Vec<u8>`.
 ///
@@ -123,7 +130,7 @@ pub fn array_to_map(bytes: &mut [u8]) -> Result<()> {
     // The 5 least significant bits are the number of elements in the array
     let n = 0b000_11111 & bytes[0];
     match n {
-        _ if n > 23 => Err(Error::TooManyItems),
+        _ if n > 23 => Err(CborError::TooManyItems),
         n => {
             // Change the major type and number of elements accordingly
             bytes[0] = 0b101_00000 | (n / 2);
@@ -141,7 +148,7 @@ pub fn map_to_array(bytes: &mut [u8]) -> Result<()> {
     // The 5 least significant bits are the number of key/value pairs
     let n = 0b000_11111 & bytes[0];
     match n {
-        _ if n * 2 > 23 => Err(Error::TooManyItems),
+        _ if n * 2 > 23 => Err(CborError::TooManyItems),
         n => {
             // Change the major type and number of elements accordingly
             bytes[0] = 0b100_00000 | (n * 2);
@@ -154,7 +161,7 @@ pub fn map_to_array(bytes: &mut [u8]) -> Result<()> {
 /// elements.
 fn array_byte(n: usize) -> Result<u8> {
     match n {
-        _ if n > 23 => Err(Error::TooManyItems),
+        _ if n > 23 => Err(CborError::TooManyItems),
         // The major type for arrays is indicated by the three leftmost bits.
         // By doing bitwise OR with the number of items, we assign the
         // remaining bits for the number of elements.
