@@ -7,9 +7,6 @@ key exchange.
 
 ## Security
 This should **not currently be used in production code**, use at your own risk.
-Because of the severe lack of Rust crypto libraries that work in `#![no_std]`,
-a [library that isn't ready yet](https://github.com/brycx/orion#security)
-is employed for AEAD.
 
 ## License
 Licensed under either of
