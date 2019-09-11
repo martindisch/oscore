@@ -97,7 +97,7 @@ impl From<Error> for OwnError {
             Error::UnsupportedSuite => {
                 OwnError(util::build_error_message(ERR_SUITE))
             }
-            _ => OwnError(util::build_error_message("This should not happen")),
+            _ => unreachable!(),
         }
     }
 }
