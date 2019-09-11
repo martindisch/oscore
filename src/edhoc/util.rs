@@ -5,8 +5,8 @@ use hkdf::Hkdf;
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha256;
 
-use super::cose;
-use crate::{cbor, error::Error, Result};
+use super::{cose, error::Error, Result};
+use crate::cbor;
 
 pub const CCM_KEY_LEN: usize = 16;
 pub const CCM_NONCE_LEN: usize = 13;

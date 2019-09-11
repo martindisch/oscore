@@ -3,7 +3,8 @@ use ed25519_dalek::{Keypair, Signature};
 use serde_bytes::Bytes;
 use sha2::Sha512;
 
-use crate::{cbor, Result};
+use super::Result;
+use crate::cbor;
 
 /// Returns the signature from signing the `Sig_structure` of the given data.
 ///

@@ -1,6 +1,5 @@
 //! The errors of the crate.
 
-use alloc::string::String;
 use coap_lite::error as coap;
 use core::fmt;
 #[cfg(feature = "std")]
@@ -15,16 +14,10 @@ use crate::cbor;
 pub enum Error {
     /// Wraps errors from the `cbor` module.
     Cbor(cbor::CborError),
-    /// Wraps errors from `ed25519_dalek`.
-    Ed25519(ed25519_dalek::SignatureError),
     /// Wraps errors from `hkdf`.
     Hkdf(hkdf::InvalidLength),
     /// Wraps errors from `aes_ccm`.
     Aead(aes_ccm::Error),
-    /// Using an unsupported cipher suite.
-    UnsupportedSuite,
-    /// Wraps a received EDHOC error message.
-    Edhoc(String),
     /// Wraps errors from `coap_lite`.
     Coap(coap::MessageError),
     /// CoAP request doesn't contain OSCORE option.
@@ -38,12 +31,6 @@ pub enum Error {
 impl From<cbor::CborError> for Error {
     fn from(e: cbor::CborError) -> Error {
         Error::Cbor(e)
-    }
-}
-
-impl From<ed25519_dalek::SignatureError> for Error {
-    fn from(e: ed25519_dalek::SignatureError) -> Error {
-        Error::Ed25519(e)
     }
 }
 
@@ -69,11 +56,8 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Cbor(e) => write!(f, "CBOR error: {}", e),
-            Error::Ed25519(e) => write!(f, "Signature error: {}", e),
             Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
             Error::Aead(e) => write!(f, "AEAD error: {}", e),
-            Error::UnsupportedSuite => write!(f, "Cipher suite unsupported"),
-            Error::Edhoc(e) => write!(f, "EDHOC error message: {}", e),
             Error::Coap(e) => write!(f, "CoAP error: {}", e),
             Error::NoOscoreOption => {
                 write!(f, "CoAP request doesn't contain OSCORE option")

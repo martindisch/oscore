@@ -76,6 +76,9 @@ mod util;
 #[cfg_attr(tarpaulin, skip)]
 pub mod error;
 
+/// The result type for internal operations of the `edhoc` module.
+type Result<T> = core::result::Result<T, error::Error>;
+
 pub use api::{
     Msg1Receiver, Msg1Sender, Msg2Receiver, Msg2Sender, Msg2Verifier,
     Msg3Receiver, Msg3Sender, Msg3Verifier,
