@@ -104,6 +104,7 @@ pub fn build_oscore_option(kid: Option<&[u8]>, piv: Option<&[u8]>) -> Vec<u8> {
 }
 
 /// Returns the `kid` and `piv` values from the message, if present.
+#[allow(clippy::type_complexity)]
 pub fn extract_kid_piv(
     message: &Packet,
 ) -> Result<(Option<Vec<u8>>, Option<Vec<u8>>)> {

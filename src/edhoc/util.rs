@@ -256,10 +256,10 @@ pub fn compute_th_2(
     c_v: &[u8],
 ) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items from the data
-    let data_2 = if c_u.is_some() {
+    let data_2 = if let Some(c_u) = c_u {
         // Case where we have c_u
         cbor::encode_sequence((
-            Bytes::new(c_u.unwrap()),
+            Bytes::new(c_u),
             Bytes::new(x_v),
             Bytes::new(c_v),
         ))?
@@ -287,9 +287,9 @@ pub fn compute_th_3(
     // Add the items that are always present
     seq.extend(th_2);
     seq.extend(cbor::encode(Bytes::new(ciphertext_2))?);
-    if c_v.is_some() {
+    if let Some(c_v) = c_v {
         // Case where we have c_v
-        seq.extend(cbor::encode(Bytes::new(c_v.unwrap()))?);
+        seq.extend(cbor::encode(Bytes::new(c_v))?);
     }
 
     // Return the hash of this
