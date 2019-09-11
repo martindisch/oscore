@@ -10,6 +10,12 @@ use crate::cbor;
 // TODO: Derive PartialEq as soon as cbor does for its error type
 #[derive(Debug)]
 pub enum Error {
+    /// CoAP request doesn't contain OSCORE option.
+    NoOscoreOption,
+    /// CoAP request doesn't have kid or piv.
+    NoKidPiv,
+    /// This message has been received already.
+    ReplayDetected,
     /// Wraps errors from the `cbor` module.
     Cbor(cbor::CborError),
     /// Wraps errors from `hkdf`.
@@ -18,12 +24,6 @@ pub enum Error {
     Aead(aes_ccm::Error),
     /// Wraps errors from `coap_lite`.
     Coap(coap::MessageError),
-    /// CoAP request doesn't contain OSCORE option.
-    NoOscoreOption,
-    /// CoAP request doesn't have kid or piv.
-    NoKidPiv,
-    /// This message has been received already.
-    ReplayDetected,
 }
 
 impl From<cbor::CborError> for Error {
@@ -53,10 +53,6 @@ impl From<coap::MessageError> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Cbor(e) => write!(f, "CBOR error: {}", e),
-            Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
-            Error::Aead(e) => write!(f, "AEAD error: {}", e),
-            Error::Coap(e) => write!(f, "CoAP error: {}", e),
             Error::NoOscoreOption => {
                 write!(f, "CoAP request doesn't contain OSCORE option")
             }
@@ -66,6 +62,10 @@ impl fmt::Display for Error {
             Error::ReplayDetected => {
                 write!(f, "This message has been received already")
             }
+            Error::Cbor(e) => e.fmt(f),
+            Error::Hkdf(e) => e.fmt(f),
+            Error::Aead(e) => e.fmt(f),
+            Error::Coap(e) => e.fmt(f),
         }
     }
 }

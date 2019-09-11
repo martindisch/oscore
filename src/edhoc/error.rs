@@ -32,6 +32,9 @@ pub enum OwnOrPeerError {
 impl From<Error> for OwnOrPeerError {
     fn from(e: Error) -> OwnOrPeerError {
         match e {
+            Error::UnsupportedSuite => {
+                OwnOrPeerError::OwnError(util::build_error_message(ERR_SUITE))
+            }
             Error::Cbor(_) => {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_CBOR))
             }
@@ -43,9 +46,6 @@ impl From<Error> for OwnOrPeerError {
             }
             Error::Aead(_) => {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_AEAD))
-            }
-            Error::UnsupportedSuite => {
-                OwnOrPeerError::OwnError(util::build_error_message(ERR_SUITE))
             }
             Error::Edhoc(msg) => OwnOrPeerError::PeerError(msg),
         }
@@ -81,15 +81,15 @@ pub struct OwnError(pub alloc::vec::Vec<u8>);
 impl From<Error> for OwnError {
     fn from(e: Error) -> OwnError {
         match e {
+            Error::UnsupportedSuite => {
+                OwnError(util::build_error_message(ERR_SUITE))
+            }
             Error::Cbor(_) => OwnError(util::build_error_message(ERR_CBOR)),
             Error::Ed25519(_) => {
                 OwnError(util::build_error_message(ERR_ED25519))
             }
             Error::Hkdf(_) => OwnError(util::build_error_message(ERR_HKDF)),
             Error::Aead(_) => OwnError(util::build_error_message(ERR_AEAD)),
-            Error::UnsupportedSuite => {
-                OwnError(util::build_error_message(ERR_SUITE))
-            }
             _ => unreachable!(),
         }
     }
@@ -137,6 +137,8 @@ impl error::Error for EarlyError {
 // TODO: Derive PartialEq as soon as cbor does for its error type
 #[derive(Debug)]
 pub enum Error {
+    /// Using an unsupported cipher suite.
+    UnsupportedSuite,
     /// Wraps errors from the `cbor` module.
     Cbor(cbor::CborError),
     /// Wraps errors from `ed25519_dalek`.
@@ -145,8 +147,6 @@ pub enum Error {
     Hkdf(hkdf::InvalidLength),
     /// Wraps errors from `aes_ccm`.
     Aead(aes_ccm::Error),
-    /// Using an unsupported cipher suite.
-    UnsupportedSuite,
     /// Wraps a received EDHOC error message.
     Edhoc(String),
 }
@@ -178,12 +178,12 @@ impl From<aes_ccm::Error> for Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Cbor(e) => write!(f, "CBOR error: {}", e),
-            Error::Ed25519(e) => write!(f, "Signature error: {}", e),
-            Error::Hkdf(e) => write!(f, "HKDF error: {}", e),
-            Error::Aead(e) => write!(f, "AEAD error: {}", e),
             Error::UnsupportedSuite => write!(f, "Cipher suite unsupported"),
-            Error::Edhoc(e) => write!(f, "EDHOC error message: {}", e),
+            Error::Cbor(e) => e.fmt(f),
+            Error::Ed25519(e) => e.fmt(f),
+            Error::Hkdf(e) => e.fmt(f),
+            Error::Aead(e) => e.fmt(f),
+            Error::Edhoc(e) => e.fmt(f),
         }
     }
 }

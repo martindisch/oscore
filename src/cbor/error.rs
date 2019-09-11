@@ -6,10 +6,10 @@ use std::error;
 // TODO: Derive PartialEq as soon as serde_cbor does for its error type
 #[derive(Debug)]
 pub enum CborError {
-    /// Wraps errors from `serde_cbor`.
-    SerdeCbor(serde_cbor::Error),
     /// Tried to encode/decode CBOR sequence of more than 23 items.
     TooManyItems,
+    /// Wraps errors from `serde_cbor`.
+    SerdeCbor(serde_cbor::Error),
 }
 
 impl From<serde_cbor::Error> for CborError {
@@ -21,11 +21,10 @@ impl From<serde_cbor::Error> for CborError {
 impl fmt::Display for CborError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            CborError::SerdeCbor(e) => write!(f, "CBOR error: {}", e),
-            CborError::TooManyItems => write!(
-                f,
-                "CBOR error: can't decode CBOR sequence of more than 23 items"
-            ),
+            CborError::TooManyItems => {
+                write!(f, "Can't decode CBOR sequence of more than 23 items")
+            }
+            CborError::SerdeCbor(e) => e.fmt(f),
         }
     }
 }
@@ -34,8 +33,8 @@ impl fmt::Display for CborError {
 impl error::Error for CborError {
     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
         match self {
-            CborError::SerdeCbor(e) => Some(e),
             CborError::TooManyItems => None,
+            CborError::SerdeCbor(e) => Some(e),
         }
     }
 }
