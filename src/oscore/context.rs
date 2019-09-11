@@ -8,8 +8,7 @@ use crate::{error::Error, Result};
 
 /// The common context part of the security context.
 struct CommonContext {
-    master_secret: Vec<u8>,
-    master_salt: Vec<u8>,
+    // Master secret and salt are unused, hence not part of this
     common_iv: [u8; util::NONCE_LEN],
 }
 
@@ -75,11 +74,7 @@ impl SecurityContext {
         common_iv.copy_from_slice(&common_iv_vec);
 
         // Build the subcontexts
-        let common_context = CommonContext {
-            master_secret,
-            master_salt,
-            common_iv,
-        };
+        let common_context = CommonContext { common_iv };
         let sender_context = SenderContext {
             sender_id,
             sender_key,
@@ -452,14 +447,6 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            &MASTER_SECRET,
-            &security_context.common_context.master_secret[..]
-        );
-        assert_eq!(
-            &MASTER_SALT,
-            &security_context.common_context.master_salt[..]
-        );
         assert_eq!(&COMMON_IV, &security_context.common_context.common_iv[..]);
 
         assert_eq!(&CLIENT_ID, &security_context.sender_context.sender_id[..]);
