@@ -18,7 +18,7 @@ sha2 = { version = "0.8.0", default-features = false }
 aes-ccm = { version = "0.3.0", default-features = false }
 hkdf = "0.8.0"
 digest = "0.8.1"
-coap-lite = { version = "0.2.0", default-features = false }
+coap-lite = { version = "0.3.0", default-features = false }
 
 [features]
 default = ["std"]

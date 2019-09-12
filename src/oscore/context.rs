@@ -1,7 +1,6 @@
 use aes_ccm::CcmMode;
 use alloc::vec::Vec;
 use coap_lite::{CoapOption, MessageClass, Packet, RequestType, ResponseType};
-use core::convert::{TryFrom, TryInto};
 
 use super::{error::Error, util, Result};
 
@@ -229,8 +228,7 @@ impl SecurityContext {
             }
 
             // At this point the option is class E or undefined, so protect it
-            // TODO: Better integration with coap module, error handling
-            let option = CoapOption::try_from(*number).unwrap();
+            let option = CoapOption::from(*number);
             // Add it to the inner message
             inner.set_option(option, value_list.clone());
             // Remember it's been moved
@@ -360,8 +358,7 @@ impl SecurityContext {
             }
 
             // At this point the option is class E or undefined, so discard it
-            // TODO: Better integration with coap module, error handling
-            let option = CoapOption::try_from(*number).unwrap();
+            let option = CoapOption::from(*number);
             to_discard.push(option);
         }
         // Discard class E options
@@ -390,9 +387,7 @@ impl SecurityContext {
         original.header.code = inner.header.code;
         // Set the options from the inner message
         for (number, value_list) in inner.options() {
-            // TODO: error handling
-            original
-                .set_option((*number).try_into().unwrap(), value_list.clone());
+            original.set_option((*number).into(), value_list.clone());
         }
         // Set the payload from the inner message
         original.payload = inner.payload;
