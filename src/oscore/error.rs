@@ -1,4 +1,4 @@
-use coap_lite::error as coap;
+use coap_lite::{error as coap, CoapOption};
 use core::fmt;
 #[cfg(feature = "std")]
 use std::error;
@@ -16,6 +16,8 @@ pub enum Error {
     NoKidPiv,
     /// This message has been received already.
     ReplayDetected,
+    /// Message contains an unsupported option.
+    UnsupportedOption(CoapOption),
     /// Wraps errors from the `cbor` module.
     Cbor(cbor::CborError),
     /// Wraps errors from `hkdf`.
@@ -61,6 +63,9 @@ impl fmt::Display for Error {
             }
             Error::ReplayDetected => {
                 write!(f, "This message has been received already")
+            }
+            Error::UnsupportedOption(o) => {
+                write!(f, "Message contains an unsupported option: {:?}", o)
             }
             Error::Cbor(e) => e.fmt(f),
             Error::Hkdf(e) => e.fmt(f),

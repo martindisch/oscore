@@ -234,8 +234,7 @@ impl SecurityContext {
 
             // Abort on unimplemented optional features
             if UNSUPPORTED.contains(&option) {
-                // TODO: Error instead of panic
-                unimplemented!("Option {}", number);
+                return Err(Error::UnsupportedOption(option));
             }
             // Skip class U options
             if CLASS_U.contains(&option) {
@@ -365,8 +364,7 @@ impl SecurityContext {
 
             // Abort on unimplemented optional features
             if UNSUPPORTED.contains(&option) {
-                // TODO: Error instead of panic
-                unimplemented!("Option {}", number);
+                return Err(Error::UnsupportedOption(option));
             }
             // Skip class U options
             if CLASS_U.contains(&option) {
