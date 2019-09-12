@@ -3,14 +3,14 @@
 //! This is I/O-free, so all it does is provide facilities to parse incoming
 //! messages and receive output that can then be sent to the other party.
 //! Since doing all of this often depends on previous state, it uses a kind of
-//! state pattern with different structs for different protocol states, which
+//! session types pattern with structs as different protocol states, which
 //! are consumed by an action and return the next state struct together with
 //! optional data.
 //!
-//! Party U starts by initializing a `Msg1Sender` and using it to generate the
-//! first message and the `Msg2Receiver`. Party V does the opposite,
-//! initializing a `Msg1Receiver` and using this to handle the message and get
-//! the `Msg2Sender`, etc.
+//! Party U starts by initializing a `PartyU` and using it to generate the
+//! first message and its next state. Party V does the opposite,
+//! initializing a `PartyV` and using this to handle the message and get
+//! its next state, etc.
 //!
 //! # Errors
 //! EDHOC defines an error message that needs to be sent to the peer to abort
@@ -47,7 +47,7 @@
 //! to demonstrate the general pattern and the error handling.
 //! ```rust
 //! // This is a case where we get additional data from the message handling,
-//! // as well as the next structure we can use afterwards.
+//! // as well as the next state we can use afterwards.
 //! let (v_kid, msg2_verifier) =
 //!    // This is a case where we could receive an error message (just abort
 //!    // then), or cause an error (send it to the peer)
@@ -79,7 +79,4 @@ pub mod error;
 /// The result type for internal operations of the `edhoc` module.
 type Result<T> = core::result::Result<T, error::Error>;
 
-pub use api::{
-    Msg1Receiver, Msg1Sender, Msg2Receiver, Msg2Sender, Msg2Verifier,
-    Msg3Receiver, Msg3Sender, Msg3Verifier,
-};
+pub use api::{PartyU, PartyV};

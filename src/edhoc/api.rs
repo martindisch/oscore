@@ -11,7 +11,17 @@ use super::{
 
 // Party U constructs ---------------------------------------------------------
 
-/// Generates the first message.
+/// The structure providing all operations for Party U.
+pub struct PartyU<S: PartyUState>(S);
+
+// Necessary stuff for session types
+pub trait PartyUState {}
+impl PartyUState for Msg1Sender {}
+impl PartyUState for Msg2Receiver {}
+impl PartyUState for Msg2Verifier {}
+impl PartyUState for Msg3Sender {}
+
+/// Contains the state to build the first message.
 pub struct Msg1Sender {
     c_u: Vec<u8>,
     secret: StaticSecret,
@@ -20,8 +30,8 @@ pub struct Msg1Sender {
     kid: Vec<u8>,
 }
 
-impl Msg1Sender {
-    /// Initializes a new `Msg1Sender`.
+impl PartyU<Msg1Sender> {
+    /// Creates a new `PartyU` ready to build the first message.
     ///
     /// # Arguments
     /// * `c_u` - The chosen connection identifier.
@@ -36,7 +46,7 @@ impl Msg1Sender {
         auth_private: &[u8; 32],
         auth_public: &[u8; 32],
         kid: Vec<u8>,
-    ) -> Msg1Sender {
+    ) -> PartyU<Msg1Sender> {
         // From the secret bytes, create the DH secret
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
@@ -46,13 +56,13 @@ impl Msg1Sender {
         auth[..32].copy_from_slice(auth_private);
         auth[32..].copy_from_slice(auth_public);
 
-        Msg1Sender {
+        PartyU(Msg1Sender {
             c_u,
             secret,
             x_u,
             auth,
             kid,
-        }
+        })
     }
 
     /// Returns the bytes of the first message.
@@ -69,13 +79,13 @@ impl Msg1Sender {
     pub fn generate_message_1(
         self,
         r#type: isize,
-    ) -> Result<(Vec<u8>, Msg2Receiver), EarlyError> {
+    ) -> Result<(Vec<u8>, PartyU<Msg2Receiver>), EarlyError> {
         // Encode the necessary information into the first message
         let msg_1 = Message1 {
             r#type,
             suite: 0,
-            x_u: self.x_u.as_bytes().to_vec(),
-            c_u: self.c_u,
+            x_u: self.0.x_u.as_bytes().to_vec(),
+            c_u: self.0.c_u,
         };
         // Get CBOR sequence for message
         let msg_1_seq = util::serialize_message_1(&msg_1)?;
@@ -84,18 +94,18 @@ impl Msg1Sender {
 
         Ok((
             msg_1_bytes,
-            Msg2Receiver {
-                secret: self.secret,
-                auth: self.auth,
-                kid: self.kid,
+            PartyU(Msg2Receiver {
+                secret: self.0.secret,
+                auth: self.0.auth,
+                kid: self.0.kid,
                 msg_1_seq,
                 msg_1,
-            },
+            }),
         ))
     }
 }
 
-/// Processes the second message.
+/// Contains the state to receive the second message.
 pub struct Msg2Receiver {
     secret: StaticSecret,
     auth: [u8; 64],
@@ -104,12 +114,12 @@ pub struct Msg2Receiver {
     msg_1: Message1,
 }
 
-impl Msg2Receiver {
+impl PartyU<Msg2Receiver> {
     /// Returns the key ID of the other party's public authentication key.
     pub fn extract_peer_kid(
         self,
         msg_2: Vec<u8>,
-    ) -> Result<(Vec<u8>, Msg2Verifier), OwnOrPeerError> {
+    ) -> Result<(Vec<u8>, PartyU<Msg2Verifier>), OwnOrPeerError> {
         // Check if we don't have an error message
         util::fail_on_error_message(&msg_2)?;
         // Decode the second message
@@ -119,11 +129,11 @@ impl Msg2Receiver {
         let mut x_v_bytes = [0; 32];
         x_v_bytes.copy_from_slice(&msg_2.x_v[..32]);
         let v_public = x25519_dalek::PublicKey::from(x_v_bytes);
-        let shared_secret = self.secret.diffie_hellman(&v_public);
+        let shared_secret = self.0.secret.diffie_hellman(&v_public);
 
         // Compute TH_2
         let th_2 = util::compute_th_2(
-            self.msg_1_seq,
+            self.0.msg_1_seq,
             crate::as_deref(&msg_2.c_u),
             &msg_2.x_v,
             &msg_2.c_v,
@@ -155,21 +165,21 @@ impl Msg2Receiver {
 
         Ok((
             v_kid_cpy,
-            Msg2Verifier {
+            PartyU(Msg2Verifier {
                 shared_secret,
-                auth: self.auth,
-                kid: self.kid,
-                msg_1: self.msg_1,
+                auth: self.0.auth,
+                kid: self.0.kid,
+                msg_1: self.0.msg_1,
                 msg_2,
                 th_2,
                 v_kid,
                 v_sig,
-            },
+            }),
         ))
     }
 }
 
-/// Verifies the second message.
+/// Contains the state to verify the second message.
 pub struct Msg2Verifier {
     shared_secret: SharedSecret,
     auth: [u8; 64],
@@ -181,33 +191,39 @@ pub struct Msg2Verifier {
     v_sig: Vec<u8>,
 }
 
-impl Msg2Verifier {
+impl PartyU<Msg2Verifier> {
     /// Checks the authenticity of the second message with the other party's
     /// public authentication key.
     pub fn verify_message_2(
         self,
         v_public: &[u8],
-    ) -> Result<Msg3Sender, OwnError> {
+    ) -> Result<PartyU<Msg3Sender>, OwnError> {
         // Build the COSE header map identifying the public authentication key
         // of V
-        let id_cred_v = cose::build_id_cred_x(&self.v_kid)?;
+        let id_cred_v = cose::build_id_cred_x(&self.0.v_kid)?;
         // Build the COSE_Key containing V's public authentication key
         let cred_v = cose::serialize_cose_key(v_public)?;
         // Verify the signed data from Party V
-        cose::verify(&id_cred_v, &self.th_2, &cred_v, v_public, &self.v_sig)?;
+        cose::verify(
+            &id_cred_v,
+            &self.0.th_2,
+            &cred_v,
+            v_public,
+            &self.0.v_sig,
+        )?;
 
-        Ok(Msg3Sender {
-            shared_secret: self.shared_secret,
-            auth: self.auth,
-            kid: self.kid,
-            msg_1: self.msg_1,
-            msg_2: self.msg_2,
-            th_2: self.th_2,
-        })
+        Ok(PartyU(Msg3Sender {
+            shared_secret: self.0.shared_secret,
+            auth: self.0.auth,
+            kid: self.0.kid,
+            msg_1: self.0.msg_1,
+            msg_2: self.0.msg_2,
+            th_2: self.0.th_2,
+        }))
     }
 }
 
-/// Generates the third message and returns the OSCORE context.
+/// Contains the state to build the third message.
 pub struct Msg3Sender {
     shared_secret: SharedSecret,
     auth: [u8; 64],
@@ -217,7 +233,7 @@ pub struct Msg3Sender {
     th_2: Vec<u8>,
 }
 
-impl Msg3Sender {
+impl PartyU<Msg3Sender> {
     /// Returns the bytes of the third message, as well as the OSCORE master
     /// secret and the OSCORE master salt.
     #[allow(clippy::type_complexity)]
@@ -225,42 +241,43 @@ impl Msg3Sender {
         self,
     ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), OwnError> {
         // Determine whether to include c_v in message_3 or not
-        let c_v = if self.msg_1.r#type % 4 == 2 || self.msg_1.r#type % 4 == 3 {
-            None
-        } else {
-            Some(self.msg_2.c_v)
-        };
+        let c_v =
+            if self.0.msg_1.r#type % 4 == 2 || self.0.msg_1.r#type % 4 == 3 {
+                None
+            } else {
+                Some(self.0.msg_2.c_v)
+            };
 
         // Build the COSE header map identifying the public authentication key
-        let id_cred_u = cose::build_id_cred_x(&self.kid)?;
+        let id_cred_u = cose::build_id_cred_x(&self.0.kid)?;
         // Build the COSE_Key containing our public authentication key
-        let cred_u = cose::serialize_cose_key(&self.auth[32..])?;
+        let cred_u = cose::serialize_cose_key(&self.0.auth[32..])?;
         // Compute TH_3
         let th_3 = util::compute_th_3(
-            &self.th_2,
-            &self.msg_2.ciphertext,
+            &self.0.th_2,
+            &self.0.msg_2.ciphertext,
             crate::as_deref(&c_v),
         )?;
         // Sign it
-        let sig = cose::sign(&id_cred_u, &th_3, &cred_u, &self.auth)?;
+        let sig = cose::sign(&id_cred_u, &th_3, &cred_u, &self.0.auth)?;
 
         // Derive K_3
         let k_3 = util::edhoc_key_derivation(
             &"10",
             util::CCM_KEY_LEN * 8,
             &th_3,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
         // Derive IV_3
         let iv_3 = util::edhoc_key_derivation(
             &"IV-GENERATION",
             util::CCM_NONCE_LEN * 8,
             &th_3,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
 
         // Put together the plaintext for the encryption
-        let plaintext = util::build_plaintext(&self.kid, &sig)?;
+        let plaintext = util::build_plaintext(&self.0.kid, &sig)?;
         // Compute the associated data
         let ad = cose::build_ad(&th_3)?;
         // Get the ciphertext
@@ -277,13 +294,13 @@ impl Msg3Sender {
             "OSCORE Master Secret",
             util::CCM_KEY_LEN,
             &th_4,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
         let master_salt = util::edhoc_exporter(
             "OSCORE Master Salt",
             8,
             &th_4,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
 
         Ok((msg_3_seq, master_secret, master_salt))
@@ -292,7 +309,17 @@ impl Msg3Sender {
 
 // Party V constructs ---------------------------------------------------------
 
-/// Handles the first message.
+/// The structure providing all operations for Party V.
+pub struct PartyV<S: PartyVState>(S);
+
+// Necessary stuff for session types
+pub trait PartyVState {}
+impl PartyVState for Msg1Receiver {}
+impl PartyVState for Msg2Sender {}
+impl PartyVState for Msg3Receiver {}
+impl PartyVState for Msg3Verifier {}
+
+/// Contains the state to receive the first message.
 pub struct Msg1Receiver {
     c_v: Vec<u8>,
     secret: StaticSecret,
@@ -301,8 +328,8 @@ pub struct Msg1Receiver {
     kid: Vec<u8>,
 }
 
-impl Msg1Receiver {
-    /// Initializes a new `Msg1Receiver`.
+impl PartyV<Msg1Receiver> {
+    /// Creates a new `PartyV` ready to receive the first message.
     ///
     /// # Arguments
     /// * `c_v` - The chosen connection identifier.
@@ -317,7 +344,7 @@ impl Msg1Receiver {
         auth_private: &[u8; 32],
         auth_public: &[u8; 32],
         kid: Vec<u8>,
-    ) -> Msg1Receiver {
+    ) -> PartyV<Msg1Receiver> {
         // From the secret bytes, create the DH secret
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
@@ -327,20 +354,20 @@ impl Msg1Receiver {
         auth[..32].copy_from_slice(auth_private);
         auth[32..].copy_from_slice(auth_public);
 
-        Msg1Receiver {
+        PartyV(Msg1Receiver {
             c_v,
             secret,
             x_v,
             auth,
             kid,
-        }
+        })
     }
 
     /// Processes the first message.
     pub fn handle_message_1(
         self,
         msg_1: Vec<u8>,
-    ) -> Result<Msg2Sender, OwnError> {
+    ) -> Result<PartyV<Msg2Sender>, OwnError> {
         // Alias this
         let msg_1_seq = msg_1;
         // Decode the first message
@@ -354,21 +381,21 @@ impl Msg1Receiver {
         let mut x_u_bytes = [0; 32];
         x_u_bytes.copy_from_slice(&msg_1.x_u[..32]);
         let u_public = x25519_dalek::PublicKey::from(x_u_bytes);
-        let shared_secret = self.secret.diffie_hellman(&u_public);
+        let shared_secret = self.0.secret.diffie_hellman(&u_public);
 
-        Ok(Msg2Sender {
-            c_v: self.c_v,
+        Ok(PartyV(Msg2Sender {
+            c_v: self.0.c_v,
             shared_secret,
-            x_v: self.x_v,
-            auth: self.auth,
-            kid: self.kid,
+            x_v: self.0.x_v,
+            auth: self.0.auth,
+            kid: self.0.kid,
             msg_1_seq,
             msg_1,
-        })
+        }))
     }
 }
 
-/// Generates the second message.
+/// Contains the state to build the second message.
 pub struct Msg2Sender {
     c_v: Vec<u8>,
     shared_secret: SharedSecret,
@@ -379,49 +406,50 @@ pub struct Msg2Sender {
     msg_1: Message1,
 }
 
-impl Msg2Sender {
+impl PartyV<Msg2Sender> {
     /// Returns the bytes of the second message.
     pub fn generate_message_2(
         self,
-    ) -> Result<(Vec<u8>, Msg3Receiver), OwnError> {
+    ) -> Result<(Vec<u8>, PartyV<Msg3Receiver>), OwnError> {
         // Determine whether to include c_u in message_2 or not
-        let c_u = if self.msg_1.r#type % 4 == 1 || self.msg_1.r#type % 4 == 3 {
-            None
-        } else {
-            Some(self.msg_1.c_u.clone())
-        };
+        let c_u =
+            if self.0.msg_1.r#type % 4 == 1 || self.0.msg_1.r#type % 4 == 3 {
+                None
+            } else {
+                Some(self.0.msg_1.c_u.clone())
+            };
 
         // Build the COSE header map identifying the public authentication key
-        let id_cred_v = cose::build_id_cred_x(&self.kid)?;
+        let id_cred_v = cose::build_id_cred_x(&self.0.kid)?;
         // Build the COSE_Key containing our public authentication key
-        let cred_v = cose::serialize_cose_key(&self.auth[32..])?;
+        let cred_v = cose::serialize_cose_key(&self.0.auth[32..])?;
         // Compute TH_2
         let th_2 = util::compute_th_2(
-            self.msg_1_seq,
+            self.0.msg_1_seq,
             crate::as_deref(&c_u),
-            self.x_v.as_bytes(),
-            &self.c_v,
+            self.0.x_v.as_bytes(),
+            &self.0.c_v,
         )?;
         // Sign it
-        let sig = cose::sign(&id_cred_v, &th_2, &cred_v, &self.auth)?;
+        let sig = cose::sign(&id_cred_v, &th_2, &cred_v, &self.0.auth)?;
 
         // Derive K_2
         let k_2 = util::edhoc_key_derivation(
             &"10",
             util::CCM_KEY_LEN * 8,
             &th_2,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
         // Derive IV_2
         let iv_2 = util::edhoc_key_derivation(
             &"IV-GENERATION",
             util::CCM_NONCE_LEN * 8,
             &th_2,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
 
         // Put together the plaintext for the encryption
-        let plaintext = util::build_plaintext(&self.kid, &sig)?;
+        let plaintext = util::build_plaintext(&self.0.kid, &sig)?;
         // Compute the associated data
         let ad = cose::build_ad(&th_2)?;
         // Get the ciphertext
@@ -430,8 +458,8 @@ impl Msg2Sender {
         // Produce message_2
         let msg_2 = Message2 {
             c_u,
-            x_v: self.x_v.as_bytes().to_vec(),
-            c_v: self.c_v,
+            x_v: self.0.x_v.as_bytes().to_vec(),
+            c_v: self.0.c_v,
             ciphertext,
         };
         // Get CBOR sequence for message
@@ -439,28 +467,28 @@ impl Msg2Sender {
 
         Ok((
             msg_2_seq,
-            Msg3Receiver {
-                shared_secret: self.shared_secret,
+            PartyV(Msg3Receiver {
+                shared_secret: self.0.shared_secret,
                 msg_2,
                 th_2,
-            },
+            }),
         ))
     }
 }
 
-/// Processes the third message.
+/// Contains the state to receive the third message.
 pub struct Msg3Receiver {
     shared_secret: SharedSecret,
     msg_2: Message2,
     th_2: Vec<u8>,
 }
 
-impl Msg3Receiver {
+impl PartyV<Msg3Receiver> {
     /// Returns the key ID of the other party's public authentication key.
     pub fn extract_peer_kid(
         self,
         msg_3: Vec<u8>,
-    ) -> Result<(Vec<u8>, Msg3Verifier), OwnOrPeerError> {
+    ) -> Result<(Vec<u8>, PartyV<Msg3Verifier>), OwnOrPeerError> {
         // Check if we don't have an error message
         util::fail_on_error_message(&msg_3)?;
         // Decode the third message
@@ -468,8 +496,8 @@ impl Msg3Receiver {
 
         // Compute TH_3
         let th_3 = util::compute_th_3(
-            &self.th_2,
-            &self.msg_2.ciphertext,
+            &self.0.th_2,
+            &self.0.msg_2.ciphertext,
             crate::as_deref(&msg_3.c_v),
         )?;
 
@@ -478,14 +506,14 @@ impl Msg3Receiver {
             &"10",
             util::CCM_KEY_LEN * 8,
             &th_3,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
         // Derive IV_3
         let iv_3 = util::edhoc_key_derivation(
             &"IV-GENERATION",
             util::CCM_NONCE_LEN * 8,
             &th_3,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
 
         // Compute the associated data
@@ -499,18 +527,18 @@ impl Msg3Receiver {
 
         Ok((
             u_kid_cpy,
-            Msg3Verifier {
-                shared_secret: self.shared_secret,
+            PartyV(Msg3Verifier {
+                shared_secret: self.0.shared_secret,
                 msg_3,
                 th_3,
                 u_kid,
                 u_sig,
-            },
+            }),
         ))
     }
 }
 
-/// Verifies the third message and returns the OSCORE context.
+/// Contains the state to verify the third message.
 pub struct Msg3Verifier {
     shared_secret: SharedSecret,
     msg_3: Message3,
@@ -519,7 +547,7 @@ pub struct Msg3Verifier {
     u_sig: Vec<u8>,
 }
 
-impl Msg3Verifier {
+impl PartyV<Msg3Verifier> {
     /// Checks the authenticity of the third message with the other party's
     /// public authentication key and returns the OSCORE master secret and the
     /// OSCORE master Salt.
@@ -529,32 +557,36 @@ impl Msg3Verifier {
     ) -> Result<(Vec<u8>, Vec<u8>), OwnError> {
         // Build the COSE header map identifying the public authentication key
         // of U
-        let id_cred_u = cose::build_id_cred_x(&self.u_kid)?;
+        let id_cred_u = cose::build_id_cred_x(&self.0.u_kid)?;
         // Build the COSE_Key containing U's public authentication key
         let cred_u = cose::serialize_cose_key(&u_public)?;
         // Verify the signed data from Party U
-        cose::verify(&id_cred_u, &self.th_3, &cred_u, &u_public, &self.u_sig)?;
+        cose::verify(
+            &id_cred_u,
+            &self.0.th_3,
+            &cred_u,
+            &u_public,
+            &self.0.u_sig,
+        )?;
 
         // Derive values for the OSCORE context
-        let th_4 = util::compute_th_4(&self.th_3, &self.msg_3.ciphertext)?;
+        let th_4 = util::compute_th_4(&self.0.th_3, &self.0.msg_3.ciphertext)?;
         let master_secret = util::edhoc_exporter(
             "OSCORE Master Secret",
             util::CCM_KEY_LEN,
             &th_4,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
         let master_salt = util::edhoc_exporter(
             "OSCORE Master Salt",
             8,
             &th_4,
-            self.shared_secret.as_bytes(),
+            self.0.shared_secret.as_bytes(),
         )?;
 
         Ok((master_secret, master_salt))
     }
 }
-
-// Common functionality -------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -574,7 +606,7 @@ mod tests {
 
     fn successful_run(r#type: isize) -> (Vec<u8>, Vec<u8>) {
         // Party U ------------------------------------------------------------
-        let msg1_sender = Msg1Sender::new(
+        let msg1_sender = PartyU::new(
             C_U.to_vec(),
             EPH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -586,7 +618,7 @@ mod tests {
 
         // Party V ------------------------------------------------------------
 
-        let msg1_receiver = Msg1Receiver::new(
+        let msg1_receiver = PartyV::new(
             C_V.to_vec(),
             EPH_V_PRIVATE,
             &AUTH_V_PRIVATE,
@@ -635,7 +667,7 @@ mod tests {
     fn unsupported_suite() {
         // Party U ------------------------------------------------------------
 
-        let msg1_sender = Msg1Sender::new(
+        let msg1_sender = PartyU::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -647,7 +679,7 @@ mod tests {
         msg1_bytes[1] = 0x01;
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver = Msg1Receiver::new(
+        let msg1_receiver = PartyV::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
             &AUTH_V_PRIVATE,
@@ -663,7 +695,7 @@ mod tests {
     #[test]
     fn only_own_error() {
         // Party U ------------------------------------------------------------
-        let msg1_sender = Msg1Sender::new(
+        let msg1_sender = PartyU::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -675,7 +707,7 @@ mod tests {
         msg1_bytes[0] = 0xFF;
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver = Msg1Receiver::new(
+        let msg1_receiver = PartyV::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
             &AUTH_V_PRIVATE,
@@ -691,7 +723,7 @@ mod tests {
     #[test]
     fn both_own_error() {
         // Party U ------------------------------------------------------------
-        let msg1_sender = Msg1Sender::new(
+        let msg1_sender = PartyU::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -702,7 +734,7 @@ mod tests {
             msg1_sender.generate_message_1(1).unwrap();
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver = Msg1Receiver::new(
+        let msg1_receiver = PartyV::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
             &AUTH_V_PRIVATE,
@@ -724,7 +756,7 @@ mod tests {
     #[test]
     fn both_peer_error() {
         // Party U ------------------------------------------------------------
-        let msg1_sender = Msg1Sender::new(
+        let msg1_sender = PartyU::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -737,7 +769,7 @@ mod tests {
         msg1_bytes[0] = 0xFF;
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver = Msg1Receiver::new(
+        let msg1_receiver = PartyV::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
             &AUTH_V_PRIVATE,
