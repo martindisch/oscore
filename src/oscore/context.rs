@@ -33,9 +33,22 @@ pub struct SecurityContext {
     recipient_context: RecipientContext,
 }
 
-// TODO: Better integration with improved coap module in the future
-static CLASS_U: [usize; 4] = [3, 7, 35, 39];
-static UNSUPPORTED: [usize; 6] = [6, 23, 27, 28, 60, 258];
+/// The known class U options that have to remain public.
+static CLASS_U: [CoapOption; 4] = [
+    CoapOption::UriHost,
+    CoapOption::UriPort,
+    CoapOption::ProxyUri,
+    CoapOption::ProxyScheme,
+];
+/// The optional options that we don't support.
+static UNSUPPORTED: [CoapOption; 6] = [
+    CoapOption::Observe,
+    CoapOption::Block2,
+    CoapOption::Block1,
+    CoapOption::Size2,
+    CoapOption::Size1,
+    CoapOption::NoResponse,
+];
 
 impl SecurityContext {
     /// Creates a new `SecurityContext`.
@@ -217,18 +230,19 @@ impl SecurityContext {
         let mut moved_options = vec![];
         // Go over options, moving class E ones into the inner message
         for (number, value_list) in original.options() {
+            let option = CoapOption::from(*number);
+
             // Abort on unimplemented optional features
-            if UNSUPPORTED.contains(number) {
+            if UNSUPPORTED.contains(&option) {
                 // TODO: Error instead of panic
                 unimplemented!("Option {}", number);
             }
             // Skip class U options
-            if CLASS_U.contains(number) {
+            if CLASS_U.contains(&option) {
                 continue;
             }
 
             // At this point the option is class E or undefined, so protect it
-            let option = CoapOption::from(*number);
             // Add it to the inner message
             inner.set_option(option, value_list.clone());
             // Remember it's been moved
@@ -347,18 +361,19 @@ impl SecurityContext {
         let mut to_discard = vec![];
         // Go over options, remembering class E ones to discard
         for (number, _) in original.options() {
+            let option = CoapOption::from(*number);
+
             // Abort on unimplemented optional features
-            if UNSUPPORTED.contains(number) {
+            if UNSUPPORTED.contains(&option) {
                 // TODO: Error instead of panic
                 unimplemented!("Option {}", number);
             }
             // Skip class U options
-            if CLASS_U.contains(number) {
+            if CLASS_U.contains(&option) {
                 continue;
             }
 
             // At this point the option is class E or undefined, so discard it
-            let option = CoapOption::from(*number);
             to_discard.push(option);
         }
         // Discard class E options
