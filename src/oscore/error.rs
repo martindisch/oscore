@@ -7,8 +7,7 @@ use crate::cbor;
 
 /// The catch-all error type for this module, mostly just wrapping errors from
 /// various libraries.
-// TODO: Derive PartialEq as soon as cbor does for its error type
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     /// CoAP request doesn't contain OSCORE option.
     NoOscoreOption,

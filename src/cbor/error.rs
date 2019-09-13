@@ -1,9 +1,9 @@
+use alloc::string::ToString;
 use core::fmt;
 #[cfg(feature = "std")]
 use std::error;
 
 /// The error type for the `cbor` module.
-// TODO: Derive PartialEq as soon as serde_cbor does for its error type
 #[derive(Debug)]
 pub enum CborError {
     /// Tried to encode/decode CBOR sequence of more than 23 items.
@@ -15,6 +15,21 @@ pub enum CborError {
 impl From<serde_cbor::Error> for CborError {
     fn from(e: serde_cbor::Error) -> CborError {
         CborError::SerdeCbor(e)
+    }
+}
+
+impl PartialEq for CborError {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            CborError::TooManyItems => match other {
+                CborError::TooManyItems => true,
+                _ => false,
+            },
+            CborError::SerdeCbor(e1) => match other {
+                CborError::SerdeCbor(e2) => e1.to_string() == e2.to_string(),
+                _ => false,
+            },
+        }
     }
 }
 
@@ -36,5 +51,24 @@ impl error::Error for CborError {
             CborError::TooManyItems => None,
             CborError::SerdeCbor(e) => Some(e),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::ser::Error;
+
+    #[test]
+    fn partial_eq() {
+        let own_error = CborError::TooManyItems;
+        let serde_error_1 = CborError::SerdeCbor(serde_cbor::Error::eof(2));
+        let serde_error_2 =
+            CborError::SerdeCbor(serde_cbor::Error::custom("what?"));
+        assert!(own_error != serde_error_1);
+        assert!(serde_error_1 != serde_error_2);
+        assert_eq!(own_error, own_error);
+        assert_eq!(serde_error_1, serde_error_1);
+        assert_eq!(serde_error_2, serde_error_2);
     }
 }

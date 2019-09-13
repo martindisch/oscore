@@ -110,8 +110,7 @@ impl error::Error for OwnError {
 
 /// The error type for operations that may fail before any messages have been
 /// sent, which means the protocol can be aborted without any further action.
-// TODO: Derive PartialEq, as soon as Error does (depends on cbor)
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct EarlyError(pub Error);
 
 impl From<Error> for EarlyError {
@@ -135,8 +134,7 @@ impl error::Error for EarlyError {
 
 /// The catch-all error type for this module, mostly just wrapping errors from
 /// various libraries.
-// TODO: Derive PartialEq as soon as cbor does for its error type
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     /// Using an unsupported cipher suite.
     UnsupportedSuite,
