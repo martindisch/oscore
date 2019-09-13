@@ -1,5 +1,6 @@
 //! The errors of the `edhoc` module.
 
+use alloc::string::String;
 use core::fmt;
 #[cfg(feature = "std")]
 use std::error;
@@ -22,7 +23,7 @@ static ERR_SUITE: &str = "Cipher suite unsupported";
 pub enum OwnOrPeerError {
     /// This variant wraps an error message that was received from the other
     /// party. On receiving this error, abort the protocol.
-    PeerError(alloc::string::String),
+    PeerError(String),
     /// This variant wraps an EDHOC error message that was generated because
     /// something went wrong on our end. These bytes need to be sent to the
     /// other party before aborting the protocol.
