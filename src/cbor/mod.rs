@@ -33,9 +33,10 @@ impl VecWrite {
         }
     }
 
-    /// Extracts a slice containing the entire vector.
-    pub fn as_slice(&self) -> &[u8] {
-        &self.vec
+    /// Moves the vector out of the writer.
+    pub fn into_vec(mut self) -> Vec<u8> {
+        self.vec.shrink_to_fit();
+        self.vec
     }
 }
 
@@ -81,10 +82,11 @@ fn serialize(object: impl Serialize, offset: usize) -> Result<Vec<u8>> {
     // Attempt serialization
     object.serialize(&mut serializer)?;
     let writer = serializer.into_inner();
+    // Take the backing vector out of the writer
+    let mut v = writer.into_vec();
 
-    // Return the bytes from the offset the caller requested
-    // TODO: There should be a way to move a range out of the vector
-    Ok(writer.as_slice()[offset..].to_vec())
+    // Return everything starting from the offset
+    Ok(v.drain(offset..).collect())
 }
 
 /// Deserializes a CBOR encoded object.
@@ -271,7 +273,7 @@ mod tests {
         let mut serializer = Serializer::new(writer);
         input_mixed.serialize(&mut serializer).unwrap();
         let writer = serializer.into_inner();
-        assert_eq!(&OUTPUT_MIXED, writer.as_slice());
+        assert_eq!(OUTPUT_MIXED, writer.into_vec()[..]);
 
         // Initialize the writer with one byte less than necessary, so there's
         // one reallocation
@@ -279,7 +281,7 @@ mod tests {
         let mut serializer = Serializer::new(writer);
         input_mixed.serialize(&mut serializer).unwrap();
         let writer = serializer.into_inner();
-        assert_eq!(&OUTPUT_MIXED, writer.as_slice());
+        assert_eq!(OUTPUT_MIXED, writer.into_vec()[..]);
 
         // Test the ability to allocate more than the default 128 bytes if what
         // it needs to write is larger
@@ -288,6 +290,6 @@ mod tests {
         let mut serializer = Serializer::new(writer);
         input.serialize(&mut serializer).unwrap();
         let writer = serializer.into_inner();
-        assert_eq!(&OUTPUT_LARGE[..], writer.as_slice());
+        assert_eq!(OUTPUT_LARGE[..], writer.into_vec()[..]);
     }
 }
