@@ -62,10 +62,12 @@ mod tests {
     #[test]
     fn partial_eq() {
         let own_error = CborError::TooManyItems;
-        let serde_error_1 = CborError::SerdeCbor(serde_cbor::Error::eof(2));
+        let serde_error_1 =
+            CborError::SerdeCbor(serde_cbor::Error::custom("nope!"));
         let serde_error_2 =
             CborError::SerdeCbor(serde_cbor::Error::custom("what?"));
         assert!(own_error != serde_error_1);
+        #[cfg(feature = "std")]
         assert!(serde_error_1 != serde_error_2);
         assert_eq!(own_error, own_error);
         assert_eq!(serde_error_1, serde_error_1);
