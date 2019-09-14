@@ -151,8 +151,8 @@ pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
         // Again, we have a single element and therefore don't use the sequence
         // decoder. The regular encoder needs to operate on a mutable
         // reference, so clone the contents.
-        let mut cpy = msg.to_vec();
-        let ciphertext = cbor::decode::<ByteBuf>(&mut cpy)?;
+        let cpy = msg.to_vec();
+        let ciphertext = cbor::decode::<ByteBuf>(&cpy)?;
         // If we managed this time, we can return the struct without c_v
         Ok(Message3 {
             c_v: None,
