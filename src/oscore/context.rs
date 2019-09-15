@@ -1,8 +1,9 @@
 use aes_ccm::CcmMode;
-use alloc::vec::Vec;
+use alloc::{collections::LinkedList, vec::Vec};
 use coap_lite::{CoapOption, MessageClass, Packet, RequestType, ResponseType};
+use core::convert::TryFrom;
 
-use super::{error::Error, util, Result};
+use super::{error::Error, util, util::ProxyUri, Result};
 
 /// The common context part of the security context.
 struct CommonContext {
@@ -225,6 +226,28 @@ impl SecurityContext {
             // All requests (and unknown + reserved) get POST
             _ => MessageClass::Request(RequestType::Post),
         };
+
+        // Proxy-Uri handling if it's present
+        if let Some(proxy_uri) = original.get_option(CoapOption::ProxyUri) {
+            // Obtain and parse it
+            let proxy_uri = proxy_uri.front().ok_or(Error::InvalidProxyUri)?;
+            let proxy_uri = ProxyUri::try_from(proxy_uri.as_slice())?;
+
+            // If there's a Uri-Path or Uri-Query, add them to the options and
+            // they will be protected in the next stage
+            if let Some(path_list) = proxy_uri.get_path_list() {
+                original.set_option(CoapOption::UriPath, path_list);
+            }
+            if let Some(query_list) = proxy_uri.get_query_list() {
+                original.set_option(CoapOption::UriQuery, query_list);
+            }
+
+            // Compose the remaining parts into the Proxy-Uri, which will
+            // remain public
+            let mut uri_list = LinkedList::new();
+            uri_list.push_back(proxy_uri.compose_proxy_uri());
+            original.set_option(CoapOption::ProxyUri, uri_list);
+        }
 
         // Store which options we remove from the outer message in this
         let mut moved_options = vec![];
@@ -549,6 +572,67 @@ mod tests {
             &res_security_context
                 .unprotect_response(&RES_PIV_PROTECTED)
                 .unwrap()[..]
+        );
+    }
+
+    #[test]
+    fn proxying() {
+        let mut req_ctx = SecurityContext::new(
+            MASTER_SECRET.to_vec(),
+            MASTER_SALT.to_vec(),
+            CLIENT_ID.to_vec(),
+            SERVER_ID.to_vec(),
+        )
+        .unwrap();
+        let mut res_ctx = SecurityContext::new(
+            MASTER_SECRET.to_vec(),
+            MASTER_SALT.to_vec(),
+            SERVER_ID.to_vec(),
+            CLIENT_ID.to_vec(),
+        )
+        .unwrap();
+
+        let mut packet = Packet::new();
+        packet.add_option(
+            CoapOption::ProxyUri,
+            "coap://example.com:9999/path/to/resource?q=1&p=2"
+                .as_bytes()
+                .to_vec(),
+        );
+        let protected_bytes = &req_ctx
+            .protect_request(&packet.to_bytes().unwrap())
+            .unwrap();
+        let protected_coap = Packet::from_bytes(protected_bytes).unwrap();
+        // Check the only unprotected options are the OSCORE option and
+        // the new Proxy-Uri
+        assert_eq!(2, protected_coap.options().len());
+        // Check the Proxy-Uri contains only the public part
+        assert_eq!(
+            b"coap://example.com:9999",
+            &protected_coap
+                .get_option(CoapOption::ProxyUri)
+                .unwrap()
+                .front()
+                .unwrap()[..]
+        );
+
+        let unprotected_bytes =
+            &res_ctx.unprotect_request(protected_bytes).unwrap();
+        let unprotected_coap = Packet::from_bytes(unprotected_bytes).unwrap();
+        let mut uri_path = LinkedList::new();
+        uri_path.push_back("path".as_bytes().to_vec());
+        uri_path.push_back("to".as_bytes().to_vec());
+        uri_path.push_back("resource".as_bytes().to_vec());
+        let mut uri_query = LinkedList::new();
+        uri_query.push_back("q=1".as_bytes().to_vec());
+        uri_query.push_back("p=2".as_bytes().to_vec());
+        assert_eq!(
+            &uri_path,
+            unprotected_coap.get_option(CoapOption::UriPath).unwrap()
+        );
+        assert_eq!(
+            &uri_query,
+            unprotected_coap.get_option(CoapOption::UriQuery).unwrap()
         );
     }
 
