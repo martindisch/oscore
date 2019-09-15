@@ -1,5 +1,6 @@
-use alloc::{collections::LinkedList, vec::Vec};
+use alloc::{collections::LinkedList, vec::Vec, string::String};
 use coap_lite::{CoapOption, Packet};
+use core::convert::TryFrom;
 use hkdf::Hkdf;
 use serde_bytes::Bytes;
 use sha2::Sha256;
@@ -216,6 +217,90 @@ pub struct ProxyUri {
     pub uri_query: Option<String>,
 }
 
+impl TryFrom<&[u8]> for ProxyUri {
+    type Error = Error;
+    /// Splits a Proxy-Uri into the Proxy-Scheme, Uri-Host, Uri-Port, Uri-Path and
+    /// Uri-Query options.
+    ///
+    /// I don't implement this myself because I think I can do a better job than
+    /// the 105 people wo have contributed to `rust-url`. On the contrary. I'd love
+    /// to use it, but it requires `std`. And since I don't know of a better
+    /// option, I have to write this abomination.
+    fn try_from(bytes: &[u8]) -> Result<ProxyUri> {
+        // Convert to a String we can work with
+        let mut proxy_uri = String::from_utf8(bytes.to_vec())?;
+
+        // Take the Uri-Scheme out
+        let scheme_end = proxy_uri.find(':').ok_or(Error::InvalidProxyUri)?;
+        let proxy_scheme: String = proxy_uri.drain(..scheme_end).collect();
+        // Drain the next three characters which should be '://'
+        proxy_uri.drain(..3);
+
+        // Take the Uri-Host out
+        let host_end = if let Some(port_separator) = proxy_uri.find(':') {
+            port_separator
+        } else if let Some(path_separator) = proxy_uri.find('/') {
+            path_separator
+        } else if let Some(query_separator) = proxy_uri.find('?') {
+            query_separator
+        } else {
+            proxy_uri.len()
+        };
+        let uri_host: String = proxy_uri.drain(..host_end).collect();
+
+        // Take the Uri-Port out
+        let port_end = if let Some(port_separator) = proxy_uri.find(':') {
+            proxy_uri.remove(port_separator);
+            if let Some(path_separator) = proxy_uri.find('/') {
+                path_separator
+            } else if let Some(query_separator) = proxy_uri.find('?') {
+                query_separator
+            } else {
+                proxy_uri.len()
+            }
+        } else {
+            0
+        };
+        let uri_port: String = proxy_uri.drain(..port_end).collect();
+        // Now we can remove the leading path separator, if any
+        if let Some(path_separator) = proxy_uri.find('/') {
+            proxy_uri.remove(path_separator);
+        }
+
+        // Take the path out
+        let path_end = if let Some(query_separator) = proxy_uri.find('?') {
+            proxy_uri.remove(query_separator);
+            query_separator
+        } else {
+            proxy_uri.len()
+        };
+        let uri_path: String = proxy_uri.drain(..path_end).collect();
+
+        // Whatever remains is the query
+        let uri_query = proxy_uri;
+
+        Ok(ProxyUri {
+            proxy_scheme,
+            uri_host,
+            uri_port: if uri_port.is_empty() {
+                None
+            } else {
+                Some(uri_port)
+            },
+            uri_path: if uri_path.is_empty() {
+                None
+            } else {
+                Some(uri_path)
+            },
+            uri_query: if uri_query.is_empty() {
+                None
+            } else {
+                Some(uri_query)
+            },
+        })
+    }
+}
+
 impl ProxyUri {
     /// Returns a `LinkedList` of the path components to be added as option
     /// values.
@@ -246,100 +331,19 @@ impl ProxyUri {
             None => None,
         }
     }
-}
 
-/// Splits a Proxy-Uri into the Proxy-Scheme, Uri-Host, Uri-Port, Uri-Path and
-/// Uri-Query options.
-///
-/// I don't implement this myself because I think I can do a better job than
-/// the 105 people wo have contributed to `rust-url`. On the contrary. I'd love
-/// to use it, but it requires `std`. And since I don't know of a better
-/// option, I have to write this abomination.
-pub fn parse_proxy_uri(proxy_uri: &[u8]) -> Result<ProxyUri> {
-    // Convert to a String we can work with
-    let mut proxy_uri = String::from_utf8(proxy_uri.to_vec())?;
+    /// Returns the class U option value for Proxy-Uri.
+    pub fn compose_proxy_uri(&self) -> Vec<u8> {
+        let mut proxy_uri_str = self.proxy_scheme.clone();
+        proxy_uri_str += "://";
+        proxy_uri_str += &self.uri_host;
+        if let Some(ref port) = self.uri_port {
+            proxy_uri_str += ":";
+            proxy_uri_str += port;
+        };
 
-    // Take the Uri-Scheme out
-    let scheme_end = proxy_uri.find(':').ok_or(Error::InvalidProxyUri)?;
-    let proxy_scheme: String = proxy_uri.drain(..scheme_end).collect();
-    // Drain the next three characters which should be '://'
-    proxy_uri.drain(..3);
-
-    // Take the Uri-Host out
-    let host_end = if let Some(port_separator) = proxy_uri.find(':') {
-        port_separator
-    } else if let Some(path_separator) = proxy_uri.find('/') {
-        path_separator
-    } else if let Some(query_separator) = proxy_uri.find('?') {
-        query_separator
-    } else {
-        proxy_uri.len()
-    };
-    let uri_host: String = proxy_uri.drain(..host_end).collect();
-
-    // Take the Uri-Port out
-    let port_end = if let Some(port_separator) = proxy_uri.find(':') {
-        proxy_uri.remove(port_separator);
-        if let Some(path_separator) = proxy_uri.find('/') {
-            path_separator
-        } else if let Some(query_separator) = proxy_uri.find('?') {
-            query_separator
-        } else {
-            proxy_uri.len()
-        }
-    } else {
-        0
-    };
-    let uri_port: String = proxy_uri.drain(..port_end).collect();
-    // Now we can remove the leading path separator, if any
-    if let Some(path_separator) = proxy_uri.find('/') {
-        proxy_uri.remove(path_separator);
+        proxy_uri_str.into_bytes()
     }
-
-    // Take the path out
-    let path_end = if let Some(query_separator) = proxy_uri.find('?') {
-        proxy_uri.remove(query_separator);
-        query_separator
-    } else {
-        proxy_uri.len()
-    };
-    let uri_path: String = proxy_uri.drain(..path_end).collect();
-
-    // Whatever remains is the query
-    let uri_query = proxy_uri;
-
-    Ok(ProxyUri {
-        proxy_scheme,
-        uri_host,
-        uri_port: if uri_port.is_empty() {
-            None
-        } else {
-            Some(uri_port)
-        },
-        uri_path: if uri_path.is_empty() {
-            None
-        } else {
-            Some(uri_path)
-        },
-        uri_query: if uri_query.is_empty() {
-            None
-        } else {
-            Some(uri_query)
-        },
-    })
-}
-
-/// Returns the class U option value for Proxy-Uri.
-pub fn compose_proxy_uri(proxy_uri: &ProxyUri) -> Vec<u8> {
-    let mut proxy_uri_str = proxy_uri.proxy_scheme.clone();
-    proxy_uri_str += "://";
-    proxy_uri_str += &proxy_uri.uri_host;
-    if let Some(ref port) = proxy_uri.uri_port {
-        proxy_uri_str += ":";
-        proxy_uri_str += port;
-    };
-
-    proxy_uri_str.into_bytes()
 }
 
 #[cfg(test)]
@@ -446,10 +450,13 @@ mod tests {
 
     #[test]
     fn proxy_uri() {
-        let ex1 = b"example.com/resource?q=1";
-        assert_eq!(Error::InvalidProxyUri, parse_proxy_uri(ex1).unwrap_err());
+        let ex1 = "example.com/resource?q=1";
+        assert_eq!(
+            Error::InvalidProxyUri,
+            ProxyUri::try_from(ex1.as_bytes()).unwrap_err()
+        );
 
-        let ex2 = b"coap://example.com:9999/resource?q=1";
+        let ex2 = "coap://example.com:9999/resource?q=1";
         let ex2_split = ProxyUri {
             proxy_scheme: String::from("coap"),
             uri_host: String::from("example.com"),
@@ -457,9 +464,9 @@ mod tests {
             uri_path: Some(String::from("resource")),
             uri_query: Some(String::from("q=1")),
         };
-        assert_eq!(ex2_split, parse_proxy_uri(ex2).unwrap());
+        assert_eq!(ex2_split, ProxyUri::try_from(ex2.as_bytes()).unwrap());
 
-        let ex3 = b"coap://example.com/resource?q=1";
+        let ex3 = "coap://example.com/resource?q=1";
         let ex3_split = ProxyUri {
             proxy_scheme: String::from("coap"),
             uri_host: String::from("example.com"),
@@ -467,9 +474,9 @@ mod tests {
             uri_path: Some(String::from("resource")),
             uri_query: Some(String::from("q=1")),
         };
-        assert_eq!(ex3_split, parse_proxy_uri(ex3).unwrap());
+        assert_eq!(ex3_split, ProxyUri::try_from(ex3.as_bytes()).unwrap());
 
-        let ex4 = b"coap://example.com:9999";
+        let ex4 = "coap://example.com:9999";
         let ex4_split = ProxyUri {
             proxy_scheme: String::from("coap"),
             uri_host: String::from("example.com"),
@@ -477,9 +484,9 @@ mod tests {
             uri_path: None,
             uri_query: None,
         };
-        assert_eq!(ex4_split, parse_proxy_uri(ex4).unwrap());
+        assert_eq!(ex4_split, ProxyUri::try_from(ex4.as_bytes()).unwrap());
 
-        let ex5 = b"coap://example.com";
+        let ex5 = "coap://example.com";
         let ex5_split = ProxyUri {
             proxy_scheme: String::from("coap"),
             uri_host: String::from("example.com"),
@@ -487,9 +494,9 @@ mod tests {
             uri_path: None,
             uri_query: None,
         };
-        assert_eq!(ex5_split, parse_proxy_uri(ex5).unwrap());
+        assert_eq!(ex5_split, ProxyUri::try_from(ex5.as_bytes()).unwrap());
 
-        let ex6 = b"coap://example.com/";
+        let ex6 = "coap://example.com/";
         let ex6_split = ProxyUri {
             proxy_scheme: String::from("coap"),
             uri_host: String::from("example.com"),
@@ -497,9 +504,9 @@ mod tests {
             uri_path: None,
             uri_query: None,
         };
-        assert_eq!(ex6_split, parse_proxy_uri(ex6).unwrap());
+        assert_eq!(ex6_split, ProxyUri::try_from(ex6.as_bytes()).unwrap());
 
-        let ex7 = b"coap://example.com/resource?q=1&b=2&c=3";
+        let ex7 = "coap://example.com/resource?q=1&b=2&c=3";
         let ex7_split = ProxyUri {
             proxy_scheme: String::from("coap"),
             uri_host: String::from("example.com"),
@@ -507,9 +514,9 @@ mod tests {
             uri_path: Some(String::from("resource")),
             uri_query: Some(String::from("q=1&b=2&c=3")),
         };
-        assert_eq!(ex7_split, parse_proxy_uri(ex7).unwrap());
+        assert_eq!(ex7_split, ProxyUri::try_from(ex7.as_bytes()).unwrap());
 
-        let ex8 = b"coap://example.com:9999?q=1";
+        let ex8 = "coap://example.com:9999?q=1";
         let ex8_split = ProxyUri {
             proxy_scheme: String::from("coap"),
             uri_host: String::from("example.com"),
@@ -517,9 +524,9 @@ mod tests {
             uri_path: None,
             uri_query: Some(String::from("q=1")),
         };
-        assert_eq!(ex8_split, parse_proxy_uri(ex8).unwrap());
+        assert_eq!(ex8_split, ProxyUri::try_from(ex8.as_bytes()).unwrap());
 
-        let ex9 = b"coap://example.com?q=1";
+        let ex9 = "coap://example.com?q=1";
         let ex9_split = ProxyUri {
             proxy_scheme: String::from("coap"),
             uri_host: String::from("example.com"),
@@ -527,7 +534,7 @@ mod tests {
             uri_path: None,
             uri_query: Some(String::from("q=1")),
         };
-        assert_eq!(ex9_split, parse_proxy_uri(ex9).unwrap());
+        assert_eq!(ex9_split, ProxyUri::try_from(ex9.as_bytes()).unwrap());
     }
 
     #[test]
@@ -541,7 +548,7 @@ mod tests {
         };
         assert_eq!(
             b"coap://example.com"[..],
-            compose_proxy_uri(&ex_no_port)[..]
+            ex_no_port.compose_proxy_uri()[..]
         );
 
         let ex_port = ProxyUri {
@@ -553,14 +560,14 @@ mod tests {
         };
         assert_eq!(
             b"coap://example.com:9999"[..],
-            compose_proxy_uri(&ex_port)[..]
+            ex_port.compose_proxy_uri()[..]
         );
     }
 
     #[test]
     fn lists() {
-        let ex1 = b"coap://example.com:1234/path/to/resource?q=1&b=2&c=3";
-        let ex1_split = parse_proxy_uri(ex1).unwrap();
+        let ex1 = "coap://example.com:1234/path/to/resource?q=1&b=2&c=3";
+        let ex1_split = ProxyUri::try_from(ex1.as_bytes()).unwrap();
         let mut path_list = LinkedList::new();
         path_list.push_back("path".as_bytes().to_vec());
         path_list.push_back("to".as_bytes().to_vec());
@@ -572,8 +579,8 @@ mod tests {
         query_list.push_back("c=3".as_bytes().to_vec());
         assert_eq!(query_list, ex1_split.get_query_list().unwrap());
 
-        let ex2 = b"coap://example.com:1234/path/to/resource/";
-        let ex2_split = parse_proxy_uri(ex2).unwrap();
+        let ex2 = "coap://example.com:1234/path/to/resource/";
+        let ex2_split = ProxyUri::try_from(ex2.as_bytes()).unwrap();
         let mut path_list = LinkedList::new();
         path_list.push_back("path".as_bytes().to_vec());
         path_list.push_back("to".as_bytes().to_vec());
@@ -581,8 +588,8 @@ mod tests {
         assert_eq!(path_list, ex2_split.get_path_list().unwrap());
         assert_eq!(None, ex2_split.get_query_list());
 
-        let ex3 = b"coap://example.com:1234?q=1&b=2&c=3&";
-        let ex3_split = parse_proxy_uri(ex3).unwrap();
+        let ex3 = "coap://example.com:1234?q=1&b=2&c=3&";
+        let ex3_split = ProxyUri::try_from(ex3.as_bytes()).unwrap();
         assert_eq!(None, ex3_split.get_path_list());
         let mut query_list = LinkedList::new();
         query_list.push_back("q=1".as_bytes().to_vec());
