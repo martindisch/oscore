@@ -15,6 +15,8 @@ pub enum Error {
     NoKidPiv,
     /// This message has been received already.
     ReplayDetected,
+    /// Error while parsing Proxy-Uri.
+    InvalidProxyUri,
     /// Message contains an unsupported option.
     UnsupportedOption(CoapOption),
     /// Wraps errors from the `cbor` module.
@@ -51,6 +53,12 @@ impl From<coap::MessageError> for Error {
     }
 }
 
+impl From<alloc::string::FromUtf8Error> for Error {
+    fn from(_: alloc::string::FromUtf8Error) -> Error {
+        Error::InvalidProxyUri
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -62,6 +70,9 @@ impl fmt::Display for Error {
             }
             Error::ReplayDetected => {
                 write!(f, "This message has been received already")
+            }
+            Error::InvalidProxyUri => {
+                write!(f, "Error while parsing Proxy-Uri")
             }
             Error::UnsupportedOption(o) => {
                 write!(f, "Message contains an unsupported option: {:?}", o)
