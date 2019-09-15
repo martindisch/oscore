@@ -10,7 +10,7 @@ doctest = false
 
 [dependencies]
 serde = { version = "1.0.97", default-features = false, features = ["derive", "alloc"] }
-serde_cbor = { git = "https://github.com/martindisch/cbor", rev = "2c7ed27f0ecf89cdf2883586ad40dde1f216df6e", default-features = false, features = ["alloc"] }
+serde_cbor = { git = "https://github.com/pyfisch/cbor", rev = "2c7ed27f0ecf89cdf2883586ad40dde1f216df6e", default-features = false, features = ["alloc"] }
 serde_bytes = { version = "0.11.1", default-features = false, features = ["alloc"] }
 x25519-dalek = { version = "0.5.2", default-features = false, features = ["u32_backend"] }
 ed25519-dalek = { version = "0.9.1", default-features = false, features = ["u32_backend"] }
