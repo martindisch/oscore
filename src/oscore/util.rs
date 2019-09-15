@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{collections::LinkedList, vec::Vec};
 use coap_lite::{CoapOption, Packet};
 use hkdf::Hkdf;
 use serde_bytes::Bytes;
@@ -214,6 +214,38 @@ pub struct ProxyUri {
     pub uri_port: Option<String>,
     pub uri_path: Option<String>,
     pub uri_query: Option<String>,
+}
+
+impl ProxyUri {
+    /// Returns a `LinkedList` of the path components to be added as option
+    /// values.
+    pub fn get_path_list(&self) -> Option<LinkedList<Vec<u8>>> {
+        match &self.uri_path {
+            Some(uri_path) => Some(
+                uri_path
+                    .split('/')
+                    .filter(|e| !e.is_empty())
+                    .map(|s| s.as_bytes().to_vec())
+                    .collect(),
+            ),
+            None => None,
+        }
+    }
+
+    /// Returns a `LinkedList` of the query components to be added as option
+    /// values.
+    pub fn get_query_list(&self) -> Option<LinkedList<Vec<u8>>> {
+        match &self.uri_query {
+            Some(uri_query) => Some(
+                uri_query
+                    .split('&')
+                    .filter(|e| !e.is_empty())
+                    .map(|s| s.as_bytes().to_vec())
+                    .collect(),
+            ),
+            None => None,
+        }
+    }
 }
 
 /// Splits a Proxy-Uri into the Proxy-Scheme, Uri-Host, Uri-Port, Uri-Path and
@@ -523,5 +555,39 @@ mod tests {
             b"coap://example.com:9999"[..],
             compose_proxy_uri(&ex_port)[..]
         );
+    }
+
+    #[test]
+    fn lists() {
+        let ex1 = b"coap://example.com:1234/path/to/resource?q=1&b=2&c=3";
+        let ex1_split = parse_proxy_uri(ex1).unwrap();
+        let mut path_list = LinkedList::new();
+        path_list.push_back("path".as_bytes().to_vec());
+        path_list.push_back("to".as_bytes().to_vec());
+        path_list.push_back("resource".as_bytes().to_vec());
+        assert_eq!(path_list, ex1_split.get_path_list().unwrap());
+        let mut query_list = LinkedList::new();
+        query_list.push_back("q=1".as_bytes().to_vec());
+        query_list.push_back("b=2".as_bytes().to_vec());
+        query_list.push_back("c=3".as_bytes().to_vec());
+        assert_eq!(query_list, ex1_split.get_query_list().unwrap());
+
+        let ex2 = b"coap://example.com:1234/path/to/resource/";
+        let ex2_split = parse_proxy_uri(ex2).unwrap();
+        let mut path_list = LinkedList::new();
+        path_list.push_back("path".as_bytes().to_vec());
+        path_list.push_back("to".as_bytes().to_vec());
+        path_list.push_back("resource".as_bytes().to_vec());
+        assert_eq!(path_list, ex2_split.get_path_list().unwrap());
+        assert_eq!(None, ex2_split.get_query_list());
+
+        let ex3 = b"coap://example.com:1234?q=1&b=2&c=3&";
+        let ex3_split = parse_proxy_uri(ex3).unwrap();
+        assert_eq!(None, ex3_split.get_path_list());
+        let mut query_list = LinkedList::new();
+        query_list.push_back("q=1".as_bytes().to_vec());
+        query_list.push_back("b=2".as_bytes().to_vec());
+        query_list.push_back("c=3".as_bytes().to_vec());
+        assert_eq!(query_list, ex3_split.get_query_list().unwrap());
     }
 }
