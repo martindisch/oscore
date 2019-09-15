@@ -238,6 +238,8 @@ pub fn parse_proxy_uri(proxy_uri: &[u8]) -> Result<ProxyUri> {
         port_separator
     } else if let Some(path_separator) = proxy_uri.find('/') {
         path_separator
+    } else if let Some(query_separator) = proxy_uri.find('?') {
+        query_separator
     } else {
         proxy_uri.len()
     };
@@ -248,6 +250,8 @@ pub fn parse_proxy_uri(proxy_uri: &[u8]) -> Result<ProxyUri> {
         proxy_uri.remove(port_separator);
         if let Some(path_separator) = proxy_uri.find('/') {
             path_separator
+        } else if let Some(query_separator) = proxy_uri.find('?') {
+            query_separator
         } else {
             proxy_uri.len()
         }
@@ -472,6 +476,26 @@ mod tests {
             uri_query: Some(String::from("q=1&b=2&c=3")),
         };
         assert_eq!(ex7_split, parse_proxy_uri(ex7).unwrap());
+
+        let ex8 = b"coap://example.com:9999?q=1";
+        let ex8_split = ProxyUri {
+            proxy_scheme: String::from("coap"),
+            uri_host: String::from("example.com"),
+            uri_port: Some(String::from("9999")),
+            uri_path: None,
+            uri_query: Some(String::from("q=1")),
+        };
+        assert_eq!(ex8_split, parse_proxy_uri(ex8).unwrap());
+
+        let ex9 = b"coap://example.com?q=1";
+        let ex9_split = ProxyUri {
+            proxy_scheme: String::from("coap"),
+            uri_host: String::from("example.com"),
+            uri_port: None,
+            uri_path: None,
+            uri_query: Some(String::from("q=1")),
+        };
+        assert_eq!(ex9_split, parse_proxy_uri(ex9).unwrap());
     }
 
     #[test]
