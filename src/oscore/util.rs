@@ -1,4 +1,4 @@
-use alloc::{collections::LinkedList, vec::Vec, string::String};
+use alloc::{collections::LinkedList, string::String, vec::Vec};
 use coap_lite::{CoapOption, Packet};
 use core::convert::TryFrom;
 use hkdf::Hkdf;

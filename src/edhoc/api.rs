@@ -1,3 +1,5 @@
+//! Structs used in the API.
+
 use alloc::vec::Vec;
 use core::result::Result;
 use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};

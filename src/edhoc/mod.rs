@@ -67,12 +67,12 @@
 //! };
 //! ```
 
-mod api;
 mod cose;
 #[cfg(test)]
 mod test_vectors;
 mod util;
 
+pub mod api;
 #[cfg_attr(tarpaulin, skip)]
 pub mod error;
 
