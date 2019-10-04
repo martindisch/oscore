@@ -7,8 +7,7 @@ use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};
 use super::{
     cose,
     error::{EarlyError, Error, OwnError, OwnOrPeerError},
-    util,
-    util::{Message1, Message2, Message3},
+    util::{self, Message1, Message2, Message3},
 };
 
 // Party U constructs ---------------------------------------------------------

@@ -3,7 +3,11 @@ use alloc::{collections::LinkedList, vec::Vec};
 use coap_lite::{CoapOption, MessageClass, Packet, RequestType, ResponseType};
 use core::convert::TryFrom;
 
-use super::{error::Error, util, util::ProxyUri, Result};
+use super::{
+    error::Error,
+    util::{self, ProxyUri},
+    Result,
+};
 
 /// The common context part of the security context.
 struct CommonContext {
