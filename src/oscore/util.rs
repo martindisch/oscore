@@ -219,13 +219,13 @@ pub struct ProxyUri {
 
 impl TryFrom<&[u8]> for ProxyUri {
     type Error = Error;
-    /// Splits a Proxy-Uri into the Proxy-Scheme, Uri-Host, Uri-Port, Uri-Path and
-    /// Uri-Query options.
+    /// Splits a Proxy-Uri into the Proxy-Scheme, Uri-Host, Uri-Port, Uri-Path
+    /// and Uri-Query options.
     ///
-    /// I don't implement this myself because I think I can do a better job than
-    /// the 105 people wo have contributed to `rust-url`. On the contrary. I'd love
-    /// to use it, but it requires `std`. And since I don't know of a better
-    /// option, I have to write this abomination.
+    /// I don't implement this myself because I think I can do a better job
+    /// than the 105 people wo have contributed to `rust-url`. On the contrary.
+    /// I'd love to use it, but it requires `std`. And since I don't know of a
+    /// better option, I have to write this abomination.
     fn try_from(bytes: &[u8]) -> Result<ProxyUri> {
         // Convert to a String we can work with
         let mut proxy_uri = String::from_utf8(bytes.to_vec())?;
