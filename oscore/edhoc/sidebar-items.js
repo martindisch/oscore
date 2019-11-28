@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["api","Structs used in the API."],["error","The errors of the `edhoc` module."]]});

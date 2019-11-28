@@ -1,0 +1,167 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source to the Rust file `src/edhoc/mod.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>mod.rs.html -- source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css"><link rel="stylesheet" type="text/css" href="../../../light.css" id="themeStyle"><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="../../../favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../oscore/index.html'><div class='logo-container'><img src='../../../rust-logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form js-only"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1"> 1</span>
+<span id="2"> 2</span>
+<span id="3"> 3</span>
+<span id="4"> 4</span>
+<span id="5"> 5</span>
+<span id="6"> 6</span>
+<span id="7"> 7</span>
+<span id="8"> 8</span>
+<span id="9"> 9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+<span id="44">44</span>
+<span id="45">45</span>
+<span id="46">46</span>
+<span id="47">47</span>
+<span id="48">48</span>
+<span id="49">49</span>
+<span id="50">50</span>
+<span id="51">51</span>
+<span id="52">52</span>
+<span id="53">53</span>
+<span id="54">54</span>
+<span id="55">55</span>
+<span id="56">56</span>
+<span id="57">57</span>
+<span id="58">58</span>
+<span id="59">59</span>
+<span id="60">60</span>
+<span id="61">61</span>
+<span id="62">62</span>
+<span id="63">63</span>
+<span id="64">64</span>
+<span id="65">65</span>
+<span id="66">66</span>
+<span id="67">67</span>
+<span id="68">68</span>
+<span id="69">69</span>
+<span id="70">70</span>
+<span id="71">71</span>
+<span id="72">72</span>
+<span id="73">73</span>
+<span id="74">74</span>
+<span id="75">75</span>
+<span id="76">76</span>
+<span id="77">77</span>
+<span id="78">78</span>
+<span id="79">79</span>
+<span id="80">80</span>
+<span id="81">81</span>
+<span id="82">82</span>
+</pre><div class="example-wrap"><pre class="rust ">
+<span class="doccomment">//! Ephemeral Diffie-Hellman Over COSE (EDHOC) to establish an OSCORE context.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! This is I/O-free, so all it does is provide facilities to parse incoming</span>
+<span class="doccomment">//! messages and receive output that can then be sent to the other party.</span>
+<span class="doccomment">//! Since doing all of this often depends on previous state, it uses a kind of</span>
+<span class="doccomment">//! session types pattern with structs as different protocol states, which</span>
+<span class="doccomment">//! are consumed by an action and return the next state struct together with</span>
+<span class="doccomment">//! optional data.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! Party U starts by initializing a `PartyU` and using it to generate the</span>
+<span class="doccomment">//! first message and its next state. Party V does the opposite,</span>
+<span class="doccomment">//! initializing a `PartyV` and using this to handle the message and get</span>
+<span class="doccomment">//! its next state, etc.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Errors</span>
+<span class="doccomment">//! EDHOC defines an error message that needs to be sent to the peer to abort</span>
+<span class="doccomment">//! the protocol, if any verification of messages goes wrong. This means that</span>
+<span class="doccomment">//! when receiving a message, it&#39;s possible that this is an error message</span>
+<span class="doccomment">//! instead of the expected regular message. If that&#39;s the case, we just need</span>
+<span class="doccomment">//! to abort the protocol.</span>
+<span class="doccomment">//! It&#39;s also possible that while processing a message, we ourselves run into</span>
+<span class="doccomment">//! trouble, which means that we need to send an error message.</span>
+<span class="doccomment">//! And finally there&#39;s also the single case where we&#39;re Party U preparing the</span>
+<span class="doccomment">//! first message and fail, which means we don&#39;t need to send an error message,</span>
+<span class="doccomment">//! since the protocol hasn&#39;t started yet.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! To make dealing with this reality as easy as possible, this module defines</span>
+<span class="doccomment">//! three error types, which are thrown accordingly.</span>
+<span class="doccomment">//! * `EarlyError` - When Party U fails before having sent the first message.</span>
+<span class="doccomment">//!   When encountering this, just stop executing the protocol.</span>
+<span class="doccomment">//! * `OwnError` - Encountered an error while doing something. This error wraps</span>
+<span class="doccomment">//!   the bytes (EDHOC error message) that need to be sent to the peer before</span>
+<span class="doccomment">//!   aborting the protocol run.</span>
+<span class="doccomment">//! * `OwnOrPeerError` - This is for cases where we&#39;re dealing with a received</span>
+<span class="doccomment">//!   message, so it could be an error message itself, or we could fail while</span>
+<span class="doccomment">//!   dealing with the message. This is an enum with two variants:</span>
+<span class="doccomment">//!   * `OwnError` - We failed. This wraps the EDHOC error message that needs</span>
+<span class="doccomment">//!     to be sent to the peer before aborting the protocol.</span>
+<span class="doccomment">//!   * `PeerError` - We received an error message, which is wrapped inside.</span>
+<span class="doccomment">//!     Just abort the protocol.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! The easiest way to work with this, is to just match the results of method</span>
+<span class="doccomment">//! calls and deal with all error variants.</span>
+<span class="doccomment">//!</span>
+<span class="doccomment">//! # Usage</span>
+<span class="doccomment">//! A full usage example is in the `examples` directory. This is only intended</span>
+<span class="doccomment">//! to demonstrate the general pattern and the error handling.</span>
+<span class="doccomment">//! ```rust</span>
+<span class="doccomment">//! // This is a case where we get additional data from the message handling,</span>
+<span class="doccomment">//! // as well as the next state we can use afterwards.</span>
+<span class="doccomment">//! let (v_kid, msg2_verifier) =</span>
+<span class="doccomment">//!    // This is a case where we could receive an error message (just abort</span>
+<span class="doccomment">//!    // then), or cause an error (send it to the peer)</span>
+<span class="doccomment">//!    match msg2_receiver.extract_peer_kid(msg2_bytes) {</span>
+<span class="doccomment">//!        Err(OwnOrPeerError::PeerError(s)) =&gt; {</span>
+<span class="doccomment">//!            panic!(&quot;Received error msg: {}&quot;, s)</span>
+<span class="doccomment">//!        }</span>
+<span class="doccomment">//!        Err(OwnOrPeerError::OwnError(b)) =&gt; {</span>
+<span class="doccomment">//!            panic!(&quot;Send these bytes: {:?}&quot;, &amp;b)</span>
+<span class="doccomment">//!        }</span>
+<span class="doccomment">//!        Ok(val) =&gt; val,</span>
+<span class="doccomment">//!    };</span>
+<span class="doccomment">//! // Here we use the struct we received to do something and receive the next</span>
+<span class="doccomment">//! let msg3_sender = match msg2_verifier.verify_message_2(&amp;v_public) {</span>
+<span class="doccomment">//!     Err(OwnError(b)) =&gt; panic!(&quot;Send these bytes: {:?}&quot;, &amp;b),</span>
+<span class="doccomment">//!     Ok(val) =&gt; val,</span>
+<span class="doccomment">//! };</span>
+<span class="doccomment">//! ```</span>
+
+<span class="kw">mod</span> <span class="ident">cose</span>;
+<span class="attribute">#[<span class="ident">cfg</span>(<span class="ident">test</span>)]</span>
+<span class="kw">mod</span> <span class="ident">test_vectors</span>;
+<span class="kw">mod</span> <span class="ident">util</span>;
+
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">api</span>;
+<span class="attribute">#[<span class="ident">cfg_attr</span>(<span class="ident">tarpaulin</span>, <span class="ident">skip</span>)]</span>
+<span class="kw">pub</span> <span class="kw">mod</span> <span class="ident">error</span>;
+
+<span class="doccomment">/// The result type for internal operations of the `edhoc` module.</span>
+<span class="kw">type</span> <span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span><span class="op">&gt;</span> <span class="op">=</span> <span class="ident">core</span>::<span class="ident">result</span>::<span class="prelude-ty">Result</span><span class="op">&lt;</span><span class="ident">T</span>, <span class="ident">error</span>::<span class="ident">Error</span><span class="op">&gt;</span>;
+
+<span class="kw">pub</span> <span class="kw">use</span> <span class="ident">api</span>::{<span class="ident">PartyU</span>, <span class="ident">PartyV</span>};
+</pre></div>
+</section><section id="search" class="content hidden"></section><section class="footer"></section><aside id="help" class="hidden"><div><h1 class="hidden">Help</h1><div class="shortcuts"><h2>Keyboard Shortcuts</h2><dl><dt><kbd>?</kbd></dt><dd>Show this help dialog</dd><dt><kbd>S</kbd></dt><dd>Focus the search field</dd><dt><kbd>↑</kbd></dt><dd>Move up in search results</dd><dt><kbd>↓</kbd></dt><dd>Move down in search results</dd><dt><kbd>↹</kbd></dt><dd>Switch tab</dd><dt><kbd>&#9166;</kbd></dt><dd>Go to active search result</dd><dt><kbd>+</kbd></dt><dd>Expand all sections</dd><dt><kbd>-</kbd></dt><dd>Collapse all sections</dd></dl></div><div class="infos"><h2>Search Tricks</h2><p>Prefix searches with a type followed by a colon (e.g., <code>fn:</code>) to restrict the search to a given type.</p><p>Accepted types are: <code>fn</code>, <code>mod</code>, <code>struct</code>, <code>enum</code>, <code>trait</code>, <code>type</code>, <code>macro</code>, and <code>const</code>.</p><p>Search functions by type signature (e.g., <code>vec -> usize</code> or <code>* -> vec</code>)</p><p>Search multiple things at once by splitting your query with comma (e.g., <code>str,u8</code> or <code>String,struct:Vec,test</code>)</p></div></div></aside><script>window.rootPath = "../../../";window.currentCrate = "oscore";</script><script src="../../../aliases.js"></script><script src="../../../main.js"></script><script src="../../../source-script.js"></script><script src="../../../source-files.js"></script><script defer src="../../../search-index.js"></script></body></html>

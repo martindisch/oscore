@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["edhoc","Ephemeral Diffie-Hellman Over COSE (EDHOC) to establish an OSCORE context."],["oscore","OSCORE implementation deriving keys from a master secret and master salt."]]});
