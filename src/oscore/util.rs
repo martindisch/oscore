@@ -11,7 +11,6 @@ use super::{error::Error, Result};
 
 pub const KEY_LEN: usize = 16;
 pub const NONCE_LEN: usize = 13;
-pub const MAC_LEN: usize = 8;
 
 /// Returns the CBOR encoded `info` structure.
 ///

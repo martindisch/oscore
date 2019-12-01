@@ -45,7 +45,7 @@ impl From<Error> for OwnOrPeerError {
             Error::Hkdf(_) => {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_HKDF))
             }
-            Error::Aead(_) => {
+            Error::Aead => {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_AEAD))
             }
             Error::Edhoc(msg) => OwnOrPeerError::PeerError(msg),
@@ -90,7 +90,7 @@ impl From<Error> for OwnError {
                 OwnError(util::build_error_message(ERR_ED25519))
             }
             Error::Hkdf(_) => OwnError(util::build_error_message(ERR_HKDF)),
-            Error::Aead(_) => OwnError(util::build_error_message(ERR_AEAD)),
+            Error::Aead => OwnError(util::build_error_message(ERR_AEAD)),
             _ => unreachable!(),
         }
     }
@@ -144,8 +144,8 @@ pub enum Error {
     Ed25519(ed25519_dalek::SignatureError),
     /// Wraps errors from `hkdf`.
     Hkdf(hkdf::InvalidLength),
-    /// Wraps errors from `aes_ccm`.
-    Aead(aes_ccm::Error),
+    /// Error in `aes_ccm`.
+    Aead,
     /// Wraps a received EDHOC error message.
     Edhoc(String),
 }
@@ -169,8 +169,8 @@ impl From<hkdf::InvalidLength> for Error {
 }
 
 impl From<aes_ccm::Error> for Error {
-    fn from(e: aes_ccm::Error) -> Error {
-        Error::Aead(e)
+    fn from(_: aes_ccm::Error) -> Error {
+        Error::Aead
     }
 }
 
@@ -181,7 +181,7 @@ impl fmt::Display for Error {
             Error::Cbor(e) => e.fmt(f),
             Error::Ed25519(e) => e.fmt(f),
             Error::Hkdf(e) => e.fmt(f),
-            Error::Aead(e) => e.fmt(f),
+            Error::Aead => write!(f, "{}", ERR_AEAD),
             Error::Edhoc(e) => e.fmt(f),
         }
     }
@@ -193,7 +193,6 @@ impl error::Error for Error {
         match self {
             Error::Cbor(e) => Some(e),
             Error::Hkdf(e) => Some(e),
-            Error::Aead(e) => Some(e),
             // Other errors that don't implement the Error trait
             _ => None,
         }

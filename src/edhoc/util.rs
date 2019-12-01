@@ -1,4 +1,7 @@
-use aes_ccm::CcmMode;
+use aes_ccm::{
+    aead::{generic_array::typenum::U8, Aead, NewAead, Payload},
+    AesCcm,
+};
 use alloc::{string::String, vec::Vec};
 use digest::{FixedOutput, Input};
 use hkdf::Hkdf;
@@ -10,7 +13,6 @@ use crate::cbor;
 
 pub const CCM_KEY_LEN: usize = 16;
 pub const CCM_NONCE_LEN: usize = 13;
-pub const CCM_MAC_LEN: usize = 8;
 
 /// EDHOC `message_1`.
 #[derive(Debug, PartialEq)]
@@ -355,11 +357,15 @@ pub fn aead_seal(
     let mut nonce_arr = [0; CCM_NONCE_LEN];
     nonce_arr.copy_from_slice(nonce);
     // Initialize CCM mode
-    let ccm = CcmMode::new(&key_arr, nonce_arr, CCM_MAC_LEN)?;
-    // Allocate space for ciphertext & Poly1305 tag
-    let mut dst_out_ct = vec![0; plaintext.len() + CCM_MAC_LEN];
+    let ccm: AesCcm<U8> = AesCcm::new(key_arr.into());
     // Encrypt and place ciphertext & tag in dst_out_ct
-    ccm.generate_encrypt(&mut dst_out_ct, ad, plaintext)?;
+    let dst_out_ct = ccm.encrypt(
+        &nonce_arr.into(),
+        Payload {
+            aad: ad,
+            msg: plaintext,
+        },
+    )?;
 
     Ok(dst_out_ct)
 }
@@ -378,11 +384,15 @@ pub fn aead_open(
     let mut nonce_arr = [0; CCM_NONCE_LEN];
     nonce_arr.copy_from_slice(nonce);
     // Initialize CCM mode
-    let ccm = CcmMode::new(&key_arr, nonce_arr, CCM_MAC_LEN)?;
-    // Allocate space for the plaintext
-    let mut dst_out_pt = vec![0; ciphertext.len() - CCM_MAC_LEN];
+    let ccm: AesCcm<U8> = AesCcm::new(key_arr.into());
     // Verify tag, if correct then decrypt and place plaintext in dst_out_pt
-    ccm.decrypt_verify(&mut dst_out_pt, ad, ciphertext)?;
+    let dst_out_pt = ccm.decrypt(
+        &nonce_arr.into(),
+        Payload {
+            aad: ad,
+            msg: ciphertext,
+        },
+    )?;
 
     Ok(dst_out_pt)
 }

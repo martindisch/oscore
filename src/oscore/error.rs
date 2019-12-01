@@ -23,8 +23,8 @@ pub enum Error {
     Cbor(cbor::CborError),
     /// Wraps errors from `hkdf`.
     Hkdf(hkdf::InvalidLength),
-    /// Wraps errors from `aes_ccm`.
-    Aead(aes_ccm::Error),
+    /// Error in `aes_ccm`.
+    Aead,
     /// Wraps errors from `coap_lite`.
     Coap(coap::MessageError),
 }
@@ -42,8 +42,8 @@ impl From<hkdf::InvalidLength> for Error {
 }
 
 impl From<aes_ccm::Error> for Error {
-    fn from(e: aes_ccm::Error) -> Error {
-        Error::Aead(e)
+    fn from(_: aes_ccm::Error) -> Error {
+        Error::Aead
     }
 }
 
@@ -79,7 +79,7 @@ impl fmt::Display for Error {
             }
             Error::Cbor(e) => e.fmt(f),
             Error::Hkdf(e) => e.fmt(f),
-            Error::Aead(e) => e.fmt(f),
+            Error::Aead => write!(f, "Error using AEAD"),
             Error::Coap(e) => e.fmt(f),
         }
     }
@@ -91,7 +91,6 @@ impl error::Error for Error {
         match self {
             Error::Cbor(e) => Some(e),
             Error::Hkdf(e) => Some(e),
-            Error::Aead(e) => Some(e),
             Error::Coap(e) => Some(e),
             // Other errors that don't implement the Error trait
             _ => None,

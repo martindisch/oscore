@@ -1,4 +1,7 @@
-use aes_ccm::CcmMode;
+use aes_ccm::{
+    aead::{generic_array::typenum::U8, Aead, NewAead, Payload},
+    AesCcm,
+};
 use alloc::{collections::LinkedList, vec::Vec};
 use coap_lite::{CoapOption, MessageClass, Packet, RequestType, ResponseType};
 use core::convert::TryFrom;
@@ -290,13 +293,15 @@ impl SecurityContext {
         inner_bytes.remove(0);
 
         // Encrypt the payload
-        let ccm = CcmMode::new(
-            &self.sender_context.sender_key,
-            nonce,
-            util::MAC_LEN,
+        let ccm: AesCcm<U8> =
+            AesCcm::new(self.sender_context.sender_key.into());
+        let ciphertext_buf = ccm.encrypt(
+            &nonce.into(),
+            Payload {
+                aad,
+                msg: &inner_bytes,
+            },
         )?;
-        let mut ciphertext_buf = vec![0; inner_bytes.len() + util::MAC_LEN];
-        ccm.generate_encrypt(&mut ciphertext_buf, &aad, &inner_bytes)?;
         // Set the ciphertext as the new payload
         original.payload = ciphertext_buf;
 
@@ -407,14 +412,15 @@ impl SecurityContext {
         }
 
         // Decrypt the payload
-        let ccm = CcmMode::new(
-            &self.recipient_context.recipient_key,
-            nonce,
-            util::MAC_LEN,
+        let ccm: AesCcm<U8> =
+            AesCcm::new(self.recipient_context.recipient_key.into());
+        let plaintext_buf = ccm.decrypt(
+            &nonce.into(),
+            Payload {
+                aad,
+                msg: &original.payload,
+            },
         )?;
-        let mut plaintext_buf =
-            vec![0; original.payload.len() - util::MAC_LEN];
-        ccm.decrypt_verify(&mut plaintext_buf, &aad, &original.payload)?;
 
         // Build a CoAP message from the bytes of the plaintext, which contain
         // the code, class E options and the payload
