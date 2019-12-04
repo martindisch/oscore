@@ -8,6 +8,7 @@ readme = "README.md"
 
 [lib]
 doctest = false
+bench = false
 
 [dependencies]
 serde = { version = "1.0.97", default-features = false, features = ["derive", "alloc"] }
@@ -20,6 +21,9 @@ aes-ccm = "0.4.0"
 hkdf = "0.8.0"
 digest = "0.8.1"
 coap-lite = { version = "0.3.0", default-features = false }
+
+[dev-dependencies]
+criterion = "0.3.0"
 
 [features]
 default = ["std"]
@@ -35,3 +39,9 @@ std = [
     "digest/std",
     "coap-lite/std",
 ]
+# This disables replay protection, which is necessary for benchmarking
+no_replay = []
+
+[[bench]]
+name = "bench"
+harness = false

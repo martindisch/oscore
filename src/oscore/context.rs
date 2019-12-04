@@ -447,6 +447,7 @@ impl SecurityContext {
         let piv_64 = util::piv_to_u64(&piv);
         if let Some(previous) = self.recipient_context.replay_window {
             if previous == piv_64 {
+                #[cfg(not(feature = "no_replay"))]
                 return Err(Error::ReplayDetected);
             }
         }
