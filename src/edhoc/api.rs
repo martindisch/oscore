@@ -135,7 +135,7 @@ impl PartyU<Msg2Receiver> {
         // Compute TH_2
         let th_2 = util::compute_th_2(
             self.0.msg_1_seq,
-            crate::as_deref(&msg_2.c_u),
+            msg_2.c_u.as_deref(),
             &msg_2.x_v,
             &msg_2.c_v,
         )?;
@@ -257,7 +257,7 @@ impl PartyU<Msg3Sender> {
         let th_3 = util::compute_th_3(
             &self.0.th_2,
             &self.0.msg_2.ciphertext,
-            crate::as_deref(&c_v),
+            c_v.as_deref(),
         )?;
         // Sign it
         let sig = cose::sign(&id_cred_u, &th_3, &cred_u, &self.0.auth)?;
@@ -427,7 +427,7 @@ impl PartyV<Msg2Sender> {
         // Compute TH_2
         let th_2 = util::compute_th_2(
             self.0.msg_1_seq,
-            crate::as_deref(&c_u),
+            c_u.as_deref(),
             self.0.x_v.as_bytes(),
             &self.0.c_v,
         )?;
@@ -499,7 +499,7 @@ impl PartyV<Msg3Receiver> {
         let th_3 = util::compute_th_3(
             &self.0.th_2,
             &self.0.msg_2.ciphertext,
-            crate::as_deref(&msg_3.c_v),
+            msg_3.c_v.as_deref(),
         )?;
 
         // Derive K_3

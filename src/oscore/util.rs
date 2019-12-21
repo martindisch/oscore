@@ -392,20 +392,20 @@ mod tests {
     #[test]
     fn option_decoding() {
         let (kid, piv) = extract_oscore_option(&EX1_OPTION);
-        assert_eq!(EX1_KID, crate::as_deref(&kid));
-        assert_eq!(EX1_PIV, crate::as_deref(&piv));
+        assert_eq!(EX1_KID, kid.as_deref());
+        assert_eq!(EX1_PIV, piv.as_deref());
 
         let (kid, piv) = extract_oscore_option(&EX2_OPTION);
-        assert_eq!(EX2_KID, crate::as_deref(&kid));
-        assert_eq!(EX2_PIV, crate::as_deref(&piv));
+        assert_eq!(EX2_KID, kid.as_deref());
+        assert_eq!(EX2_PIV, piv.as_deref());
 
         let (kid, piv) = extract_oscore_option(&EX4_OPTION);
-        assert_eq!(EX4_KID, crate::as_deref(&kid));
-        assert_eq!(EX4_PIV, crate::as_deref(&piv));
+        assert_eq!(EX4_KID, kid.as_deref());
+        assert_eq!(EX4_PIV, piv.as_deref());
 
         let (kid, piv) = extract_oscore_option(&EX5_OPTION);
-        assert_eq!(EX5_KID, crate::as_deref(&kid));
-        assert_eq!(EX5_PIV, crate::as_deref(&piv));
+        assert_eq!(EX5_KID, kid.as_deref());
+        assert_eq!(EX5_PIV, piv.as_deref());
 
         let (kid, piv) = extract_oscore_option(&CRASH_OPTION);
         assert_eq!(None, kid);
