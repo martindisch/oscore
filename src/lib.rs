@@ -12,8 +12,8 @@
 //! On the OSCORE side, it does key derivation using the master secret and
 //! master salt, which can be established with EDHOC.
 //!
-//! There is a
-//! [demo implementation](https://github.com/martindisch/oscore-demo)
+//! There is [documentation](https://martindisch.github.io/oscore/oscore/) as
+//! well as a [demo implementation](https://github.com/martindisch/oscore-demo)
 //! using this library, with a resource server on an STM32F3, a client on an
 //! STM32F4 and a CoAP proxy running on a Raspberry Pi.
 //!
