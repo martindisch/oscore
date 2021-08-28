@@ -1,4 +1,3 @@
-use alloc::string::ToString;
 use core::fmt;
 #[cfg(feature = "std")]
 use std::error;
@@ -23,7 +22,7 @@ impl PartialEq for CborError {
         match (self, other) {
             (CborError::TooManyItems, CborError::TooManyItems) => true,
             (CborError::SerdeCbor(e1), CborError::SerdeCbor(e2)) => {
-                e1.to_string() == e2.to_string()
+                (e1.classify(), e1.offset()) == (e2.classify(), e2.offset())
             }
             _ => false,
         }
@@ -55,14 +54,18 @@ impl error::Error for CborError {
 mod tests {
     use super::*;
     use serde::ser::Error;
+    #[cfg(feature = "std")]
+    use std::io::ErrorKind;
 
     #[test]
     fn partial_eq() {
         let own_error = CborError::TooManyItems;
         let serde_error_1 =
             CborError::SerdeCbor(serde_cbor::Error::custom("nope!"));
-        let serde_error_2 =
-            CborError::SerdeCbor(serde_cbor::Error::custom("what?"));
+        #[cfg(feature = "std")]
+        let serde_error_2 = CborError::SerdeCbor(serde_cbor::Error::from(
+            std::io::Error::new(ErrorKind::Other, "oh no!"),
+        ));
         assert!(own_error != serde_error_1);
         #[cfg(feature = "std")]
         assert!(serde_error_1 != serde_error_2);
