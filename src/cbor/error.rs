@@ -20,15 +20,12 @@ impl From<serde_cbor::Error> for CborError {
 
 impl PartialEq for CborError {
     fn eq(&self, other: &Self) -> bool {
-        match self {
-            CborError::TooManyItems => match other {
-                CborError::TooManyItems => true,
-                _ => false,
-            },
-            CborError::SerdeCbor(e1) => match other {
-                CborError::SerdeCbor(e2) => e1.to_string() == e2.to_string(),
-                _ => false,
-            },
+        match (self, other) {
+            (CborError::TooManyItems, CborError::TooManyItems) => true,
+            (CborError::SerdeCbor(e1), CborError::SerdeCbor(e2)) => {
+                e1.to_string() == e2.to_string()
+            }
+            _ => false,
         }
     }
 }
