@@ -371,7 +371,7 @@ impl SecurityContext {
 
         // Compute the nonce
         let nonce =
-            util::compute_nonce(&piv, &kid, &self.common_context.common_iv);
+            util::compute_nonce(&piv, kid, &self.common_context.common_iv);
 
         // Use these values to protect the message
         self.unprotect_message(original, &aad, nonce)
@@ -444,7 +444,7 @@ impl SecurityContext {
     /// Throws an error if the `piv` has been received before and adds it to
     /// the replay window.
     fn check_and_remember(&mut self, piv: &[u8]) -> Result<()> {
-        let piv_64 = util::piv_to_u64(&piv);
+        let piv_64 = util::piv_to_u64(piv);
         if let Some(previous) = self.recipient_context.replay_window {
             if previous == piv_64 {
                 #[cfg(not(feature = "no_replay"))]

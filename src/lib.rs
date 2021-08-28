@@ -26,6 +26,8 @@
 #[macro_use]
 extern crate alloc;
 
+// Unusual byte groupings are used for consistency with RFC.
+#[allow(clippy::unusual_byte_groupings)]
 mod cbor;
 
 pub mod edhoc;

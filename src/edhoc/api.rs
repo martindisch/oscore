@@ -142,14 +142,14 @@ impl PartyU<Msg2Receiver> {
 
         // Derive K_2
         let k_2 = util::edhoc_key_derivation(
-            &"10",
+            "10",
             util::CCM_KEY_LEN * 8,
             &th_2,
             shared_secret.as_bytes(),
         )?;
         // Derive IV_2
         let iv_2 = util::edhoc_key_derivation(
-            &"IV-GENERATION",
+            "IV-GENERATION",
             util::CCM_NONCE_LEN * 8,
             &th_2,
             shared_secret.as_bytes(),
@@ -264,14 +264,14 @@ impl PartyU<Msg3Sender> {
 
         // Derive K_3
         let k_3 = util::edhoc_key_derivation(
-            &"10",
+            "10",
             util::CCM_KEY_LEN * 8,
             &th_3,
             self.0.shared_secret.as_bytes(),
         )?;
         // Derive IV_3
         let iv_3 = util::edhoc_key_derivation(
-            &"IV-GENERATION",
+            "IV-GENERATION",
             util::CCM_NONCE_LEN * 8,
             &th_3,
             self.0.shared_secret.as_bytes(),
@@ -436,14 +436,14 @@ impl PartyV<Msg2Sender> {
 
         // Derive K_2
         let k_2 = util::edhoc_key_derivation(
-            &"10",
+            "10",
             util::CCM_KEY_LEN * 8,
             &th_2,
             self.0.shared_secret.as_bytes(),
         )?;
         // Derive IV_2
         let iv_2 = util::edhoc_key_derivation(
-            &"IV-GENERATION",
+            "IV-GENERATION",
             util::CCM_NONCE_LEN * 8,
             &th_2,
             self.0.shared_secret.as_bytes(),
@@ -504,14 +504,14 @@ impl PartyV<Msg3Receiver> {
 
         // Derive K_3
         let k_3 = util::edhoc_key_derivation(
-            &"10",
+            "10",
             util::CCM_KEY_LEN * 8,
             &th_3,
             self.0.shared_secret.as_bytes(),
         )?;
         // Derive IV_3
         let iv_3 = util::edhoc_key_derivation(
-            &"IV-GENERATION",
+            "IV-GENERATION",
             util::CCM_NONCE_LEN * 8,
             &th_3,
             self.0.shared_secret.as_bytes(),
@@ -560,13 +560,13 @@ impl PartyV<Msg3Verifier> {
         // of U
         let id_cred_u = cose::build_id_cred_x(&self.0.u_kid)?;
         // Build the COSE_Key containing U's public authentication key
-        let cred_u = cose::serialize_cose_key(&u_public)?;
+        let cred_u = cose::serialize_cose_key(u_public)?;
         // Verify the signed data from Party U
         cose::verify(
             &id_cred_u,
             &self.0.th_3,
             &cred_u,
-            &u_public,
+            u_public,
             &self.0.u_sig,
         )?;
 

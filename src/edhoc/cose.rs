@@ -22,7 +22,7 @@ pub fn sign(
     keypair_bytes: &[u8],
 ) -> Result<[u8; 64]> {
     let to_be_signed = build_to_be_signed(id_cred_x, th_i, cred_x)?;
-    let keypair = Keypair::from_bytes(&keypair_bytes)?;
+    let keypair = Keypair::from_bytes(keypair_bytes)?;
     let signature = keypair.sign::<Sha512>(&to_be_signed);
 
     Ok(signature.to_bytes())

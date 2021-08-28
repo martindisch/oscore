@@ -165,10 +165,10 @@ pub fn compute_nonce(
 
     let mut nonce = [0; NONCE_LEN];
     // Left-pad the Partial IV (PIV) with zeros to exactly 5 bytes
-    nonce[NONCE_LEN - piv.len()..].copy_from_slice(&piv);
+    nonce[NONCE_LEN - piv.len()..].copy_from_slice(piv);
     // Left-pad ID_PIV with zeros to exactly nonce length minus 6 bytes
     nonce[1 + NONCE_LEN - 6 - id_piv.len()..NONCE_LEN - 5]
-        .copy_from_slice(&id_piv);
+        .copy_from_slice(id_piv);
     // Add the size of the ID_PIV (a single byte S)
     nonce[0] = id_piv.len() as u8;
     // XOR with common IV
@@ -304,31 +304,25 @@ impl ProxyUri {
     /// Returns a `LinkedList` of the path components to be added as option
     /// values.
     pub fn get_path_list(&self) -> Option<LinkedList<Vec<u8>>> {
-        match &self.uri_path {
-            Some(uri_path) => Some(
-                uri_path
-                    .split('/')
-                    .filter(|e| !e.is_empty())
-                    .map(|s| s.as_bytes().to_vec())
-                    .collect(),
-            ),
-            None => None,
-        }
+        self.uri_path.as_ref().map(|uri_path| {
+            uri_path
+                .split('/')
+                .filter(|e| !e.is_empty())
+                .map(|s| s.as_bytes().to_vec())
+                .collect()
+        })
     }
 
     /// Returns a `LinkedList` of the query components to be added as option
     /// values.
     pub fn get_query_list(&self) -> Option<LinkedList<Vec<u8>>> {
-        match &self.uri_query {
-            Some(uri_query) => Some(
-                uri_query
-                    .split('&')
-                    .filter(|e| !e.is_empty())
-                    .map(|s| s.as_bytes().to_vec())
-                    .collect(),
-            ),
-            None => None,
-        }
+        self.uri_query.as_ref().map(|uri_query| {
+            uri_query
+                .split('&')
+                .filter(|e| !e.is_empty())
+                .map(|s| s.as_bytes().to_vec())
+                .collect()
+        })
     }
 
     /// Returns the class U option value for Proxy-Uri.
