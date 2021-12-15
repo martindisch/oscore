@@ -1,16 +1,16 @@
 //! An experimental
 //! [OSCORE](https://tools.ietf.org/html/rfc8613)
 //! implementation with
-//! [EDHOC](https://tools.ietf.org/html/draft-selander-ace-cose-ecdhe-14)
+//! [EDHOC](https://datatracker.ietf.org/doc/draft-ietf-lake-edhoc)
 //! key exchange, intended for embedded devices.
 //!
-//! The EDHOC implementation is based on
-//! [draft 14](https://tools.ietf.org/html/draft-selander-ace-cose-ecdhe-14)
-//! of the EDHOC specification. It only does authentication with raw public
-//! keys (RPK), so it covers the asymmetric authentication scenario, but not
-//! the symmetric one using pre-shared keys (PSK).
-//! On the OSCORE side, it does key derivation using the master secret and
-//! master salt, which can be established with EDHOC.
+//! The EDHOC implementation is based on the older
+//! [version 14](https://tools.ietf.org/html/draft-selander-ace-cose-ecdhe-14)
+//! of draft-selander-ace-cose-ecdhe. It only does authentication with raw
+//! public keys (RPK), so it covers the asymmetric authentication scenario, but
+//! not the symmetric one using pre-shared keys (PSK). On the OSCORE side, it
+//! does key derivation using the master secret and master salt, which can be
+//! established with EDHOC.
 //!
 //! There is [documentation](https://martindisch.github.io/oscore/oscore/) as
 //! well as a [demo implementation](https://github.com/martindisch/oscore-demo)
