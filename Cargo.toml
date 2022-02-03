@@ -12,7 +12,7 @@ bench = false
 
 [dependencies]
 serde = { version = "1.0.97", default-features = false, features = ["derive", "alloc"] }
-serde_cbor = { version = "0.10.2", default-features = false, features = ["alloc"] }
+serde_cbor = { version = "0.11.2", default-features = false, features = ["alloc"] }
 serde_bytes = { version = "0.11.1", default-features = false, features = ["alloc"] }
 x25519-dalek = { version = "0.5.2", default-features = false, features = ["u32_backend"] }
 ed25519-dalek = { version = "0.9.1", default-features = false, features = ["u32_backend"] }

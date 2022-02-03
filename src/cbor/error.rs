@@ -71,6 +71,7 @@ mod tests {
         assert!(serde_error_1 != serde_error_2);
         assert_eq!(own_error, own_error);
         assert_eq!(serde_error_1, serde_error_1);
+        #[cfg(feature = "std")]
         assert_eq!(serde_error_2, serde_error_2);
     }
 }
