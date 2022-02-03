@@ -1,8 +1,10 @@
-use aes_ccm::{
-    aead::{generic_array::typenum::U8, Aead, NewAead, Payload},
-    AesCcm,
-};
+use aes::Aes128;
 use alloc::{string::String, vec::Vec};
+use ccm::{
+    aead::{generic_array::GenericArray, Aead, NewAead, Payload},
+    consts::{U13, U8},
+    Ccm,
+};
 use digest::{FixedOutput, Input};
 use hkdf::Hkdf;
 use serde_bytes::{ByteBuf, Bytes};
@@ -350,17 +352,11 @@ pub fn aead_seal(
     plaintext: &[u8],
     ad: &[u8],
 ) -> Result<Vec<u8>> {
-    // Prepare key & nonce. This is fine, since it's not part of the public
-    // API and we can guarantee that key & nonce always have the right length.
-    let mut key_arr = [0; CCM_KEY_LEN];
-    key_arr.copy_from_slice(key);
-    let mut nonce_arr = [0; CCM_NONCE_LEN];
-    nonce_arr.copy_from_slice(nonce);
     // Initialize CCM mode
-    let ccm: AesCcm<U8> = AesCcm::new(key_arr.into());
+    let ccm: Ccm<Aes128, U8, U13> = Ccm::new(GenericArray::from_slice(key));
     // Encrypt and place ciphertext & tag in dst_out_ct
     let dst_out_ct = ccm.encrypt(
-        &nonce_arr.into(),
+        GenericArray::from_slice(nonce),
         Payload {
             aad: ad,
             msg: plaintext,
@@ -377,17 +373,11 @@ pub fn aead_open(
     ciphertext: &[u8],
     ad: &[u8],
 ) -> Result<Vec<u8>> {
-    // Prepare key & nonce. This is fine, since it's not part of the public
-    // API and we can guarantee that key & nonce always have the right length.
-    let mut key_arr = [0; CCM_KEY_LEN];
-    key_arr.copy_from_slice(key);
-    let mut nonce_arr = [0; CCM_NONCE_LEN];
-    nonce_arr.copy_from_slice(nonce);
     // Initialize CCM mode
-    let ccm: AesCcm<U8> = AesCcm::new(key_arr.into());
+    let ccm: Ccm<Aes128, U8, U13> = Ccm::new(GenericArray::from_slice(key));
     // Verify tag, if correct then decrypt and place plaintext in dst_out_pt
     let dst_out_pt = ccm.decrypt(
-        &nonce_arr.into(),
+        GenericArray::from_slice(nonce),
         Payload {
             aad: ad,
             msg: ciphertext,

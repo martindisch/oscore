@@ -1,8 +1,10 @@
-use aes_ccm::{
-    aead::{generic_array::typenum::U8, Aead, NewAead, Payload},
-    AesCcm,
-};
+use aes::Aes128;
 use alloc::{collections::LinkedList, vec::Vec};
+use ccm::{
+    aead::{generic_array::GenericArray, Aead, NewAead, Payload},
+    consts::{U13, U8},
+    Ccm,
+};
 use coap_lite::{CoapOption, MessageClass, Packet, RequestType, ResponseType};
 use core::convert::TryFrom;
 
@@ -293,8 +295,9 @@ impl SecurityContext {
         inner_bytes.remove(0);
 
         // Encrypt the payload
-        let ccm: AesCcm<U8> =
-            AesCcm::new(self.sender_context.sender_key.into());
+        let ccm: Ccm<Aes128, U8, U13> = Ccm::new(GenericArray::from_slice(
+            &self.sender_context.sender_key,
+        ));
         let ciphertext_buf = ccm.encrypt(
             &nonce.into(),
             Payload {
@@ -412,8 +415,9 @@ impl SecurityContext {
         }
 
         // Decrypt the payload
-        let ccm: AesCcm<U8> =
-            AesCcm::new(self.recipient_context.recipient_key.into());
+        let ccm: Ccm<Aes128, U8, U13> = Ccm::new(GenericArray::from_slice(
+            &self.recipient_context.recipient_key,
+        ));
         let plaintext_buf = ccm.decrypt(
             &nonce.into(),
             Payload {

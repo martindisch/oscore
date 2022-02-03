@@ -41,8 +41,8 @@ impl From<hkdf::InvalidLength> for Error {
     }
 }
 
-impl From<aes_ccm::Error> for Error {
-    fn from(_: aes_ccm::Error) -> Error {
+impl From<ccm::aead::Error> for Error {
+    fn from(_: ccm::aead::Error) -> Error {
         Error::Aead
     }
 }
