@@ -44,7 +44,8 @@ applies to:
 - sha2, Copyright (c) 2006-2009 Graydon Hoare
         Copyright (c) 2009-2013 Mozilla Foundation
         Copyright (c) 2016 Artyom Pavlov
-- aes-ccm, Copyright (c) 2019 Martin Disch, Arnaud Durand
+- aes, Copyright (c) 2018 Artyom Pavlov
+- ccm, Copyright (c) 2020 The RustCrypto Project Developers
 - hkdf, Copyright (c) 2015-2018 Vlad Filippov
         Copyright (c) 2018 RustCrypto Developers
 - digest, Copyright (c) 2017 Artyom Pavlov
@@ -78,7 +79,8 @@ applies to:
 - serde_cbor
 - serde_bytes
 - sha2
-- aes-ccm
+- aes
+- ccm
 - hkdf
 - digest
 - coap-lite
