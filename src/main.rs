@@ -10,8 +10,8 @@ use x25519_dalek::{EphemeralSecret, PublicKey,StaticSecret};
 use rand_core::{RngCore, OsRng, CryptoRng,};
 fn main() {
 
-    let v_static_pub = EphemeralSecret::new(OsRng);
-    let v_static_priv = PublicKey::from(&v_static_pub);
+    let v_static_priv : EphemeralSecret  = EphemeralSecret::new(OsRng);
+    let v_static_pub = PublicKey::from(&v_static_priv);
 
     let v_auth_pub = [
         0x1B, 0x66, 0x1E, 0xE5, 0xD5, 0xEF, 0x16, 0x72, 0xA2, 0xD8, 0x77,

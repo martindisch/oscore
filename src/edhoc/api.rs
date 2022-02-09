@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 use core::result::Result;
-use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};
+use x25519_dalek::{PublicKey, SharedSecret, StaticSecret, EphemeralSecret};
 
 use super::{
     cose,
@@ -27,8 +27,10 @@ pub struct Msg1Sender {
     c_u: Vec<u8>,
     secret: StaticSecret,
     x_u: PublicKey,
-    auth: [u8; 64],
+    static_secret: EphemeralSecret,
+    static_public: PublicKey,
     kid: Vec<u8>,
+    auth: [u8; 64],
 }
 
 impl PartyU<Msg1Sender> {
@@ -44,8 +46,8 @@ impl PartyU<Msg1Sender> {
     pub fn new(
         c_u: Vec<u8>,
         ecdh_secret: [u8; 32],
-        auth_private: &[u8; 32],
-        auth_public: &[u8; 32],
+        stat_priv: EphemeralSecret,
+        stat_pub: PublicKey,
         kid: Vec<u8>,
     ) -> PartyU<Msg1Sender> {
         // From the secret bytes, create the DH secret
@@ -53,16 +55,16 @@ impl PartyU<Msg1Sender> {
         // and from that build the corresponding public key
         let x_u = PublicKey::from(&secret);
         // Combine the authentication key pair for convenience
-        let mut auth = [0; 64];
-        auth[..32].copy_from_slice(auth_private);
-        auth[32..].copy_from_slice(auth_public);
-
+ 
+        let mut auth = [0; 64];  
         PartyU(Msg1Sender {
             c_u,
             secret,
             x_u,
-            auth,
+            static_secret:stat_priv,
+            static_public:stat_pub,
             kid,
+            auth
         })
     }
 
@@ -588,7 +590,7 @@ impl PartyV<Msg3Verifier> {
         Ok((master_secret, master_salt))
     }
 }
-
+/*
 #[cfg(test)]
 mod tests {
     use super::super::test_vectors::*;
@@ -812,3 +814,4 @@ mod tests {
         assert_eq!(&SHARED_SECRET, v_priv.diffie_hellman(&u_pub).as_bytes());
     }
 }
+*/
