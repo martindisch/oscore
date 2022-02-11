@@ -30,7 +30,7 @@ pub struct Msg1Sender {
     static_secret: EphemeralSecret,
     static_public: PublicKey,
     kid: Vec<u8>,
-    auth: [u8; 64],
+    auth: [u8; 64], //remove
 }
 
 impl PartyU<Msg1Sender> {
@@ -39,8 +39,8 @@ impl PartyU<Msg1Sender> {
     /// # Arguments
     /// * `c_u` - The chosen connection identifier.
     /// * `ecdh_secret` - The ECDH secret to use for this protocol run.
-    /// * `auth_private` - The private ed25519 authentication key.
-    /// * `auth_public` - The public ed25519 authentication key.
+    /// * `stat_priv` - The private ed25519 authentication key.
+    /// * `stat_priv` - The public ed25519 authentication key.
     /// * `kid` - The key ID by which the other party is able to retrieve
     ///   `auth_public`.
     pub fn new(
@@ -56,7 +56,7 @@ impl PartyU<Msg1Sender> {
         let x_u = PublicKey::from(&secret);
         // Combine the authentication key pair for convenience
  
-        let mut auth = [0; 64];  
+        let mut auth = [0; 64];   //remove
         PartyU(Msg1Sender {
             c_u,
             secret,
@@ -64,7 +64,7 @@ impl PartyU<Msg1Sender> {
             static_secret:stat_priv,
             static_public:stat_pub,
             kid,
-            auth
+            auth //slettes
         })
     }
 

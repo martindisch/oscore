@@ -1,13 +1,15 @@
-use oscore::edhoc::{
-    error::{OwnError, OwnOrPeerError},
-    PartyU, PartyV,
-};
+
+
 use rand::{rngs::StdRng, Rng,SeedableRng};
 
 use x25519_dalek::{EphemeralSecret, PublicKey,StaticSecret};
 
 
 use rand_core::{RngCore, OsRng, CryptoRng,};
+
+   
+
+
 fn main() {
 
     let v_static_priv : EphemeralSecret  = EphemeralSecret::new(OsRng);
@@ -41,15 +43,19 @@ fn main() {
     ];
     let u_kid = [0xA2].to_vec();
     let msg1_sender =
-        PartyU::new(u_c_u, u_priv, &u_auth_priv, &u_auth_pub, u_kid);
+        PartyU::new(u_c_u, u_priv, v_static_priv, v_static_pub, u_kid);
 
-        /*
+        
     // type = 1 would be the case in CoAP, where party U can correlate
     // message_1 and message_2 with the token
     let (msg1_bytes, msg2_receiver) =
         // If an error happens here, we just abort. No need to send a message,
         // since the protocol hasn't started yet.
         msg1_sender.generate_message_1(1).unwrap();
+
+    let decmsg1 = util::deserialize_message_1(msg1_bytesl)
+
+        /*
 
     // Party V ----------------------------------------------------------------
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)
