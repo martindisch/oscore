@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 use core::result::Result;
 use x25519_dalek::{PublicKey, SharedSecret, StaticSecret, EphemeralSecret};
-
+use eui::{Eui64};
 use super::{
     cose,
     error::{EarlyError, Error, OwnError, OwnOrPeerError},
@@ -19,18 +19,18 @@ pub struct PartyU<S: PartyUState>(S);
 pub trait PartyUState {}
 impl PartyUState for Msg1Sender {}
 impl PartyUState for Msg2Receiver {}
-impl PartyUState for Msg2Verifier {}
-impl PartyUState for Msg3Sender {}
+//impl PartyUState for Msg2Verifier {}
+//impl PartyUState for Msg3Sender {}
 
 /// Contains the state to build the first message.
 pub struct Msg1Sender {
-    c_u: Vec<u8>,
+    c_i: Vec<u8>,
     secret: StaticSecret,
-    x_u: PublicKey,
+    pub x_i: PublicKey,
     static_secret: EphemeralSecret,
     static_public: PublicKey,
+    pub APPEUI : Eui64,
     kid: Vec<u8>,
-    auth: [u8; 64], //remove
 }
 
 impl PartyU<Msg1Sender> {
@@ -40,31 +40,32 @@ impl PartyU<Msg1Sender> {
     /// * `c_u` - The chosen connection identifier.
     /// * `ecdh_secret` - The ECDH secret to use for this protocol run.
     /// * `stat_priv` - The private ed25519 authentication key.
-    /// * `stat_priv` - The public ed25519 authentication key.
+    /// * `stat_public` - The public ed25519 authentication key.
+    /// * `APPEUI` - MAC adress of server
     /// * `kid` - The key ID by which the other party is able to retrieve
-    ///   `auth_public`.
+    ///   `stat_public`, which is called 'ID_cred_x in edho 14 .
     pub fn new(
-        c_u: Vec<u8>,
+        c_i: Vec<u8>,
         ecdh_secret: [u8; 32],
         stat_priv: EphemeralSecret,
         stat_pub: PublicKey,
+        APPEUI : Eui64,
         kid: Vec<u8>,
     ) -> PartyU<Msg1Sender> {
         // From the secret bytes, create the DH secret
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
-        let x_u = PublicKey::from(&secret);
+        let x_i = PublicKey::from(&secret);
+
         // Combine the authentication key pair for convenience
- 
-        let mut auth = [0; 64];   //remove
-        PartyU(Msg1Sender {
-            c_u,
+         PartyU(Msg1Sender {
+            c_i,
             secret,
-            x_u,
+            x_i,
             static_secret:stat_priv,
             static_public:stat_pub,
+            APPEUI,
             kid,
-            auth //slettes
         })
     }
 
@@ -82,11 +83,12 @@ impl PartyU<Msg1Sender> {
     pub fn generate_message_1(
         self,
         r#type: isize,
+        suites: isize,
     ) -> Result<(Vec<u8>, PartyU<Msg2Receiver>), EarlyError> {
         // Encode the necessary information into the first message
         let msg_1 = Message1 {
             r#type,
-            suite: 0,
+            suite: suites,
             x_u: self.0.x_u.as_bytes().to_vec(),
             c_u: self.0.c_u,
         };
@@ -99,7 +101,7 @@ impl PartyU<Msg1Sender> {
             msg_1_bytes,
             PartyU(Msg2Receiver {
                 secret: self.0.secret,
-                auth: self.0.auth,
+      //          auth: self.0.auth,
                 kid: self.0.kid,
                 msg_1_seq,
                 msg_1,
@@ -107,15 +109,19 @@ impl PartyU<Msg1Sender> {
         ))
     }
 }
-
 /// Contains the state to receive the second message.
 pub struct Msg2Receiver {
     secret: StaticSecret,
-    auth: [u8; 64],
+  //  auth: [u8; 64],
     kid: Vec<u8>,
     msg_1_seq: Vec<u8>,
     msg_1: Message1,
 }
+
+
+
+/*
+
 
 impl PartyU<Msg2Receiver> {
     /// Returns the key ID of the other party's public authentication key.
@@ -309,7 +315,7 @@ impl PartyU<Msg3Sender> {
         Ok((msg_3_seq, master_secret, master_salt))
     }
 }
-
+*/
 // Party V constructs ---------------------------------------------------------
 
 /// The structure providing all operations for Party V.
@@ -324,10 +330,11 @@ impl PartyVState for Msg3Verifier {}
 
 /// Contains the state to receive the first message.
 pub struct Msg1Receiver {
-    c_v: Vec<u8>,
+    c_r: Vec<u8>,
     secret: StaticSecret,
-    x_v: PublicKey,
-    auth: [u8; 64],
+    x_r: PublicKey,
+    stat_priv: EphemeralSecret,
+    stat_pub: PublicKey,
     kid: Vec<u8>,
 }
 
@@ -342,30 +349,29 @@ impl PartyV<Msg1Receiver> {
     /// * `kid` - The key ID by which the other party is able to retrieve
     ///   `auth_public`.
     pub fn new(
-        c_v: Vec<u8>,
+        c_r: Vec<u8>,
         ecdh_secret: [u8; 32],
-        auth_private: &[u8; 32],
-        auth_public: &[u8; 32],
+        stat_priv: EphemeralSecret,
+        stat_pub: PublicKey,
         kid: Vec<u8>,
     ) -> PartyV<Msg1Receiver> {
         // From the secret bytes, create the DH secret
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
-        let x_v = PublicKey::from(&secret);
+        let x_r = PublicKey::from(&secret);
         // Combine the authentication key pair for convenience
-        let mut auth = [0; 64];
-        auth[..32].copy_from_slice(auth_private);
-        auth[32..].copy_from_slice(auth_public);
+
 
         PartyV(Msg1Receiver {
-            c_v,
+            c_r,
             secret,
-            x_v,
-            auth,
+            x_r,
+            stat_priv,
+            stat_pub,
             kid,
         })
     }
-
+/*
     /// Processes the first message.
     pub fn handle_message_1(
         self,
@@ -395,7 +401,7 @@ impl PartyV<Msg1Receiver> {
             msg_1_seq,
             msg_1,
         }))
-    }
+    }*/
 }
 
 /// Contains the state to build the second message.
@@ -815,3 +821,4 @@ mod tests {
     }
 }
 */
+

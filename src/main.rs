@@ -1,30 +1,27 @@
-
-
+use oscore::edhoc::{
+    error::{OwnError, OwnOrPeerError},
+    PartyU, // PartyV,
+    util::{self, deserialize_message_1, Message1},
+};
 use rand::{rngs::StdRng, Rng,SeedableRng};
 
 use x25519_dalek::{EphemeralSecret, PublicKey,StaticSecret};
-
+use eui::{Eui64};
 
 use rand_core::{RngCore, OsRng, CryptoRng,};
 
-   
 
+const suite_I: isize = 3;
+const methodType_I : isize = 0;
 
 fn main() {
+
+    let APPEUI : Eui64 =  Eui64::from(85204980412143); // completely random mac adress (should be on device)
+
 
     let v_static_priv : EphemeralSecret  = EphemeralSecret::new(OsRng);
     let v_static_pub = PublicKey::from(&v_static_priv);
 
-    let v_auth_pub = [
-        0x1B, 0x66, 0x1E, 0xE5, 0xD5, 0xEF, 0x16, 0x72, 0xA2, 0xD8, 0x77,
-        0xCD, 0x5B, 0xC2, 0x0F, 0x46, 0x30, 0xDC, 0x78, 0xA1, 0x14, 0xDE,
-        0x65, 0x9C, 0x7E, 0x50, 0x4D, 0x0F, 0x52, 0x9A, 0x6B, 0xD3,
-    ];
-    let u_auth_pub = [
-        0x42, 0x4C, 0x75, 0x6A, 0xB7, 0x7C, 0xC6, 0xFD, 0xEC, 0xF0, 0xB3,
-        0xEC, 0xFC, 0xFF, 0xB7, 0x53, 0x10, 0xC0, 0x15, 0xBF, 0x5C, 0xBA,
-        0x2E, 0xC0, 0xA2, 0x36, 0xE6, 0x65, 0x0C, 0x8A, 0xB9, 0xC7,
-    ];
 
     // Party U ----------------------------------------------------------------
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)
@@ -34,29 +31,25 @@ fn main() {
     
     // Choose a connection identifier
     let u_c_u = [0x1].to_vec();
-    // This is the keypair used to authenticate.
-    // V must have the public key.
-    let u_auth_priv = [
-        0x53, 0x21, 0xFC, 0x01, 0xC2, 0x98, 0x20, 0x06, 0x3A, 0x72, 0x50,
-        0x8F, 0xC6, 0x39, 0x25, 0x1D, 0xC8, 0x30, 0xE2, 0xF7, 0x68, 0x3E,
-        0xB8, 0xE3, 0x8A, 0xF1, 0x64, 0xA5, 0xB9, 0xAF, 0x9B, 0xE3,
-    ];
+
     let u_kid = [0xA2].to_vec();
     let msg1_sender =
-        PartyU::new(u_c_u, u_priv, v_static_priv, v_static_pub, u_kid);
+        PartyU::new(u_c_u, u_priv, v_static_priv, v_static_pub,APPEUI, u_kid);
 
-        
     // type = 1 would be the case in CoAP, where party U can correlate
     // message_1 and message_2 with the token
     let (msg1_bytes, msg2_receiver) =
         // If an error happens here, we just abort. No need to send a message,
         // since the protocol hasn't started yet.
-        msg1_sender.generate_message_1(1).unwrap();
+        msg1_sender.generate_message_1(methodType_I, suite_I).unwrap();
 
-    let decmsg1 = util::deserialize_message_1(msg1_bytesl)
+
+
+    let msg_1_struct : Message1= util::deserialize_message_1(&msg1_bytes).unwrap();
+    println!("{:?}",msg_1_struct );
+
 
         /*
-
     // Party V ----------------------------------------------------------------
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)
     // The ECDH private key used by V
