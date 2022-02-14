@@ -89,8 +89,8 @@ impl PartyU<Msg1Sender> {
         let msg_1 = Message1 {
             r#type,
             suite: suites,
-            x_u: self.0.x_u.as_bytes().to_vec(),
-            c_u: self.0.c_u,
+            x_i: self.0.x_i.as_bytes().to_vec(),
+            c_i: self.0.c_i,
         };
         // Get CBOR sequence for message
         let msg_1_seq = util::serialize_message_1(&msg_1)?;
@@ -425,7 +425,7 @@ impl PartyV<Msg2Sender> {
             if self.0.msg_1.r#type % 4 == 1 || self.0.msg_1.r#type % 4 == 3 {
                 None
             } else {
-                Some(self.0.msg_1.c_u.clone())
+                Some(self.0.msg_1.c_i.clone())
             };
 
         // Build the COSE header map identifying the public authentication key

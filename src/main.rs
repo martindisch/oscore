@@ -16,11 +16,16 @@ const methodType_I : isize = 0;
 
 fn main() {
 
+
+    /*
+    Parti I generate message 1
+    */
+
     let APPEUI : Eui64 =  Eui64::from(85204980412143); // completely random mac adress (should be on device)
 
 
-    let v_static_priv : EphemeralSecret  = EphemeralSecret::new(OsRng);
-    let v_static_pub = PublicKey::from(&v_static_priv);
+    let i_static_priv : EphemeralSecret  = EphemeralSecret::new(OsRng);
+    let i_static_pub = PublicKey::from(&i_static_priv);
 
 
     // Party U ----------------------------------------------------------------
@@ -30,11 +35,11 @@ fn main() {
     let u_priv = r.gen::<[u8;32]>();
     
     // Choose a connection identifier
-    let u_c_u = [0x1].to_vec();
+    let i_c_i = [0x1].to_vec();
 
     let u_kid = [0xA2].to_vec();
     let msg1_sender =
-        PartyU::new(u_c_u, u_priv, v_static_priv, v_static_pub,APPEUI, u_kid);
+        PartyU::new(i_c_i, u_priv, i_static_priv, i_static_pub,APPEUI, u_kid);
 
     // type = 1 would be the case in CoAP, where party U can correlate
     // message_1 and message_2 with the token
@@ -48,6 +53,16 @@ fn main() {
     let msg_1_struct : Message1= util::deserialize_message_1(&msg1_bytes).unwrap();
     println!("{:?}",msg_1_struct );
 
+    /*
+    /// Party R handle message 1
+    */
+
+    let DEVEUI : Eui64 =  Eui64::from(28945057161291); 
+    let r_static_priv : EphemeralSecret  = EphemeralSecret::new(OsRng);
+    let r_static_pub = PublicKey::from(&r_static_priv);
+
+     //  let msg1_receiver =
+     //   PartyV::new(v_c_v, v_priv, &v_auth_priv, &v_auth_pub, v_kid);
 
         /*
     // Party V ----------------------------------------------------------------

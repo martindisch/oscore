@@ -21,8 +21,8 @@ pub const CCM_NONCE_LEN: usize = 13;
 pub struct Message1 {
     pub r#type: isize,
     pub suite: isize,
-    pub x_u: Vec<u8>,
-    pub c_u: Vec<u8>,
+    pub x_i: Vec<u8>,
+    pub c_i: Vec<u8>,
 }
 
 /// Serializes EDHOC `message_1`.
@@ -32,8 +32,8 @@ pub fn serialize_message_1(msg: &Message1) -> Result<Vec<u8>> {
     let raw_msg = (
         msg.r#type,
         msg.suite,
-        Bytes::new(&msg.x_u),
-        Bytes::new(&msg.c_u),
+        Bytes::new(&msg.x_i),
+        Bytes::new(&msg.c_i),
     );
 
     Ok(cbor::encode_sequence(raw_msg)?)
@@ -50,8 +50,8 @@ pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     Ok(Message1 {
         r#type: raw_msg.0,
         suite: raw_msg.1,
-        x_u: raw_msg.2.into_vec(),
-        c_u: raw_msg.3.into_vec(),
+        x_i: raw_msg.2.into_vec(),
+        c_i: raw_msg.3.into_vec(),
     })
 }
 
@@ -425,8 +425,8 @@ mod tests {
         let original = Message1 {
             r#type: TYPE,
             suite: SUITE,
-            x_u: X_U.to_vec(),
-            c_u: C_U.to_vec(),
+            x_i: X_U.to_vec(),
+            c_i: C_U.to_vec(),
         };
 
         assert_eq!(
@@ -440,8 +440,8 @@ mod tests {
         let original = Message1 {
             r#type: TYPE,
             suite: SUITE,
-            x_u: X_U.to_vec(),
-            c_u: C_U.to_vec(),
+            x_i: X_U.to_vec(),
+            c_i: C_U.to_vec(),
         };
 
         assert_eq!(original, deserialize_message_1(&MESSAGE_1).unwrap());
