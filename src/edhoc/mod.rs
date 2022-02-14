@@ -79,4 +79,4 @@ pub mod error;
 /// The result type for internal operations of the `edhoc` module.
 type Result<T> = core::result::Result<T, error::Error>;
 
-pub use api::{PartyU}; //PartyV
+pub use api::{PartyU,PartyV};

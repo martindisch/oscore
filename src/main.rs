@@ -1,6 +1,6 @@
 use oscore::edhoc::{
     error::{OwnError, OwnOrPeerError},
-    PartyU, // PartyV,
+    PartyU, PartyV,
     util::{self, deserialize_message_1, Message1},
 };
 use rand::{rngs::StdRng, Rng,SeedableRng};
