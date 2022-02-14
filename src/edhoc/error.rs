@@ -98,7 +98,7 @@ impl From<Error> for OwnError {
 
 impl fmt::Display for OwnError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Generated EDHOC error message: {:?}", &self.0)
+        write!(f, "Generated EDHOC error møssage: {:?}", &self.0)
     }
 }
 #[cfg(feature = "std")]

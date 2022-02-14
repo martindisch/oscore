@@ -32,14 +32,14 @@ fn main() {
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)
     // The ECDH private key used by U
     let mut r : StdRng = StdRng::from_entropy();
-    let u_priv = r.gen::<[u8;32]>();
+    let i_priv = r.gen::<[u8;32]>();
     
     // Choose a connection identifier
     let i_c_i = [0x1].to_vec();
 
-    let u_kid = [0xA2].to_vec();
+    let i_kid = [0xA2].to_vec();
     let msg1_sender =
-        PartyU::new(i_c_i, u_priv, i_static_priv, i_static_pub,APPEUI, u_kid);
+        PartyU::new(i_c_i, i_priv, i_static_priv, i_static_pub,APPEUI, i_kid);
 
     // type = 1 would be the case in CoAP, where party U can correlate
     // message_1 and message_2 with the token
@@ -47,6 +47,8 @@ fn main() {
         // If an error happens here, we just abort. No need to send a message,
         // since the protocol hasn't started yet.
         msg1_sender.generate_message_1(methodType_I, suite_I).unwrap();
+
+
 
 
 
@@ -61,10 +63,29 @@ fn main() {
     let r_static_priv : EphemeralSecret  = EphemeralSecret::new(OsRng);
     let r_static_pub = PublicKey::from(&r_static_priv);
 
-     //  let msg1_receiver =
-     //   PartyV::new(v_c_v, v_priv, &v_auth_priv, &v_auth_pub, v_kid);
+    // Choose a connection identifier and kid
+    let r_c_i = [0x2].to_vec();
 
-        /*
+    let r_kid = [0xA3].to_vec();
+
+    // create keying material
+
+    let mut r2 : StdRng = StdRng::from_entropy();
+    let r_priv = r2.gen::<[u8;32]>();
+
+    let msg1_receiver =
+       PartyV::new(r_c_i, r_priv, r_static_priv, r_static_pub, r_kid);
+
+        let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
+        Err(OwnError(b)) => {
+            let s = std::str::from_utf8(&b).unwrap().to_string();
+            panic!("{}", s)
+        },
+        Ok(val) => val,
+    };
+    
+
+    /*
     // Party V ----------------------------------------------------------------
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)
     // The ECDH private key used by V

@@ -52,11 +52,10 @@ impl PartyU<Msg1Sender> {
         APPEUI : Eui64,
         kid: Vec<u8>,
     ) -> PartyU<Msg1Sender> {
-        // From the secret bytes, create the DH secret
+
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
         let x_i = PublicKey::from(&secret);
-
         // Combine the authentication key pair for convenience
          PartyU(Msg1Sender {
             c_i,
@@ -320,15 +319,15 @@ impl PartyU<Msg3Sender> {
 
 /// The structure providing all operations for Party V.
 pub struct PartyV<S: PartyVState>(S);
-
 // Necessary stuff for session types
 pub trait PartyVState {}
 impl PartyVState for Msg1Receiver {}
 impl PartyVState for Msg2Sender {}
-impl PartyVState for Msg3Receiver {}
-impl PartyVState for Msg3Verifier {}
+//impl PartyVState for Msg3Receiver {}
+//impl PartyVState for Msg3Verifier {}
 
 /// Contains the state to receive the first message.
+/// 
 pub struct Msg1Receiver {
     c_r: Vec<u8>,
     secret: StaticSecret,
@@ -371,7 +370,7 @@ impl PartyV<Msg1Receiver> {
             kid,
         })
     }
-/*
+
     /// Processes the first message.
     pub fn handle_message_1(
         self,
@@ -382,39 +381,44 @@ impl PartyV<Msg1Receiver> {
         // Decode the first message
         let msg_1 = util::deserialize_message_1(&msg_1_seq)?;
         // Verify that the selected suite is supported
-        if msg_1.suite != 0 {
+        
+        if msg_1.suite != 1 {
             #[allow(clippy::try_err)]
             Err(Error::UnsupportedSuite)?;
         }
+
+        println!("hi");
         // Use U's public key to generate the ephemeral shared secret
         let mut x_u_bytes = [0; 32];
-        x_u_bytes.copy_from_slice(&msg_1.x_u[..32]);
+        x_u_bytes.copy_from_slice(&msg_1.x_i[..32]);
         let u_public = x25519_dalek::PublicKey::from(x_u_bytes);
         let shared_secret = self.0.secret.diffie_hellman(&u_public);
 
         Ok(PartyV(Msg2Sender {
-            c_v: self.0.c_v,
+            c_r: self.0.c_r,
             shared_secret,
-            x_v: self.0.x_v,
-            auth: self.0.auth,
+            x_r: self.0.x_r,
+            stat_priv: self.0.stat_priv,
+            stat_pub: self.0.stat_pub,
             kid: self.0.kid,
             msg_1_seq,
             msg_1,
         }))
-    }*/
+    }
 }
 
 /// Contains the state to build the second message.
 pub struct Msg2Sender {
-    c_v: Vec<u8>,
+    c_r: Vec<u8>,
     shared_secret: SharedSecret,
-    x_v: PublicKey,
-    auth: [u8; 64],
+    x_r: PublicKey,
+    stat_priv: EphemeralSecret,
+    stat_pub : PublicKey,
     kid: Vec<u8>,
     msg_1_seq: Vec<u8>,
     msg_1: Message1,
 }
-
+/*
 impl PartyV<Msg2Sender> {
     /// Returns the bytes of the second message.
     pub fn generate_message_2(
@@ -596,7 +600,7 @@ impl PartyV<Msg3Verifier> {
         Ok((master_secret, master_salt))
     }
 }
-/*
+
 #[cfg(test)]
 mod tests {
     use super::super::test_vectors::*;
