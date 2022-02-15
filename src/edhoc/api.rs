@@ -324,7 +324,7 @@ pub struct PartyV<S: PartyVState>(pub S);
 pub trait PartyVState {}
 impl PartyVState for Msg1Receiver {}
 impl PartyVState for Msg2Sender {}
-//impl PartyVState for Msg3Receiver {}
+impl PartyVState for Msg3Receiver {}
 //impl PartyVState for Msg3Verifier {}
 
 /// Contains the state to receive the first message.
@@ -420,7 +420,7 @@ pub struct Msg2Sender {
     msg_1_seq: Vec<u8>,
     msg_1: Message1,
 }
-/*
+
 impl PartyV<Msg2Sender> {
     /// Returns the bytes of the second message.
     pub fn generate_message_2(
@@ -442,8 +442,8 @@ impl PartyV<Msg2Sender> {
         let th_2 = util::compute_th_2(
             self.0.msg_1_seq,
             c_u.as_deref(),
-            self.0.x_v.as_bytes(),
-            &self.0.c_v,
+            self.0.x_r.as_bytes(),
+            &self.0.c_r,
         )?;
         // Sign it
         let sig = cose::sign(&id_cred_v, &th_2, &cred_v, &self.0.auth)?;
@@ -497,7 +497,7 @@ pub struct Msg3Receiver {
     msg_2: Message2,
     th_2: Vec<u8>,
 }
-
+/*
 impl PartyV<Msg3Receiver> {
     /// Returns the key ID of the other party's public authentication key.
     pub fn extract_peer_kid(
