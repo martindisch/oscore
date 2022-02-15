@@ -171,7 +171,7 @@ pub fn build_error_message(err_msg: &str) -> Vec<u8> {
     // (type, err_msg)
     let raw_msg = (-1, err_msg);
 
-    println!("{}", err_msg);
+
     // Try to serialize the message. If we fail for some reason, return a
     // valid, pregenerated error message saying as much.
     cbor::encode_sequence(raw_msg).unwrap_or_else(|_| {

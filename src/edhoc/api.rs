@@ -13,7 +13,7 @@ use super::{
 // Party U constructs ---------------------------------------------------------
 
 /// The structure providing all operations for Party U.
-pub struct PartyU<S: PartyUState>(S);
+pub struct PartyU<S: PartyUState>(pub S);
 
 // Necessary stuff for session types
 pub trait PartyUState {}
@@ -25,7 +25,7 @@ impl PartyUState for Msg2Receiver {}
 /// Contains the state to build the first message.
 pub struct Msg1Sender {
     c_i: Vec<u8>,
-    secret: StaticSecret,
+    pub secret: StaticSecret,
     pub x_i: PublicKey,
     static_secret: EphemeralSecret,
     static_public: PublicKey,
@@ -56,6 +56,7 @@ impl PartyU<Msg1Sender> {
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
         let x_i = PublicKey::from(&secret);
+
         // Combine the authentication key pair for convenience
          PartyU(Msg1Sender {
             c_i,
@@ -84,11 +85,11 @@ impl PartyU<Msg1Sender> {
         r#type: isize,
         suites: isize,
     ) -> Result<(Vec<u8>, PartyU<Msg2Receiver>), EarlyError> {
-        // Encode the necessary information into the first message
+        // Encode the necessary informati'on into the first message
         let msg_1 = Message1 {
             r#type,
             suite: suites,
-            x_i: self.0.x_i.as_bytes().to_vec(),
+            x_i: self.0.x_i.as_bytes().to_vec(), // sending PK as vector
             c_i: self.0.c_i,
         };
         // Get CBOR sequence for message
@@ -318,7 +319,7 @@ impl PartyU<Msg3Sender> {
 // Party V constructs ---------------------------------------------------------
 
 /// The structure providing all operations for Party V.
-pub struct PartyV<S: PartyVState>(S);
+pub struct PartyV<S: PartyVState>(pub S);
 // Necessary stuff for session types
 pub trait PartyVState {}
 impl PartyVState for Msg1Receiver {}
@@ -382,17 +383,18 @@ impl PartyV<Msg1Receiver> {
         let msg_1 = util::deserialize_message_1(&msg_1_seq)?;
         // Verify that the selected suite is supported
         
-        if msg_1.suite != 1 {
+        if msg_1.suite != 0 {
             #[allow(clippy::try_err)]
             Err(Error::UnsupportedSuite)?;
         }
-
-        println!("hi");
         // Use U's public key to generate the ephemeral shared secret
-        let mut x_u_bytes = [0; 32];
-        x_u_bytes.copy_from_slice(&msg_1.x_i[..32]);
-        let u_public = x25519_dalek::PublicKey::from(x_u_bytes);
+        let mut x_i_bytes = [0; 32];
+        x_i_bytes.copy_from_slice(&msg_1.x_i[..32]);
+        let u_public = x25519_dalek::PublicKey::from(x_i_bytes);
+
+        // generating shared secret at responder
         let shared_secret = self.0.secret.diffie_hellman(&u_public);
+        
 
         Ok(PartyV(Msg2Sender {
             c_r: self.0.c_r,
@@ -410,7 +412,7 @@ impl PartyV<Msg1Receiver> {
 /// Contains the state to build the second message.
 pub struct Msg2Sender {
     c_r: Vec<u8>,
-    shared_secret: SharedSecret,
+    pub shared_secret: SharedSecret,
     x_r: PublicKey,
     stat_priv: EphemeralSecret,
     stat_pub : PublicKey,

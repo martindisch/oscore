@@ -11,8 +11,8 @@ use eui::{Eui64};
 use rand_core::{RngCore, OsRng, CryptoRng,};
 
 
-const suite_I: isize = 3;
-const methodType_I : isize = 0;
+const suite_I: isize = 0;
+const methodType_I : isize = 3;
 
 fn main() {
 
@@ -84,7 +84,9 @@ fn main() {
         Ok(val) => val,
     };
     
+     println!("{:?}", msg2_sender.0.shared_secret.to_bytes());
 
+     
     /*
     // Party V ----------------------------------------------------------------
     // "Generate" an ECDH key pair (this is static, but MUST be ephemeral)
