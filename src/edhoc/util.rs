@@ -22,7 +22,7 @@ pub struct Message1 {
     pub r#type: isize,
     pub suite: isize,
     pub x_i: Vec<u8>,
-    pub c_i: Vec<u8>,
+    pub c_i: [u8;1],
 }
 
 /// Serializes EDHOC `message_1`.
@@ -46,12 +46,15 @@ pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     let raw_msg: (isize, isize, ByteBuf, ByteBuf) =
         cbor::decode_sequence(msg, 4, &mut temp)?;
 
+    
+    let connectionIdentifierAsVec = raw_msg.3.into_vec();
+    let firstElem = [connectionIdentifierAsVec[0]];
     // On success, just move the items into the "nice" message structure
     Ok(Message1 {
         r#type: raw_msg.0,
         suite: raw_msg.1,
         x_i: raw_msg.2.into_vec(),
-        c_i: raw_msg.3.into_vec(),
+        c_i: firstElem,
     })
 }
 

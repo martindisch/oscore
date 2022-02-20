@@ -24,7 +24,7 @@ impl PartyUState for Msg2Receiver {}
 
 /// Contains the state to build the first message.
 pub struct Msg1Sender {
-    c_i: Vec<u8>,
+    c_i: [u8;1],
     pub secret: StaticSecret,
     pub x_i: PublicKey,
     static_secret: EphemeralSecret,
@@ -45,7 +45,7 @@ impl PartyU<Msg1Sender> {
     /// * `kid` - The key ID by which the other party is able to retrieve
     ///   `stat_public`, which is called 'ID_cred_x in edho 14 .
     pub fn new(
-        c_i: Vec<u8>,
+        c_i: [u8;1],
         ecdh_secret: [u8; 32],
         stat_priv: EphemeralSecret,
         stat_pub: PublicKey,
@@ -330,7 +330,7 @@ impl PartyVState for Msg3Receiver {}
 /// Contains the state to receive the first message.
 /// 
 pub struct Msg1Receiver {
-    c_r: Vec<u8>,
+    c_r: [u8;1],
     secret: StaticSecret,
     x_r: PublicKey,
     stat_priv: EphemeralSecret,
@@ -349,7 +349,7 @@ impl PartyV<Msg1Receiver> {
     /// * `kid` - The key ID by which the other party is able to retrieve
     ///   `auth_public`.
     pub fn new(
-        c_r: Vec<u8>,
+        c_r: [u8;1],
         ecdh_secret: [u8; 32],
         stat_priv: EphemeralSecret,
         stat_pub: PublicKey,
@@ -411,7 +411,7 @@ impl PartyV<Msg1Receiver> {
 
 /// Contains the state to build the second message.
 pub struct Msg2Sender {
-    c_r: Vec<u8>,
+    c_r: [u8; 1],
     pub shared_secret: SharedSecret,
     x_r: PublicKey,
     stat_priv: EphemeralSecret,

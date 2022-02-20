@@ -35,7 +35,7 @@ fn main() {
     let i_priv = r.gen::<[u8;32]>();
     
     // Choose a connection identifier
-    let i_c_i = [0x1].to_vec();
+    let i_c_i = [0x1];
 
     let clone = i_c_i.clone();
 
@@ -64,7 +64,7 @@ fn main() {
     let r_static_pub = PublicKey::from(&r_static_priv);
 
     // Choose a connection identifier and kid
-    let r_c_i = [0x2].to_vec();
+    let r_c_i = [0x2];
 
     let r_kid = [0xA3].to_vec();
 
