@@ -37,6 +37,8 @@ fn main() {
     // Choose a connection identifier
     let i_c_i = [0x1].to_vec();
 
+    let clone = i_c_i.clone();
+
     let i_kid = [0xA2].to_vec();
     let msg1_sender =
         PartyU::new(i_c_i, i_priv, i_static_priv, i_static_pub,APPEUI, i_kid);
@@ -51,9 +53,7 @@ fn main() {
 
 
 
-
-    let msg_1_struct : Message1= util::deserialize_message_1(&msg1_bytes).unwrap();
-    println!("{:?}",msg_1_struct );
+  //  let msg_1_struct : Message1= util::deserialize_message_1(&msg1_bytes).unwrap();
 
     /*
     /// Party R handle message 1
@@ -75,16 +75,26 @@ fn main() {
 
     let msg1_receiver =
        PartyV::new(r_c_i, r_priv, r_static_priv, r_static_pub, r_kid);
+       
 
-        let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
+    let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
         Err(OwnError(b)) => {
             let s = std::str::from_utf8(&b).unwrap().to_string();
             panic!("{}", s)
         },
         Ok(val) => val,
     };
+
+    // generated shared secret for responder:
+    // println!("{:?}", msg2_sender.0.shared_secret.to_bytes());
+
+
+    /*
+    Responder gør sig klar til at lave message 2.
+    */
+
     
-     println!("{:?}", msg2_sender.0.shared_secret.to_bytes());
+
 
      
     /*

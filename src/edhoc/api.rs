@@ -402,7 +402,7 @@ impl PartyV<Msg1Receiver> {
             x_r: self.0.x_r,
             stat_priv: self.0.stat_priv,
             stat_pub: self.0.stat_pub,
-            kid: self.0.kid,
+            R_kid: self.0.kid,
             msg_1_seq,
             msg_1,
         }))
@@ -416,7 +416,7 @@ pub struct Msg2Sender {
     x_r: PublicKey,
     stat_priv: EphemeralSecret,
     stat_pub : PublicKey,
-    kid: Vec<u8>,
+    R_kid: Vec<u8>,
     msg_1_seq: Vec<u8>,
     msg_1: Message1,
 }
@@ -425,69 +425,26 @@ impl PartyV<Msg2Sender> {
     /// Returns the bytes of the second message.
     pub fn generate_message_2(
         self,
-    ) -> Result<(Vec<u8>, PartyV<Msg3Receiver>), OwnError> {
+    ) -> u8 {
+
         // Determine whether to include c_u in message_2 or not
-        let c_u =
+        let c_r =
             if self.0.msg_1.r#type % 4 == 1 || self.0.msg_1.r#type % 4 == 3 {
                 None
             } else {
                 Some(self.0.msg_1.c_i.clone())
             };
 
-        // Build the COSE header map identifying the public authentication key
-        let id_cred_v = cose::build_id_cred_x(&self.0.kid)?;
-        // Build the COSE_Key containing our public authentication key
-        let cred_v = cose::serialize_cose_key(&self.0.auth[32..])?;
-        // Compute TH_2
-        let th_2 = util::compute_th_2(
-            self.0.msg_1_seq,
-            c_u.as_deref(),
-            self.0.x_r.as_bytes(),
-            &self.0.c_r,
-        )?;
-        // Sign it
-        let sig = cose::sign(&id_cred_v, &th_2, &cred_v, &self.0.auth)?;
+            // first we need to build the id_cred_r from the kid
+            let id_cred_u = cose::build_id_cred_x(&self.0.R_kid); // put ? på senere
 
-        // Derive K_2
-        let k_2 = util::edhoc_key_derivation(
-            "10",
-            util::CCM_KEY_LEN * 8,
-            &th_2,
-            self.0.shared_secret.as_bytes(),
-        )?;
-        // Derive IV_2
-        let iv_2 = util::edhoc_key_derivation(
-            "IV-GENERATION",
-            util::CCM_NONCE_LEN * 8,
-            &th_2,
-            self.0.shared_secret.as_bytes(),
-        )?;
+            // We now build the cred_x using the public key, and kid value
+            let cred_v = cose::serialize_cred_x(&self.0.stat_pub.to_bytes(),&self.0.R_kid ); // put ? på senere 
+            println!("||| {:?} |||| ",c_r );
 
-        // Put together the plaintext for the encryption
-        let plaintext = util::build_plaintext(&self.0.kid, &sig)?;
-        // Compute the associated data
-        let ad = cose::build_ad(&th_2)?;
-        // Get the ciphertext
-        let ciphertext = util::aead_seal(&k_2, &iv_2, &plaintext, &ad)?;
 
-        // Produce message_2
-        let msg_2 = Message2 {
-            c_u,
-            x_v: self.0.x_v.as_bytes().to_vec(),
-            c_v: self.0.c_v,
-            ciphertext,
-        };
-        // Get CBOR sequence for message
-        let msg_2_seq = util::serialize_message_2(&msg_2)?;
-
-        Ok((
-            msg_2_seq,
-            PartyV(Msg3Receiver {
-                shared_secret: self.0.shared_secret,
-                msg_2,
-                th_2,
-            }),
-        ))
+        let n = 9;
+        n
     }
 }
 

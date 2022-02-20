@@ -147,6 +147,26 @@ pub fn serialize_cose_key(x: &[u8]) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+/// Returns the CBOR encoded `COSE_Key` for the given data.
+///
+/// This is specific to our use case where we only have Ed25519 public keys,
+/// which are Octet Key Pairs (OKP) in COSE and represented as a single
+/// x-coordinate.
+pub fn serialize_cred_x(x: &[u8], kid : &Vec<u8>) -> Result<Vec<u8>> { //
+    // Pack the data into a structure that nicely serializes almost into
+    // what we want to have as the actual bytes for the COSE_Key.
+    // ( kid key, kid value, COSE_key key, COSE_key value)
+    let raw_key = (1, kid, 2, Bytes::new(x));
+    // Get the byte representation of it
+    let mut bytes = cbor::encode(raw_key)?;
+    // This is a CBOR array, but we want a map
+    cbor::array_to_map(&mut bytes)?;
+
+    Ok(bytes)
+}
+
+
+
 /// Returns the COSE header map for the given `kid`.
 pub fn build_id_cred_x(kid: &[u8]) -> Result<Vec<u8>> {
     // Pack the data into a structure that nicely serializes almost into
