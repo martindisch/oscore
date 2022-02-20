@@ -11,8 +11,8 @@ use eui::{Eui64};
 use rand_core::{RngCore, OsRng, CryptoRng,};
 
 
-const suite_I: isize = 0;
-const methodType_I : isize = 3;
+const suite_I: isize = 3;
+const methodType_I : isize = 0;
 
 fn main() {
 
@@ -93,7 +93,7 @@ fn main() {
     Responder gør sig klar til at lave message 2.
     */
 
-    
+    let n = msg2_sender.generate_message_2();
 
 
      

@@ -383,7 +383,7 @@ impl PartyV<Msg1Receiver> {
         let msg_1 = util::deserialize_message_1(&msg_1_seq)?;
         // Verify that the selected suite is supported
         
-        if msg_1.suite != 0 {
+        if msg_1.suite != 3 {
             #[allow(clippy::try_err)]
             Err(Error::UnsupportedSuite)?;
         }
@@ -427,7 +427,9 @@ impl PartyV<Msg2Sender> {
         self,
     ) -> u8 {
 
-        // Determine whether to include c_u in message_2 or not
+        // Determine whether to include c_r in message_2 or not
+
+        println!("||| {:?} |||| ",self.0.msg_1.r#type );
         let c_r =
             if self.0.msg_1.r#type % 4 == 1 || self.0.msg_1.r#type % 4 == 3 {
                 None
