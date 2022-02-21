@@ -429,7 +429,6 @@ impl PartyV<Msg2Sender> {
 
         // Determine whether to include c_r in message_2 or not
 
-        println!("||| {:?} |||| ",self.0.msg_1.r#type );
         let c_r =
             if self.0.msg_1.r#type % 4 == 1 || self.0.msg_1.r#type % 4 == 3 {
                 None
@@ -442,7 +441,9 @@ impl PartyV<Msg2Sender> {
 
             // We now build the cred_x using the public key, and kid value
             let cred_v = cose::serialize_cred_x(&self.0.stat_pub.to_bytes(),&self.0.R_kid ); // put ? på senere 
-            println!("||| {:?} |||| ",c_r );
+
+
+         //   let PRK_2e = util::HKDFextract(None, self.0.shared_secret.as_bytes());
 
 
         let n = 9;

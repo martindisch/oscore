@@ -209,7 +209,19 @@ pub fn fail_on_error_message(msg: &[u8]) -> Result<()> {
         Err(_) => Ok(()),
     }
 }
+/*/// Simple prk generation function
 
+pub fn HKDFextract(
+    salt : Option<&[u8]>, 
+    secret: &[u8],
+) -> Result<(GenericArray<u8, 10::OutputSize>,Hkdf<Sha256>)> {
+
+    // This is the extract step, resulting in the pseudorandom key (PRK)
+    let (material, PRK) = Hkdf::extract(salt, secret);
+    // Expand the PRK to the desired length output keying material (OKM)
+
+    Ok((material,  PRK))
+}*/
 /// The `EDHOC-Key-Derivation` function.
 ///
 /// # Arguments
@@ -237,9 +249,50 @@ pub fn edhoc_key_derivation(
     let mut okm = vec![0; key_data_length / 8];
     h.expand(&info, &mut okm)?;
 
+
+
     Ok(okm)
 }
 
+
+///Function for creating MAC tags for messages
+///
+/// # Arguments
+/// * `PRK` - the prk used to create tag
+/// * `maclength`  mac length given by cipher suite
+/// * `th` transcript hash
+/// * `ID_cred_x` 
+/// * `cred_x` 
+/// 
+
+pub fn createMACWithExpand(
+    PRK: Hkdf<Sha256>,
+    maclength: usize,
+    th: &[u8],
+    macIdentifier : &str,
+    ID_cred_x : Vec<u8>,
+    cred_x : Vec<u8>,
+) -> Result<Vec<u8>> {
+
+    // For the Expand step, take the COSE_KDF_Context structure as info
+
+    let info = (
+        th,
+        macIdentifier,
+        ID_cred_x,
+        cred_x,
+    );
+
+   let infoEncoded =  cbor::encode(info)?;
+
+    // Expand the PRK to the desired length output keying material (OKM)
+    let mut okm = vec![0; maclength / 8];
+    PRK.expand(&infoEncoded, &mut okm)?;
+
+
+
+    Ok(okm)
+}
 /// The `EDHOC-Exporter` interface.
 ///
 /// # Arguments
@@ -430,7 +483,7 @@ mod tests {
             r#type: TYPE,
             suite: SUITE,
             x_i: X_U.to_vec(),
-            c_i: C_U.to_vec(),
+            c_i: C_U,
         };
 
         assert_eq!(
@@ -445,7 +498,7 @@ mod tests {
             r#type: TYPE,
             suite: SUITE,
             x_i: X_U.to_vec(),
-            c_i: C_U.to_vec(),
+            c_i: C_U,
         };
 
         assert_eq!(original, deserialize_message_1(&MESSAGE_1).unwrap());
