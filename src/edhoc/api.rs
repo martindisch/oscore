@@ -27,7 +27,7 @@ pub struct Msg1Sender {
     c_i: [u8;1],
     pub secret: StaticSecret,
     pub x_i: PublicKey,
-    static_secret: EphemeralSecret,
+    static_secret: StaticSecret,
     static_public: PublicKey,
     pub APPEUI : Eui64,
     kid: Vec<u8>,
@@ -47,7 +47,7 @@ impl PartyU<Msg1Sender> {
     pub fn new(
         c_i: [u8;1],
         ecdh_secret: [u8; 32],
-        stat_priv: EphemeralSecret,
+        stat_priv: StaticSecret,
         stat_pub: PublicKey,
         APPEUI : Eui64,
         kid: Vec<u8>,
@@ -393,12 +393,18 @@ impl PartyV<Msg1Receiver> {
         let u_public = x25519_dalek::PublicKey::from(x_i_bytes);
 
         // generating shared secret at responder
-        let shared_secret = self.0.secret.diffie_hellman(&u_public);
+        let shared_secret_0 = self.0.secret.diffie_hellman(&u_public);
+
+     //   let u_public_copy = u_public.clone();
+
+     //   let stat_priv_copy = self.0.stat_priv.clone();
+
+     //   let shared_secret_1 = self.0.stat_priv.diffie_hellman(&u_public_copy);
         
 
         Ok(PartyV(Msg2Sender {
             c_r: self.0.c_r,
-            shared_secret,
+            shared_secret_0: shared_secret_0,
             x_r: self.0.x_r,
             stat_priv: self.0.stat_priv,
             stat_pub: self.0.stat_pub,
@@ -410,9 +416,13 @@ impl PartyV<Msg1Receiver> {
 }
 
 /// Contains the state to build the second message.
+///  shared_secret_0 : the first shared secret created from ephemeral keys only
+/// shared_secret_1 : The second shared secret, created only from I's public ephemeral key, and R's private static key
+/// shared_secret_2 : the third shared secret, created only from I's public static key, and I's private ephemeral key
+/// (this is from the side of I)
 pub struct Msg2Sender {
     c_r: [u8; 1],
-    pub shared_secret: SharedSecret,
+    shared_secret_0: SharedSecret,
     x_r: PublicKey,
     stat_priv: EphemeralSecret,
     stat_pub : PublicKey,
@@ -425,7 +435,7 @@ impl PartyV<Msg2Sender> {
     /// Returns the bytes of the second message.
     pub fn generate_message_2(
         self,
-    ) -> Result<u8> {
+    ) -> Result<u8,OwnOrPeerError> {
 
         // Determine whether to include c_r in message_2 or not
 
@@ -444,7 +454,7 @@ impl PartyV<Msg2Sender> {
 
             let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.c_r, self.0.x_r);
          
-            let (PRK_2e,PRK_2e_hkdf) = util::derivePRK(None, self.0.shared_secret.as_bytes())?;
+            let (PRK_2e,PRK_2e_hkdf) = util::derivePRK(None, self.0.shared_secret_0.as_bytes())?;
 
       //      let PRK_3e2m = util::derivePRK(<salt: Option<&[u8]>>, ikm: &[u8])
  

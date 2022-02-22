@@ -25,7 +25,7 @@ fn main() {
     let APPEUI : Eui64 =  Eui64::from(85204980412143); // completely random mac adress (should be on device)
 
 
-    let i_static_priv : EphemeralSecret  = EphemeralSecret::new(OsRng);
+    let i_static_priv : StaticSecret  = StaticSecret::new(OsRng);
     let i_static_pub = PublicKey::from(&i_static_priv);
 
 

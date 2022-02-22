@@ -1,3 +1,4 @@
+
 use alloc::{collections::LinkedList, string::String, vec::Vec};
 use coap_lite::{CoapOption, Packet};
 use core::convert::TryFrom;
@@ -23,28 +24,6 @@ pub fn build_info(id: &[u8], r#type: &str, l: usize) -> Result<Vec<u8>> {
     let info = (Bytes::new(id), (), 10, r#type, l);
     // Return the CBOR encoded version of that
     Ok(cbor::encode(info)?)
-}
-
-pub fn edhoc_key_derivation(
-    algorithm_id: &str,
-    key_data_length: usize,
-    other: &[u8],
-    secret: &[u8],
-) -> Result<Vec<u8>> {
-    // We use the ECDH shared secret as input keying material
-    let ikm = secret;
-    // Since we have asymmetric authentication, the salt is 0
-    let salt = None;
-    // For the Expand step, take the COSE_KDF_Context structure as info
-    let info = cose::build_kdf_context(algorithm_id, key_data_length, other)?;
-
-    // This is the extract step, resulting in the pseudorandom key (PRK)
-    let h = Hkdf::<Sha256>::new(salt, ikm);
-    // Expand the PRK to the desired length output keying material (OKM)
-    let mut okm = vec![0; key_data_length / 8];
-    h.expand(&info, &mut okm)?;
-
-    Ok(okm)
 }
 
 /// Returns the derived key/IV for this `info` structure.
