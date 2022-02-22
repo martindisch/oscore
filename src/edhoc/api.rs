@@ -425,7 +425,7 @@ impl PartyV<Msg2Sender> {
     /// Returns the bytes of the second message.
     pub fn generate_message_2(
         self,
-    ) -> u8 {
+    ) -> Result<u8> {
 
         // Determine whether to include c_r in message_2 or not
 
@@ -442,12 +442,16 @@ impl PartyV<Msg2Sender> {
             // We now build the cred_x using the public key, and kid value
             let cred_v = cose::serialize_cred_x(&self.0.stat_pub.to_bytes(),&self.0.R_kid ); // put ? på senere 
 
+            let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.c_r, self.0.x_r);
+         
+            let (PRK_2e,PRK_2e_hkdf) = util::derivePRK(None, self.0.shared_secret.as_bytes())?;
 
-         //   let PRK_2e = util::HKDFextract(None, self.0.shared_secret.as_bytes());
+      //      let PRK_3e2m = util::derivePRK(<salt: Option<&[u8]>>, ikm: &[u8])
+ 
 
+            Ok(42)
 
-        let n = 9;
-        n
+        
     }
 }
 

@@ -1,8 +1,9 @@
 use oscore::edhoc::{
     error::{OwnError, OwnOrPeerError},
     PartyU, PartyV,
-    util::{self, deserialize_message_1, Message1},
+    util::{self, deserialize_message_1, Message1, serialize_message_1},
 };
+use std::convert::TryInto;
 use rand::{rngs::StdRng, Rng,SeedableRng};
 
 use x25519_dalek::{EphemeralSecret, PublicKey,StaticSecret};
@@ -76,7 +77,7 @@ fn main() {
     let msg1_receiver =
        PartyV::new(r_c_i, r_priv, r_static_priv, r_static_pub, r_kid);
        
-
+    let msg1Byt = msg1_bytes.clone();
     let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
         Err(OwnError(b)) => {
             let s = std::str::from_utf8(&b).unwrap().to_string();
@@ -88,14 +89,26 @@ fn main() {
     // generated shared secret for responder:
     // println!("{:?}", msg2_sender.0.shared_secret.to_bytes());
 
-
     /*
     Responder gør sig klar til at lave message 2.
     */
 
-    let n = msg2_sender.generate_message_2();
+  /*  let n = msg2_sender.generate_message_2();
+
+    println!("{:?}", hexstring(&msg1Byt));
 
 
+    let msgdeserial = util::deserialize_message_1(&msg1Byt);
+
+
+    let 
+
+    println!("{:?}", msgdeserial);
+*/
+    // XOR with common IV
+   // for (b1, b2) in nonce.iter_mut().zip(common_iv.iter()) {
+   //     *b1 ^= b2;
+   // }
      
     /*
     // Party V ----------------------------------------------------------------
