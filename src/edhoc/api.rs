@@ -333,7 +333,7 @@ pub struct Msg1Receiver {
     c_r: [u8;1],
     secret: StaticSecret,
     x_r: PublicKey,
-    stat_priv: EphemeralSecret,
+    stat_priv: StaticSecret,
     stat_pub: PublicKey,
     kid: Vec<u8>,
 }
@@ -351,7 +351,7 @@ impl PartyV<Msg1Receiver> {
     pub fn new(
         c_r: [u8;1],
         ecdh_secret: [u8; 32],
-        stat_priv: EphemeralSecret,
+        stat_priv: StaticSecret,
         stat_pub: PublicKey,
         kid: Vec<u8>,
     ) -> PartyV<Msg1Receiver> {
@@ -395,16 +395,16 @@ impl PartyV<Msg1Receiver> {
         // generating shared secret at responder
         let shared_secret_0 = self.0.secret.diffie_hellman(&u_public);
 
-     //   let u_public_copy = u_public.clone();
+        let u_public_copy = u_public.clone();
 
-     //   let stat_priv_copy = self.0.stat_priv.clone();
 
-     //   let shared_secret_1 = self.0.stat_priv.diffie_hellman(&u_public_copy);
+        let shared_secret_1 = self.0.stat_priv.diffie_hellman(&u_public_copy);
         
 
         Ok(PartyV(Msg2Sender {
             c_r: self.0.c_r,
-            shared_secret_0: shared_secret_0,
+            shared_secret_0,
+            shared_secret_1,
             x_r: self.0.x_r,
             stat_priv: self.0.stat_priv,
             stat_pub: self.0.stat_pub,
@@ -423,8 +423,9 @@ impl PartyV<Msg1Receiver> {
 pub struct Msg2Sender {
     c_r: [u8; 1],
     shared_secret_0: SharedSecret,
+    shared_secret_1: SharedSecret,
     x_r: PublicKey,
-    stat_priv: EphemeralSecret,
+    stat_priv: StaticSecret,
     stat_pub : PublicKey,
     R_kid: Vec<u8>,
     msg_1_seq: Vec<u8>,
@@ -456,7 +457,7 @@ impl PartyV<Msg2Sender> {
          
             let (PRK_2e,PRK_2e_hkdf) = util::derivePRK(None, self.0.shared_secret_0.as_bytes())?;
 
-      //      let PRK_3e2m = util::derivePRK(<salt: Option<&[u8]>>, ikm: &[u8])
+            let (_,PRK_3e2m_hkdf) = util::derivePRK(Some(&PRK_2e),self.0.shared_secret_1.as_bytes())?;
  
 
             Ok(42)

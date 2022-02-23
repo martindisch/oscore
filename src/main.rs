@@ -6,7 +6,7 @@ use oscore::edhoc::{
 use std::convert::TryInto;
 use rand::{rngs::StdRng, Rng,SeedableRng};
 
-use x25519_dalek::{EphemeralSecret, PublicKey,StaticSecret};
+use x25519_dalek::{PublicKey,StaticSecret};
 use eui::{Eui64};
 
 use rand_core::{RngCore, OsRng, CryptoRng,};
@@ -61,7 +61,7 @@ fn main() {
     */
 
     let DEVEUI : Eui64 =  Eui64::from(28945057161291); 
-    let r_static_priv : EphemeralSecret  = EphemeralSecret::new(OsRng);
+    let r_static_priv : StaticSecret  = StaticSecret::new(OsRng);
     let r_static_pub = PublicKey::from(&r_static_priv);
 
     // Choose a connection identifier and kid
