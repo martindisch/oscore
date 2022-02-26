@@ -288,24 +288,75 @@ pub fn createMACWithExpand(
 ) -> Result<Vec<u8>> {
 
     // For the Expand step, take the COSE_KDF_Context structure as info
-
     let info = (
         th,
         macIdentifier,
         ID_cred_x,
         cred_x,
     );
-
-   let infoEncoded =  cbor::encode(info)?;
+   let infoEncoded =  cbor::encode_sequence(info)?;
 
     // Expand the PRK to the desired length output keying material (OKM)
     let mut okm = vec![0; maclength / 8];
     PRK.expand(&infoEncoded, &mut okm)?;
-
-
-
     Ok(okm)
 }
+
+///Function for creating keystream2 tags for messages
+///
+/// # Arguments
+/// * `PRK` - the prk used to create tag
+/// * `maclength`  mac length given by cipher suite
+/// * `th` transcript hash (SAME th as in MAC_2)
+
+/// 
+
+pub fn createKEYSTREAMWithExpand(
+    PRK: Hkdf<Sha256>,
+    th: &[u8],
+    plainTextLength : usize,
+    keystream2Identifier : &str,
+) -> Result<Vec<u8>> {
+
+    // For the Expand step, take the COSE_KDF_Context structure as info
+    let info = (
+        th,
+        keystream2Identifier,
+        "",
+    );
+   let infoEncoded =  cbor::encode_sequence(info)?;
+
+    // Expand the PRK to the desired length output keying material (OKM)
+    let mut okm = vec![0; plainTextLength / 8];
+    PRK.expand(&infoEncoded, &mut okm)?;
+    Ok(okm)
+}
+
+pub fn tmpEncode(
+    one : Vec<u8>,
+    two : Vec<u8>,
+) -> Result<Vec<u8>> {
+
+    let info = (
+        one,
+        two
+    );
+
+   let infoEncoded =  cbor::encode_sequence(info)?;
+
+    Ok(infoEncoded)
+}
+
+// Xor function, for message 2
+fn xor(a : &Vec<u8>, b:&Vec<u8>) -> Vec<u8>{
+
+    let c =  a.iter()
+      .zip(b.iter())
+      .map(|(&x1, &x2)| x1 ^ x2)
+      .collect();
+ 
+      c
+ }
 /// The `EDHOC-Exporter` interface.
 ///
 /// # Arguments

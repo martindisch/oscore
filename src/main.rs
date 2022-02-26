@@ -77,7 +77,6 @@ fn main() {
     let msg1_receiver =
        PartyV::new(r_c_i, r_priv, r_static_priv, r_static_pub, r_kid);
        
-    let msg1Byt = msg1_bytes.clone();
     let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
         Err(OwnError(b)) => {
             let s = std::str::from_utf8(&b).unwrap().to_string();
@@ -93,8 +92,40 @@ fn main() {
     Responder gør sig klar til at lave message 2.
     */
 
-  /*  let n = msg2_sender.generate_message_2();
+    let n = match msg2_sender.generate_message_2() {
+        Err(OwnOrPeerError::PeerError(s)) => {
+            panic!("Received error msg: {}", s)
+        }
+        Err(OwnOrPeerError::OwnError(b)) => {
+            panic!("Send these bytes: {}", hexstring(&b))
+        } 
+        Ok(val) => val,
+    };
 
+    //println!("{:?}", n);
+
+    /*
+
+    let v1: Vec<u8> = vec![0, 1, 2, 3];
+    let v2: Vec<u8> = vec![5, 6, 7, 8];
+
+    let v3 = xor(&v1, &v2);
+
+    println!("v1: {:?}", v1);
+
+    println!("v2: {:?}", v2);
+
+    println!("v3: {:?}", v3);
+
+
+    let v1_ = xor(&v1,&v3);
+
+
+    println!("v1_prime: {:?}", v1_);*/
+
+
+  //  println!("{:?}", n)
+/*
     println!("{:?}", hexstring(&msg1Byt));
 
 

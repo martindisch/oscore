@@ -10,6 +10,9 @@ use super::{
     util::{self, Message1, Message2, Message3},
 };
 
+
+// Constants given by cipher suite 3:
+static HASH_OUTPUT_LENGTH : usize = 32;
 // Party U constructs ---------------------------------------------------------
 
 /// The structure providing all operations for Party U.
@@ -361,7 +364,6 @@ impl PartyV<Msg1Receiver> {
         let x_r = PublicKey::from(&secret);
         // Combine the authentication key pair for convenience
 
-
         PartyV(Msg1Receiver {
             c_r,
             secret,
@@ -397,7 +399,7 @@ impl PartyV<Msg1Receiver> {
 
         let u_public_copy = u_public.clone();
 
-
+        
         let shared_secret_1 = self.0.stat_priv.diffie_hellman(&u_public_copy);
         
 
@@ -436,7 +438,7 @@ impl PartyV<Msg2Sender> {
     /// Returns the bytes of the second message.
     pub fn generate_message_2(
         self,
-    ) -> Result<u8,OwnOrPeerError> {
+    ) -> Result<Vec<u8>,OwnOrPeerError> {
 
         // Determine whether to include c_r in message_2 or not
 
@@ -448,19 +450,40 @@ impl PartyV<Msg2Sender> {
             };
 
             // first we need to build the id_cred_r from the kid
-            let id_cred_u = cose::build_id_cred_x(&self.0.R_kid); // put ? på senere
+            let id_cred_r = cose::build_id_cred_x(&self.0.R_kid)?;
 
             // We now build the cred_x using the public key, and kid value
-            let cred_v = cose::serialize_cred_x(&self.0.stat_pub.to_bytes(),&self.0.R_kid ); // put ? på senere 
+            let cred_r = cose::serialize_cred_x(&self.0.stat_pub.to_bytes(),&self.0.R_kid )?; 
 
-            let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.c_r, self.0.x_r);
+            let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.c_r, self.0.x_r)?;
+
          
             let (PRK_2e,PRK_2e_hkdf) = util::derivePRK(None, self.0.shared_secret_0.as_bytes())?;
 
             let (_,PRK_3e2m_hkdf) = util::derivePRK(Some(&PRK_2e),self.0.shared_secret_1.as_bytes())?;
- 
 
-            Ok(42)
+            let MAC_2 = util::createMACWithExpand(PRK_3e2m_hkdf, 64, &th_2, "MAC_2", id_cred_r, cred_r)?;
+
+
+            
+            let plaintextEncoded = util::build_plaintext(&self.0.R_kid, &MAC_2)?;
+            println!("{}", plaintextEncoded.len());
+
+
+
+            let KEYSTREAM_2 = util::createKEYSTREAMWithExpand(PRK_2e_hkdf, &th_2, plaintextEncoded.len(), "KEYSTREAM_2")?;
+            println!("keystream: {}", KEYSTREAM_2.len());
+
+            println!("MAC_2 {},", MAC_2.len());
+
+
+
+
+            let retvec = [1,2,3].to_vec();
+            //MAC_2 = EDHOC-KDF( PRK_3e2m, TH_2, "MAC_2", << ID_CRED_R,  CRED_R, ? EAD_2 >>, mac_length_2 ).
+
+
+            Ok(retvec)
 
         
     }
