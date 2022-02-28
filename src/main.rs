@@ -36,7 +36,7 @@ fn main() {
     let i_priv = r.gen::<[u8;32]>();
     
     // Choose a connection identifier
-    let i_c_i = [0x1];
+    let i_c_i = [0x1].to_vec();
 
     let clone = i_c_i.clone();
 
@@ -60,12 +60,11 @@ fn main() {
     /// Party R handle message 1
     */
 
-    let DEVEUI : Eui64 =  Eui64::from(28945057161291); 
     let r_static_priv : StaticSecret  = StaticSecret::new(OsRng);
     let r_static_pub = PublicKey::from(&r_static_priv);
 
     // Choose a connection identifier and kid
-    let r_c_i = [0x2];
+    let r_c_i = [0x2].to_vec();
 
     let r_kid = [0xA3].to_vec();
 
@@ -75,7 +74,7 @@ fn main() {
     let r_priv = r2.gen::<[u8;32]>();
 
     let msg1_receiver =
-       PartyV::new(r_c_i, r_priv, r_static_priv, r_static_pub, r_kid);
+       PartyV::new(r_priv, r_static_priv, r_static_pub, r_kid);
        
     let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
         Err(OwnError(b)) => {
@@ -92,7 +91,7 @@ fn main() {
     Responder gør sig klar til at lave message 2.
     */
 
-    let n = match msg2_sender.generate_message_2() {
+    let (msg2_bytes,msg3_receiver) = match msg2_sender.generate_message_2() {
         Err(OwnOrPeerError::PeerError(s)) => {
             panic!("Received error msg: {}", s)
         }
@@ -102,8 +101,31 @@ fn main() {
         Ok(val) => val,
     };
 
-    //println!("{:?}", n);
 
+    /*///////////////////////////////////////////////////////////////////////////
+    /// Initiator receiving and handling message 2
+    ///////////////////////////////////////////////////////////////////// */
+    
+    let  msg_verifier = msg2_receiver.unpack_message_2_return_kid(msg2_bytes);
+
+
+
+/*
+        // Party U ----------------------------------------------------------------
+        let (_v_kid, msg2_verifier) =
+        // This is a case where we could receive an error message (just abort
+        // then), or cause an error (send it to the peer)
+        match msg2_receiver.extract_peer_kid(msg2_bytes) {
+            Err(OwnOrPeerError::PeerError(s)) => {
+                panic!("Received error msg: {}", s)
+            }
+            Err(OwnOrPeerError::OwnError(b)) => {
+                panic!("Send these bytes: {}", hexstring(&b))
+            }
+            Ok(val) => val,
+        };
+    //println!("{:?}", n);
+*/
     /*
 
     let v1: Vec<u8> = vec![0, 1, 2, 3];

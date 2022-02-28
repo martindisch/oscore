@@ -17,6 +17,10 @@ use crate::cbor;
 
 pub const CCM_KEY_LEN: usize = 16;
 pub const CCM_NONCE_LEN: usize = 13;
+pub const HASHFUNC_OUTPUT_LEN_BYTES: usize = 32;
+pub const CONNECTION_IDENTIFIER_LENGTH: usize = 1;
+
+
 
 /// EDHOC `message_1`.
 #[derive(Debug, PartialEq)]
@@ -24,7 +28,7 @@ pub struct Message1 {
     pub r#type: isize,
     pub suite: isize,
     pub x_i: Vec<u8>,
-    pub c_i: [u8;1],
+    pub c_i: Vec<u8>,
 }
 
 /// Serializes EDHOC `message_1`.
@@ -48,77 +52,60 @@ pub fn deserialize_message_1(msg: &[u8]) -> Result<Message1> {
     let raw_msg: (isize, isize, ByteBuf, ByteBuf) =
         cbor::decode_sequence(msg, 4, &mut temp)?;
 
-    
-    let connectionIdentifierAsVec = raw_msg.3.into_vec();
-    let firstElem = [connectionIdentifierAsVec[0]];
+
     // On success, just move the items into the "nice" message structure
     Ok(Message1 {
         r#type: raw_msg.0,
         suite: raw_msg.1,
         x_i: raw_msg.2.into_vec(),
-        c_i: firstElem,
+        c_i: raw_msg.3.into_vec(),
     })
 }
 
 /// EDHOC `message_2`.
+/// * 
 #[derive(Debug, PartialEq)]
 pub struct Message2 {
-    pub c_u: Option<Vec<u8>>,
-    pub x_v: Vec<u8>,
-    pub c_v: Vec<u8>,
-    pub ciphertext: Vec<u8>,
+    pub ephemeral_key_r: Vec<u8>,
+    pub c_r: Vec<u8>,
+    pub ciphertext2: Vec<u8>,
 }
 
 /// Serializes EDHOC `message_2`.
 pub fn serialize_message_2(msg: &Message2) -> Result<Vec<u8>> {
-    Ok(if msg.c_u.is_some() {
-        // Case where we have U's connection identifier
-        cbor::encode_sequence((
-            Bytes::new(msg.c_u.as_ref().unwrap()),
-            Bytes::new(&msg.x_v),
-            Bytes::new(&msg.c_v),
-            Bytes::new(&msg.ciphertext),
-        ))
-    } else {
-        // Case where we don't
-        cbor::encode_sequence((
-            Bytes::new(&msg.x_v),
-            Bytes::new(&msg.c_v),
-            Bytes::new(&msg.ciphertext),
-        ))
-    }?)
+    let c_r_and_ciphertext = [msg.c_r.clone(), msg.ciphertext2.clone()].concat();
+
+
+  //  println!("tuple before encode {:?}", c_r_and_ciphertext);
+let encoded = (
+    Bytes::new(&msg.ephemeral_key_r),
+    Bytes::new(&c_r_and_ciphertext),
+
+);
+    Ok(cbor::encode_sequence(encoded)?)
 }
 
 /// Deserializes EDHOC `message_2`.
-pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> {
+pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> { //Result<Message2>
     let mut temp = Vec::with_capacity(msg.len() + 1);
     // First, attempt to decode the variant without c_u
-    if let Ok((x_v, c_v, ciphertext)) =
-        cbor::decode_sequence::<(ByteBuf, ByteBuf, ByteBuf)>(msg, 3, &mut temp)
-    {
-        // If that worked, return the Message2 variant without it
-        Ok(Message2 {
-            c_u: None,
-            x_v: x_v.into_vec(),
-            c_v: c_v.into_vec(),
-            ciphertext: ciphertext.into_vec(),
+    let (x_r, c_r_and_cipher2) = cbor::decode_sequence::<(ByteBuf, ByteBuf)>(msg, 2, &mut temp)?;
+
+            
+
+    let ConnectionID = &c_r_and_cipher2[..CONNECTION_IDENTIFIER_LENGTH];
+    let Ciphertext2 = &c_r_and_cipher2[CONNECTION_IDENTIFIER_LENGTH..];
+
+    Ok(Message2 {
+        ephemeral_key_r: x_r.to_vec(),
+        c_r: ConnectionID.to_vec(),
+        ciphertext2: Ciphertext2.to_vec(),
         })
-    } else {
-        // Otherwise, try the one with c_u
-        temp.clear();
-        let (c_u, x_v, c_v, ciphertext) =
-            cbor::decode_sequence::<(ByteBuf, ByteBuf, ByteBuf, ByteBuf)>(
-                msg, 4, &mut temp,
-            )?;
-        // If we managed this time, we can fill up the whole struct
-        Ok(Message2 {
-            c_u: Some(c_u.into_vec()),
-            x_v: x_v.into_vec(),
-            c_v: c_v.into_vec(),
-            ciphertext: ciphertext.into_vec(),
-        })
-    }
+
+
+    
 }
+
 // derivePRK
 //deriving PRK's from some salt, and a key (shared key)
 pub fn derivePRK(
@@ -183,6 +170,8 @@ pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
 
 /// Returns the bytes of an EDHOC error message with the given text.
 pub fn build_error_message(err_msg: &str) -> Vec<u8> {
+
+    println!("ERROR HANDLING");
     // Build a tuple for the sequence of items
     // (type, err_msg)
     let raw_msg = (-1, err_msg);
@@ -297,7 +286,8 @@ pub fn createMACWithExpand(
    let infoEncoded =  cbor::encode_sequence(info)?;
 
     // Expand the PRK to the desired length output keying material (OKM)
-    let mut okm = vec![0; maclength / 8];
+    let mut okm = vec![0; maclength];
+
     PRK.expand(&infoEncoded, &mut okm)?;
     Ok(okm)
 }
@@ -327,7 +317,27 @@ pub fn createKEYSTREAMWithExpand(
    let infoEncoded =  cbor::encode_sequence(info)?;
 
     // Expand the PRK to the desired length output keying material (OKM)
-    let mut okm = vec![0; plainTextLength / 8];
+    let mut okm = vec![0; plainTextLength];
+    PRK.expand(&infoEncoded, &mut okm)?;
+    Ok(okm)
+}
+pub fn tryexpand(
+    PRK: Hkdf<Sha256>,
+    info1: &[u8],
+    plainTextLength : usize,
+) -> Result<Vec<u8>> {
+
+    // For the Expand step, take the COSE_KDF_Context structure as info
+    let info = (
+        info1,
+        "",
+    );
+   let infoEncoded =  cbor::encode_sequence(info)?;
+
+    // Expand the PRK to the desired length output keying material (OKM)
+    let mut okm = vec![0; plainTextLength];
+    println!("okm {:?}", okm.len());
+
     PRK.expand(&infoEncoded, &mut okm)?;
     Ok(okm)
 }
@@ -348,14 +358,18 @@ pub fn tmpEncode(
 }
 
 // Xor function, for message 2
-fn xor(a : &Vec<u8>, b:&Vec<u8>) -> Vec<u8>{
+pub fn xor(a : &Vec<u8>, b:&Vec<u8>) -> Result<Vec<u8>>{
+
+    if (a.len() != b.len()){
+        panic!("Attempting to xor vec's of unequal length");
+    }
 
     let c =  a.iter()
       .zip(b.iter())
       .map(|(&x1, &x2)| x1 ^ x2)
       .collect();
  
-      c
+      Ok(c)
  }
 /// The `EDHOC-Exporter` interface.
 ///
@@ -540,7 +554,7 @@ mod tests {
             r#type: TYPE,
             suite: SUITE,
             x_i: X_U.to_vec(),
-            c_i: C_U,
+            c_i: C_U.to_vec(),
         };
 
         assert_eq!(
@@ -555,13 +569,17 @@ mod tests {
             r#type: TYPE,
             suite: SUITE,
             x_i: X_U.to_vec(),
-            c_i: C_U,
+            c_i: C_U.to_vec(),
         };
 
         assert_eq!(original, deserialize_message_1(&MESSAGE_1).unwrap());
     }
 
+
+    /* TODO look at these tests
     #[test]
+
+
     fn returns_err() {
         let bytes = vec![0xFF];
         assert!(deserialize_message_1(&bytes).is_err());
@@ -602,6 +620,7 @@ mod tests {
         original.c_u = Some(C_U.to_vec());
         assert_eq!(original, deserialize_message_2(&MESSAGE_2_LONG).unwrap());
     }
+    */
 
     #[test]
     fn serialize_3() {

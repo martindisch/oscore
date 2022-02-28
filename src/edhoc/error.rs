@@ -148,6 +148,8 @@ pub enum Error {
     Aead,
     /// Wraps a received EDHOC error message.
     Edhoc(String),
+    // wraps the error that the mac does not have the correct value
+    BadMaC,
 }
 
 impl From<cbor::CborError> for Error {
