@@ -106,7 +106,23 @@ fn main() {
     /// Initiator receiving and handling message 2
     ///////////////////////////////////////////////////////////////////// */
     
-    let  msg_verifier = msg2_receiver.unpack_message_2_return_kid(msg2_bytes);
+
+    // unpacking message, and getting kid, which we in a realworld situation would use to lookup our key
+    let  (r_kid ,msg2_verifier) = match msg2_receiver.unpack_message_2_return_kid(msg2_bytes){
+        Err(OwnOrPeerError::PeerError(s)) => {
+            panic!("Error during  {}", s)
+        }
+        Err(OwnOrPeerError::OwnError(b)) => {
+            panic!("Send these bytes: {}", hexstring(&b))
+        } 
+        Ok(val) => val,
+    };
+
+
+
+    let msg3_sender = match msg2_verifier.verify_message_2(&r_static_pub.as_bytes().to_vec()) {
+        Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
+        Ok(val) => val, };
 
 
 

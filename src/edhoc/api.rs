@@ -101,7 +101,7 @@ impl PartyU<Msg1Sender> {
         Ok((
             msg_1_bytes,
             PartyU(Msg2Receiver {
-                ecdh_secret: self.0.secret,
+                i_ecdh_ephemeralsecret: self.0.secret,
                 stat_priv: self.0.static_secret,
                 stat_pub: self.0.static_public,
       //          auth: self.0.auth,
@@ -114,7 +114,7 @@ impl PartyU<Msg1Sender> {
 }
 /// Contains the state to receive the second message.
 pub struct Msg2Receiver {
-    ecdh_secret: StaticSecret,
+    i_ecdh_ephemeralsecret: StaticSecret,
     stat_priv : StaticSecret,
     stat_pub : PublicKey,
     kid: Vec<u8>,
@@ -145,17 +145,16 @@ impl PartyU<Msg2Receiver> {
         let r_public = x25519_dalek::PublicKey::from(x_r_bytes);
 
 
-       let shared_secret_0 = self.0.ecdh_secret.diffie_hellman(&r_public);
-
-     //  let shared_secret_1 = self.0.ecdh_secret.diffie_hellman(r_static_pub)
-
+       let shared_secret_0 = self.0.i_ecdh_ephemeralsecret.diffie_hellman(&r_public);
+ 
+        let msg_1_seq_cpy = self.0.msg_1_seq.clone();
 
         // reconstructing Keystream2
         let th_2 = util::compute_th_2(self.0.msg_1_seq, &msg_2.c_r, r_public)?;
         let (prk_2e,prk_2e_hkdf) = util::derivePRK(None, shared_secret_0.as_bytes())?;
 
 
-
+        let prk_2e_hkdf_cpy = prk_2e_hkdf.clone();
         let Keystream2 = util::createKEYSTREAMWithExpand(prk_2e_hkdf, &th_2, msg_2.ciphertext2.len(), "KEYSTREAM_2")?;
         
         let decryptedlaintext = util::xor(&Keystream2, &msg_2.ciphertext2)?;
@@ -164,19 +163,20 @@ impl PartyU<Msg2Receiver> {
 
         let r_kid_cpy = r_kid.clone();
 
-        let vec1 = vec![1, 2, 3];
-
         Ok((
             r_kid,
             PartyU(Msg2Verifier {
+                i_ecdh_ephemeralsecret : self.0.i_ecdh_ephemeralsecret,
                 shared_secret_0 : shared_secret_0,
                 stat_priv: self.0.stat_priv,
                 stat_pub : self.0.stat_pub,
                 kid: self.0.kid,
                 msg_1: self.0.msg_1,
+                msg_1_seq: msg_1_seq_cpy,
                 msg_2: msg_2,
                 mac_2: mac_2,
                 prk_2e: prk_2e,
+                prk_2e_hkdf: prk_2e_hkdf_cpy,
                 th_2: th_2,
                 r_kid :r_kid_cpy,
 
@@ -192,14 +192,17 @@ impl PartyU<Msg2Receiver> {
 
 /// Contains the state to verify the second message.
 pub struct Msg2Verifier {
+    i_ecdh_ephemeralsecret : StaticSecret,
     shared_secret_0: SharedSecret,
     stat_priv : StaticSecret,
     stat_pub : PublicKey,
     kid: Vec<u8>,
     msg_1: Message1,
+    msg_1_seq : Vec<u8>,
     msg_2: Message2,
     mac_2: Vec<u8>,
     prk_2e : Vec<u8>,
+    prk_2e_hkdf : hkdf::Hkdf<sha2::Sha256>,
     th_2: Vec<u8>,
     r_kid: Vec<u8>,
 }
@@ -210,8 +213,41 @@ impl PartyU<Msg2Verifier> {
     /// public authentication key.
     pub fn verify_message_2(
         self,
-        v_public: &[u8],
+        i_public_static_bytes: &[u8],
     ) -> Result<u8, OwnError> {
+
+        // build cred_x and id_cred_x (for responder party)
+        let id_cred_r = cose::build_id_cred_x(&self.0.r_kid)?;
+        let cred_r = cose::serialize_cred_x(i_public_static_bytes,&self.0.r_kid )?; 
+
+
+        // Generating static public key of initiator
+        let mut statkey_i_bytes = [0; 32];
+        statkey_i_bytes.copy_from_slice(&i_public_static_bytes[..32]);
+        let i_public_static = x25519_dalek::PublicKey::from(statkey_i_bytes);
+
+        // Generating shared secret 1 for initiator
+
+        let shared_secret_1 = self.0.i_ecdh_ephemeralsecret.diffie_hellman(&i_public_static);
+
+        // generating prk_3
+
+        let (_,PRK_3e2m_hkdf) = util::derivePRK(Some(&self.0.prk_2e),shared_secret_1.as_bytes())?;
+
+        // transscript hash:
+    //    let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.c_r, self.0.x_r)?;
+
+
+      //  let MAC_2 = util::createMACWithExpand(PRK_3e2m_hkdf, util::HASHFUNC_OUTPUT_LEN_BYTES, &th_2, "MAC_2", id_cred_r, cred_r)?;
+
+        
+
+
+
+
+
+      //  println!("{:?}",id_cred_r );
+
         // Build the COSE header map identifying the public authentication key
         // of V
      /*   let id_cred_v = cose::build_id_cred_x(&self.0.v_kid)?;
@@ -401,14 +437,9 @@ impl PartyV<Msg1Receiver> {
         // generating shared secret at responder
         let shared_secret_0 = self.0.secret.diffie_hellman(&i_public);
 
-     //   println!("initator shared 0: {:?}", shared_secret_0.as_bytes());
-
-
         let r_public_copy = i_public.clone();
-
         
         let shared_secret_1 = self.0.stat_priv.diffie_hellman(&r_public_copy);
-
 
         Ok(PartyV(Msg2Sender {
             c_r: c_r,
@@ -459,14 +490,13 @@ impl PartyV<Msg2Sender> {
             let (prk_2e,PRK_2e_hkdf) = util::derivePRK(None, self.0.shared_secret_0.as_bytes())?;
 
             let (_,PRK_3e2m_hkdf) = util::derivePRK(Some(&prk_2e),self.0.shared_secret_1.as_bytes())?;
+
+
             let MAC_2 = util::createMACWithExpand(PRK_3e2m_hkdf, util::HASHFUNC_OUTPUT_LEN_BYTES, &th_2, "MAC_2", id_cred_r, cred_r)?;
 
-            println!("kid {:?}", self.0.R_kid);
-            println!("mac2 {:?}", MAC_2);
-            
+
             let PlaintextEncoded = util::build_plaintext(&self.0.R_kid, &MAC_2)?;
 
-            println!("plaintext {:?}", PlaintextEncoded);
 
             let Keystream2 = util::createKEYSTREAMWithExpand(PRK_2e_hkdf, &th_2, PlaintextEncoded.len(), "KEYSTREAM_2")?;
 

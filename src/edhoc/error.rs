@@ -13,6 +13,7 @@ static ERR_ED25519: &str = "Error processing signature";
 static ERR_HKDF: &str = "Error using HKDF";
 static ERR_AEAD: &str = "Error using AEAD";
 static ERR_SUITE: &str = "Cipher suite unsupported";
+static ERR_BADMAC: &str = "Error processing MAC field";
 
 /// The error type for operations that process a message from the other party
 /// and may fail if the message is an error message (in which case the protocol
@@ -49,6 +50,9 @@ impl From<Error> for OwnOrPeerError {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_AEAD))
             }
             Error::Edhoc(msg) => OwnOrPeerError::PeerError(msg),
+            Error::BadMac => {
+                OwnOrPeerError::OwnError(util::build_error_message(ERR_BADMAC))
+            }
         }
     }
 }
@@ -89,6 +93,7 @@ impl From<Error> for OwnError {
             Error::Ed25519(_) => {
                 OwnError(util::build_error_message(ERR_ED25519))
             }
+            Error::BadMac => OwnError(util::build_error_message(ERR_BADMAC)),
             Error::Hkdf(_) => OwnError(util::build_error_message(ERR_HKDF)),
             Error::Aead => OwnError(util::build_error_message(ERR_AEAD)),
             _ => unreachable!(),
@@ -136,6 +141,8 @@ impl error::Error for EarlyError {
 /// various libraries.
 #[derive(Debug, PartialEq)]
 pub enum Error {
+
+    BadMac,
     /// Using an unsupported cipher suite.
     UnsupportedSuite,
     /// Wraps errors from the `cbor` module.
@@ -149,7 +156,6 @@ pub enum Error {
     /// Wraps a received EDHOC error message.
     Edhoc(String),
     // wraps the error that the mac does not have the correct value
-    BadMaC,
 }
 
 impl From<cbor::CborError> for Error {
@@ -180,6 +186,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::UnsupportedSuite => write!(f, "Cipher suite unsupported"),
+            Error::BadMac => write!(f, "Mac tag was wrong"),
             Error::Cbor(e) => e.fmt(f),
             Error::Ed25519(e) => e.fmt(f),
             Error::Hkdf(e) => e.fmt(f),
