@@ -171,7 +171,6 @@ pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
 /// Returns the bytes of an EDHOC error message with the given text.
 pub fn build_error_message(err_msg: &str) -> Vec<u8> {
 
-    println!("ERROR HANDLING");
     // Build a tuple for the sequence of items
     // (type, err_msg)
     let raw_msg = (-1, err_msg);

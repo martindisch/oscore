@@ -155,7 +155,9 @@ impl PartyU<Msg2Receiver> {
 
 
         let prk_2e_hkdf_cpy = prk_2e_hkdf.clone();
-        let Keystream2 = util::createKEYSTREAMWithExpand(prk_2e_hkdf, &th_2, msg_2.ciphertext2.len(), "KEYSTREAM_2")?;
+        let Keystream2 = util::createKEYSTREAMWithExpand(prk_2e_hkdf, 
+                                                        &th_2, msg_2.ciphertext2.len(), 
+                                                        "KEYSTREAM_2")?;
         
         let decryptedlaintext = util::xor(&Keystream2, &msg_2.ciphertext2)?;
 
@@ -179,8 +181,9 @@ impl PartyU<Msg2Receiver> {
                 prk_2e_hkdf: prk_2e_hkdf_cpy,
                 th_2: th_2,
                 r_kid :r_kid_cpy,
+                r_ephemeral_PK: r_public,
 
-    
+            
 
             }),
         ))
@@ -205,6 +208,7 @@ pub struct Msg2Verifier {
     prk_2e_hkdf : hkdf::Hkdf<sha2::Sha256>,
     th_2: Vec<u8>,
     r_kid: Vec<u8>,
+    r_ephemeral_PK : PublicKey,
 }
 
 
@@ -235,13 +239,18 @@ impl PartyU<Msg2Verifier> {
         let (_,PRK_3e2m_hkdf) = util::derivePRK(Some(&self.0.prk_2e),shared_secret_1.as_bytes())?;
 
         // transscript hash:
-    //    let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.c_r, self.0.x_r)?;
+        let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.msg_2.c_r, self.0.r_ephemeral_PK)?;
 
 
-      //  let MAC_2 = util::createMACWithExpand(PRK_3e2m_hkdf, util::HASHFUNC_OUTPUT_LEN_BYTES, &th_2, "MAC_2", id_cred_r, cred_r)?;
 
+        let MAC_2 = util::createMACWithExpand(PRK_3e2m_hkdf, util::HASHFUNC_OUTPUT_LEN_BYTES, &th_2, "MAC_2_", id_cred_r, cred_r)?;
+
+        println!("fhdifhdif");
+        if (self.0.mac_2 != MAC_2){
+            Err(Error::BadMac)?;
+        }
         
-
+        println!("mac2 {:?}", MAC_2);
 
 
 
@@ -424,7 +433,6 @@ impl PartyV<Msg1Receiver> {
         // Verify that the selected suite is supported
         
         if msg_1.suite != 3 {
-            #[allow(clippy::try_err)]
             Err(Error::UnsupportedSuite)?;
         }
         let c_r = msg_1.c_i.iter().map(|x| x + 1).collect();
@@ -486,7 +494,7 @@ impl PartyV<Msg2Sender> {
 
             let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.c_r, self.0.x_r)?;
 
-         
+            
             let (prk_2e,PRK_2e_hkdf) = util::derivePRK(None, self.0.shared_secret_0.as_bytes())?;
 
             let (_,PRK_3e2m_hkdf) = util::derivePRK(Some(&prk_2e),self.0.shared_secret_1.as_bytes())?;
@@ -494,7 +502,7 @@ impl PartyV<Msg2Sender> {
 
             let MAC_2 = util::createMACWithExpand(PRK_3e2m_hkdf, util::HASHFUNC_OUTPUT_LEN_BYTES, &th_2, "MAC_2", id_cred_r, cred_r)?;
 
-
+            println!("mac2 {:?}", MAC_2);
             let PlaintextEncoded = util::build_plaintext(&self.0.R_kid, &MAC_2)?;
 
 

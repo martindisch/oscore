@@ -24,7 +24,6 @@ fn main() {
 
     let APPEUI : Eui64 =  Eui64::from(85204980412143); // completely random mac adress (should be on device)
 
-
     let i_static_priv : StaticSecret  = StaticSecret::new(OsRng);
     let i_static_pub = PublicKey::from(&i_static_priv);
 
@@ -121,7 +120,7 @@ fn main() {
 
 
     let msg3_sender = match msg2_verifier.verify_message_2(&r_static_pub.as_bytes().to_vec()) {
-        Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
+        Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
         Ok(val) => val, };
 
 
