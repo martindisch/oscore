@@ -15,9 +15,11 @@ use std::convert::TryInto;
 use super::{cose, error::Error, Result};
 use crate::cbor;
 
-pub const CCM_KEY_LEN: usize = 16;
-pub const CCM_NONCE_LEN: usize = 13;
-pub const HASHFUNC_OUTPUT_LEN_BYTES: usize = 32;
+
+// length in bits
+pub const CCM_KEY_LEN: usize = 128;
+pub const CCM_NONCE_LEN: usize = 104;
+pub const HASHFUNC_OUTPUT_LEN_BITS: usize = 256;
 pub const CONNECTION_IDENTIFIER_LENGTH: usize = 1;
 
 
@@ -114,63 +116,39 @@ pub fn derivePRK(
 ) -> Result<(Vec<u8>,Hkdf<Sha256>)> {
     // This is the extract step, resulting in the pseudorandom key (PRK)
     let (prk, hkdf) = Hkdf::<Sha256>::extract(salt, ikm);
-    let prkArr = prk.to_vec();
+    let prk_array = prk.to_vec();
 
-    Ok((prkArr,hkdf))
+    Ok((prk_array,hkdf))
 }
 /// EDHOC `message_3`.
 #[derive(Debug, PartialEq)]
 pub struct Message3 {
-    pub c_v: Option<Vec<u8>>,
     pub ciphertext: Vec<u8>,
 }
 
 /// Serializes EDHOC `message_3`.
 pub fn serialize_message_3(msg: &Message3) -> Result<Vec<u8>> {
-    Ok(if msg.c_v.is_some() {
-        // Case where we have V's connection identifier
-        cbor::encode_sequence((
-            Bytes::new(msg.c_v.as_ref().unwrap()),
-            Bytes::new(&msg.ciphertext),
-        ))
-    } else {
-        // Case where we don't.
-        // Since we have a single element (the ciphertext), there's no need
-        // to use the sequence encoder.
-        cbor::encode(Bytes::new(&msg.ciphertext))
-    }?)
+    Ok(cbor::encode(Bytes::new(&msg.ciphertext))?)
+
 }
 
 /// Deserializes EDHOC `message_3`.
 pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
-    let mut temp = Vec::with_capacity(msg.len() + 1);
-    // First, attempt to decode the variant with c_v
-    if let Ok((c_v, ciphertext)) =
-        cbor::decode_sequence::<(ByteBuf, ByteBuf)>(msg, 2, &mut temp)
-    {
-        // If that worked, return the Message3 variant with it
-        Ok(Message3 {
-            c_v: Some(c_v.into_vec()),
-            ciphertext: ciphertext.into_vec(),
+
+
+    let cpy = msg.to_vec();
+    let ciphertext = cbor::decode::<ByteBuf>(&cpy)?;
+    // If we managed this time, we can return the struct without c_v
+    Ok(Message3 {
+        ciphertext: ciphertext.into_vec(),
         })
-    } else {
-        // Otherwise, try the one without it.
-        // Again, we have a single element and therefore don't use the sequence
-        // decoder. The regular encoder needs to operate on a mutable
-        // reference, so clone the contents.
-        let cpy = msg.to_vec();
-        let ciphertext = cbor::decode::<ByteBuf>(&cpy)?;
-        // If we managed this time, we can return the struct without c_v
-        Ok(Message3 {
-            c_v: None,
-            ciphertext: ciphertext.into_vec(),
-        })
-    }
+    
 }
 
 /// Returns the bytes of an EDHOC error message with the given text.
 pub fn build_error_message(err_msg: &str) -> Vec<u8> {
 
+    println!("ERROR HANDLING");
     // Build a tuple for the sequence of items
     // (type, err_msg)
     let raw_msg = (-1, err_msg);
@@ -285,39 +263,48 @@ pub fn createMACWithExpand(
    let infoEncoded =  cbor::encode_sequence(info)?;
 
     // Expand the PRK to the desired length output keying material (OKM)
-    let mut okm = vec![0; maclength];
+    let mut okm = vec![0; maclength /8];
 
     PRK.expand(&infoEncoded, &mut okm)?;
     Ok(okm)
 }
 
-///Function for creating keystream2 tags for messages
+
+/// Generic acces to hkdf-expand Function for creating keystream2 and k_3 and IV_3
 ///
 /// # Arguments
 /// * `PRK` - the prk used to create tag
 /// * `maclength`  mac length given by cipher suite
 /// * `th` transcript hash (SAME th as in MAC_2)
-
+/// * identifier: string that identifies the value
 /// 
 
-pub fn createKEYSTREAMWithExpand(
+pub fn genericExpand(
     PRK: Hkdf<Sha256>,
     th: &[u8],
-    plainTextLength : usize,
-    keystream2Identifier : &str,
+    length : usize,
+    identifier : &str,
+    is_bits :bool, 
 ) -> Result<Vec<u8>> {
 
     // For the Expand step, take the COSE_KDF_Context structure as info
     let info = (
         th,
-        keystream2Identifier,
+        identifier,
         "",
     );
-   let infoEncoded =  cbor::encode_sequence(info)?;
+   let info_encoded =  cbor::encode_sequence(info)?;
 
     // Expand the PRK to the desired length output keying material (OKM)
-    let mut okm = vec![0; plainTextLength];
-    PRK.expand(&infoEncoded, &mut okm)?;
+
+    let k = if is_bits {
+        8
+      } else {
+        1
+      };
+    let mut okm = vec![0; length / k] ;
+    
+    PRK.expand(&info_encoded, &mut okm)?;
     Ok(okm)
 }
 pub fn tryexpand(
@@ -334,7 +321,7 @@ pub fn tryexpand(
    let infoEncoded =  cbor::encode_sequence(info)?;
 
     // Expand the PRK to the desired length output keying material (OKM)
-    let mut okm = vec![0; plainTextLength];
+    let mut okm = vec![0; plainTextLength / 8];
     println!("okm {:?}", okm.len());
 
     PRK.expand(&infoEncoded, &mut okm)?;
@@ -383,7 +370,7 @@ pub fn edhoc_exporter(
     th_4: &[u8],
     secret: &[u8],
 ) -> Result<Vec<u8>> {
-    edhoc_key_derivation(label, 8 * length, th_4, secret)
+    edhoc_key_derivation(label,  length, th_4, secret)
 }
 
 /// Calculates the transcript hash of the second message.
@@ -411,17 +398,12 @@ pub fn compute_th_2(
 pub fn compute_th_3(
     th_2: &[u8],
     ciphertext_2: &[u8],
-    c_v: Option<&[u8]>,
 ) -> Result<Vec<u8>> {
     // Create a sequence of CBOR items
     let mut seq = Vec::new();
     // Add the items that are always present
     seq.extend(th_2);
     seq.extend(cbor::encode(Bytes::new(ciphertext_2))?);
-    if let Some(c_v) = c_v {
-        // Case where we have c_v
-        seq.extend(cbor::encode(Bytes::new(c_v))?);
-    }
 
     // Return the hash of this
     h(&seq)

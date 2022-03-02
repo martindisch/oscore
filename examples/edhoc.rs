@@ -1,6 +1,6 @@
 use oscore::edhoc::{
     error::{OwnError, OwnOrPeerError},
-    PartyU, PartyV,
+    PartyU, V,
 };
 
 fn main() {

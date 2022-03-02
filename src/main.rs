@@ -102,7 +102,7 @@ fn main() {
 
 
     /*///////////////////////////////////////////////////////////////////////////
-    /// Initiator receiving and handling message 2
+    /// Initiator receiving and handling message 2, and then generating message 3, and the rck/sck
     ///////////////////////////////////////////////////////////////////// */
     
 
@@ -123,10 +123,18 @@ fn main() {
         Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
         Ok(val) => val, };
 
+        let (msg3_bytes, sck, rck) =
+        match msg3_sender.generate_message_3() {
+            Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
+            Ok(val) => val,
+        };
 
+    /*///////////////////////////////////////////////////////////////////////////
+    /// Initiator receiving and handling message 3, and generating message4 and sck rck
+    ///////////////////////////////////////////////////////////////////// */
+    
 
 /*
-        // Party U ----------------------------------------------------------------
         let (_v_kid, msg2_verifier) =
         // This is a case where we could receive an error message (just abort
         // then), or cause an error (send it to the peer)
