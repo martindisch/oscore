@@ -1,6 +1,6 @@
 use oscore::edhoc::{
     error::{OwnError, OwnOrPeerError},
-    PartyU, V,
+    PartyI, V,
 };
 
 fn main() {
@@ -34,7 +34,7 @@ fn main() {
     ];
     let u_kid = [0xA2].to_vec();
     let msg1_sender =
-        PartyU::new(u_c_u, u_priv, &u_auth_priv, &u_auth_pub, u_kid);
+        PartyI::new(u_c_u, u_priv, &u_auth_priv, &u_auth_pub, u_kid);
     // type = 1 would be the case in CoAP, where party U can correlate
     // message_1 and message_2 with the token
     let (msg1_bytes, msg2_receiver) =
@@ -62,7 +62,7 @@ fn main() {
     let v_kid = [0xA3].to_vec();
 
     let msg1_receiver =
-        PartyV::new(v_c_v, v_priv, &v_auth_priv, &v_auth_pub, v_kid);
+        PartyR::new(v_c_v, v_priv, &v_auth_priv, &v_auth_pub, v_kid);
     // This is a case where we could cause an error, which we'd send to the
     // other party
     let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {

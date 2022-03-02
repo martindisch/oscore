@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
-use oscore::edhoc::{PartyU, PartyV};
+use oscore::edhoc::{PartyI, PartyR};
 use oscore::oscore::SecurityContext;
 
 // EDHOC ----------------------------------------------------------------------
@@ -74,7 +74,7 @@ fn edhoc_detailed(c: &mut Criterion) {
 
     group.bench_function("party_u_build", |b| {
         b.iter(|| {
-            PartyU::new(
+            PartyI::new(
                 C_U.to_vec(),
                 EPH_U_PRIVATE,
                 &AUTH_U_PRIVATE,
@@ -87,7 +87,7 @@ fn edhoc_detailed(c: &mut Criterion) {
     group.bench_function("msg1_generate", |b| {
         b.iter_batched(
             || {
-                PartyU::new(
+                PartyI::new(
                     C_U.to_vec(),
                     EPH_U_PRIVATE,
                     &AUTH_U_PRIVATE,
@@ -102,7 +102,7 @@ fn edhoc_detailed(c: &mut Criterion) {
 
     group.bench_function("party_v_build", |b| {
         b.iter(|| {
-            PartyV::new(
+            PartyR::new(
                 C_V.to_vec(),
                 EPH_V_PRIVATE,
                 &AUTH_V_PRIVATE,
@@ -117,7 +117,7 @@ fn edhoc_detailed(c: &mut Criterion) {
             || {
                 (
                     MESSAGE_1.to_vec(),
-                    PartyV::new(
+                    PartyR::new(
                         C_V.to_vec(),
                         EPH_V_PRIVATE,
                         &AUTH_V_PRIVATE,
@@ -136,7 +136,7 @@ fn edhoc_detailed(c: &mut Criterion) {
     group.bench_function("msg2_generate", |b| {
         b.iter_batched(
             || {
-                let msg1_receiver = PartyV::new(
+                let msg1_receiver = PartyR::new(
                     C_V.to_vec(),
                     EPH_V_PRIVATE,
                     &AUTH_V_PRIVATE,
@@ -153,7 +153,7 @@ fn edhoc_detailed(c: &mut Criterion) {
     group.bench_function("msg2_extract", |b| {
         b.iter_batched(
             || {
-                let msg1_sender = PartyU::new(
+                let msg1_sender = PartyI::new(
                     C_U.to_vec(),
                     EPH_U_PRIVATE,
                     &AUTH_U_PRIVATE,
@@ -174,7 +174,7 @@ fn edhoc_detailed(c: &mut Criterion) {
     group.bench_function("msg2_verify", |b| {
         b.iter_batched(
             || {
-                let msg1_sender = PartyU::new(
+                let msg1_sender = PartyI::new(
                     C_U.to_vec(),
                     EPH_U_PRIVATE,
                     &AUTH_U_PRIVATE,
@@ -198,7 +198,7 @@ fn edhoc_detailed(c: &mut Criterion) {
     group.bench_function("msg3_generate", |b| {
         b.iter_batched(
             || {
-                let msg1_sender = PartyU::new(
+                let msg1_sender = PartyI::new(
                     C_U.to_vec(),
                     EPH_U_PRIVATE,
                     &AUTH_U_PRIVATE,
@@ -220,7 +220,7 @@ fn edhoc_detailed(c: &mut Criterion) {
     group.bench_function("msg3_extract", |b| {
         b.iter_batched(
             || {
-                let msg1_receiver = PartyV::new(
+                let msg1_receiver = PartyR::new(
                     C_V.to_vec(),
                     EPH_V_PRIVATE,
                     &AUTH_V_PRIVATE,
@@ -244,7 +244,7 @@ fn edhoc_detailed(c: &mut Criterion) {
     group.bench_function("msg3_verify", |b| {
         b.iter_batched(
             || {
-                let msg1_receiver = PartyV::new(
+                let msg1_receiver = PartyR::new(
                     C_V.to_vec(),
                     EPH_V_PRIVATE,
                     &AUTH_V_PRIVATE,
@@ -278,7 +278,7 @@ fn edhoc_full(c: &mut Criterion) {
         b.iter_batched(
             || MESSAGE_2.to_vec(),
             |msg2_bytes| {
-                let msg1_sender = PartyU::new(
+                let msg1_sender = PartyI::new(
                     C_U.to_vec(),
                     EPH_U_PRIVATE,
                     &AUTH_U_PRIVATE,
@@ -303,7 +303,7 @@ fn edhoc_full(c: &mut Criterion) {
         b.iter_batched(
             || (MESSAGE_1.to_vec(), MESSAGE_3.to_vec()),
             |(msg1_bytes, msg3_bytes)| {
-                let msg1_receiver = PartyV::new(
+                let msg1_receiver = PartyR::new(
                     C_V.to_vec(),
                     EPH_V_PRIVATE,
                     &AUTH_V_PRIVATE,

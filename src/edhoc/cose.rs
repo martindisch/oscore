@@ -99,14 +99,14 @@ pub fn build_kdf_context(
     let mut kdf_arr = match algorithm_id.parse::<usize>() {
         // It's a number
         Ok(algorithm_id) => {
-            // (AlgorithmID, PartyUInfo, PartyRInfo, SuppPubInfo)
+            // (AlgorithmID, PartyIInfo, PartyRInfo, SuppPubInfo)
             let cose_kdf_context =
                 (algorithm_id, [(); 3], [(); 3], supp_pub_info);
             cbor::encode(cose_kdf_context)?
         }
         // It's a string
         Err(_) => {
-            // (AlgorithmID, PartyUInfo, PartyRInfo, SuppPubInfo)
+            // (AlgorithmID, PartyIInfo, PartyRInfo, SuppPubInfo)
             let cose_kdf_context =
                 (algorithm_id, [(); 3], [(); 3], supp_pub_info);
             cbor::encode(cose_kdf_context)?

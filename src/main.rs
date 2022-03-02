@@ -1,6 +1,6 @@
 use oscore::edhoc::{
     error::{OwnError, OwnOrPeerError},
-    PartyU, PartyV,
+    PartyI, PartyR,
     util::{self, deserialize_message_1, Message1, serialize_message_1},
 };
 use std::convert::TryInto;
@@ -41,7 +41,7 @@ fn main() {
 
     let i_kid = [0xA2].to_vec();
     let msg1_sender =
-        PartyU::new(i_c_i, i_priv, i_static_priv, i_static_pub,APPEUI, i_kid);
+        PartyI::new(i_c_i, i_priv, i_static_priv, i_static_pub,APPEUI, i_kid);
 
     // type = 1 would be the case in CoAP, where party U can correlate
     // message_1 and message_2 with the token
@@ -73,7 +73,7 @@ fn main() {
     let r_priv = r2.gen::<[u8;32]>();
 
     let msg1_receiver =
-       PartyV::new(r_priv, r_static_priv, r_static_pub, r_kid);
+       PartyR::new(r_priv, r_static_priv, r_static_pub, r_kid);
        
     let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
         Err(OwnError(b)) => {
@@ -207,7 +207,7 @@ fn main() {
     let v_kid = [0xA3].to_vec();
 
     let msg1_receiver =
-        PartyV::new(v_c_v, v_priv, &v_auth_priv, &v_auth_pub, v_kid);
+        PartyR::new(v_c_v, v_priv, &v_auth_priv, &v_auth_pub, v_kid);
     // This is a case where we could cause an error, which we'd send to the
     // other party
 

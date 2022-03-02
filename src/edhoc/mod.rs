@@ -7,9 +7,9 @@
 //! are consumed by an action and return the next state struct together with
 //! optional data.
 //!
-//! Party U starts by initializing a `PartyU` and using it to generate the
+//! Party U starts by initializing a `PartyI` and using it to generate the
 //! first message and its next state. Party V does the opposite,
-//! initializing a `PartyV` and using this to handle the message and get
+//! initializing a `PartyR` and using this to handle the message and get
 //! its next state, etc.
 //!
 //! # Errors
@@ -79,4 +79,4 @@ pub mod error;
 /// The result type for internal operations of the `edhoc` module.
 type Result<T> = core::result::Result<T, error::Error>;
 
-pub use api::{PartyU,PartyV};
+pub use api::{PartyI,PartyR};

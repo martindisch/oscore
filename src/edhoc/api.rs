@@ -16,14 +16,14 @@ static HASH_OUTPUT_LENGTH : usize = 32;
 // Party U constructs ---------------------------------------------------------
 
 /// The structure providing all operations for Party U.
-pub struct PartyU<S: PartyUState>(pub S);
+pub struct PartyI<S: PartyIState>(pub S);
 
 // Necessary stuff for session types
-pub trait PartyUState {}
-impl PartyUState for Msg1Sender {}
-impl PartyUState for Msg2Receiver {}
-impl PartyUState for Msg2Verifier {}
-impl PartyUState for Msg3Sender {}
+pub trait PartyIState {}
+impl PartyIState for Msg1Sender {}
+impl PartyIState for Msg2Receiver {}
+impl PartyIState for Msg2Verifier {}
+impl PartyIState for Msg3Sender {}
 pub struct Msg1Sender {
     c_i: Vec<u8>,
     pub secret: StaticSecret,
@@ -34,8 +34,8 @@ pub struct Msg1Sender {
     kid: Vec<u8>,
 }
 
-impl PartyU<Msg1Sender> {
-    /// Creates a new `PartyU` ready to build the first message.
+impl PartyI<Msg1Sender> {
+    /// Creates a new `PartyI` ready to build the first message.
     ///
     /// # Arguments
     /// * `c_u` - The chosen connection identifier.
@@ -52,14 +52,14 @@ impl PartyU<Msg1Sender> {
         stat_pub: PublicKey,
         APPEUI : Eui64,
         kid: Vec<u8>,
-    ) -> PartyU<Msg1Sender> {
+    ) -> PartyI<Msg1Sender> {
 
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
         let x_i = PublicKey::from(&secret);
 
         // Combine the authentication key pair for convenience
-         PartyU(Msg1Sender {
+         PartyI(Msg1Sender {
             c_i,
             secret,
             x_i,
@@ -85,7 +85,7 @@ impl PartyU<Msg1Sender> {
         self,
         r#type: isize,
         suites: isize,
-    ) -> Result<(Vec<u8>, PartyU<Msg2Receiver>), EarlyError> {
+    ) -> Result<(Vec<u8>, PartyI<Msg2Receiver>), EarlyError> {
         // Encode the necessary informati'on into the first message
         let msg_1 = Message1 {
             r#type,
@@ -100,7 +100,7 @@ impl PartyU<Msg1Sender> {
 
         Ok((
             msg_1_bytes,
-            PartyU(Msg2Receiver {
+            PartyI(Msg2Receiver {
                 i_ecdh_ephemeralsecret: self.0.secret,
                 stat_priv: self.0.static_secret,
                 stat_pub: self.0.static_public,
@@ -124,12 +124,12 @@ pub struct Msg2Receiver {
 
 
 
-impl PartyU<Msg2Receiver> {
+impl PartyI<Msg2Receiver> {
     /// Returns the key ID of the other party's public authentication key, and the state for verification 
     pub fn unpack_message_2_return_kid(
         self,
         msg_2: Vec<u8>,
-    ) -> Result<(Vec<u8>, PartyU<Msg2Verifier>), OwnOrPeerError> {
+    ) -> Result<(Vec<u8>, PartyI<Msg2Verifier>), OwnOrPeerError> {
 
         util::fail_on_error_message(&msg_2)?;
 
@@ -167,7 +167,7 @@ impl PartyU<Msg2Receiver> {
 
         Ok((
             r_kid,
-            PartyU(Msg2Verifier {
+            PartyI(Msg2Verifier {
                 i_ecdh_ephemeralsecret : self.0.i_ecdh_ephemeralsecret,
                 shared_secret_0 : shared_secret_0,
                 stat_priv: self.0.stat_priv,
@@ -212,13 +212,13 @@ pub struct Msg2Verifier {
 }
 
 
-impl PartyU<Msg2Verifier> {
+impl PartyI<Msg2Verifier> {
     /// Checks the authenticity of the second message with the other party's
     /// public authentication key.
     pub fn verify_message_2(
         self,
         r_public_static_bytes: &[u8],
-    ) -> Result<PartyU<Msg3Sender>, OwnError> {
+    ) -> Result<PartyI<Msg3Sender>, OwnError> {
 
         // build cred_x and id_cred_x (for responder party)
         let id_cred_r = cose::build_id_cred_x(&self.0.r_kid)?;
@@ -255,7 +255,7 @@ impl PartyU<Msg2Verifier> {
             Err(Error::BadMac)?;
         }
 
-        Ok(PartyU(Msg3Sender{
+        Ok(PartyI(Msg3Sender{
             i_stat_priv : self.0.stat_priv,
             i_stat_pub : self.0.stat_pub,
             i_ecdh_ephemeralsecret : self.0.i_ecdh_ephemeralsecret,
@@ -285,7 +285,7 @@ pub struct Msg3Sender {
 
 }
 
-impl PartyU<Msg3Sender> {
+impl PartyI<Msg3Sender> {
     /// Returns the bytes of the third message, as well as the OSCORE master
     /// secret and the OSCORE master salt.
     #[allow(clippy::type_complexity)]
@@ -377,13 +377,13 @@ impl PartyU<Msg3Sender> {
 // Party V constructs ---------------------------------------------------------
 
 /// The structure providing all operations for Party V.
-pub struct PartyV<S: PartyVState>(pub S);
+pub struct PartyR<S: PartyRState>(pub S);
 // Necessary stuff for session types
-pub trait PartyVState {}
-impl PartyVState for Msg1Receiver {}
-impl PartyVState for Msg2Sender {}
-impl PartyVState for Msg3Receiver {}
-//impl PartyVState for Msg3Verifier {}
+pub trait PartyRState {}
+impl PartyRState for Msg1Receiver {}
+impl PartyRState for Msg2Sender {}
+impl PartyRState for Msg3Receiver {}
+//impl PartyRState for Msg3Verifier {}
 
 /// Contains the state to receive the first message.
 /// 
@@ -395,8 +395,8 @@ pub struct Msg1Receiver {
     kid: Vec<u8>,
 }
 
-impl PartyV<Msg1Receiver> {
-    /// Creates a new `PartyV` ready to receive the first message.
+impl PartyR<Msg1Receiver> {
+    /// Creates a new `PartyR` ready to receive the first message.
     ///
     /// # Arguments
     /// * `c_v` - The chosen connection identifier.
@@ -410,14 +410,14 @@ impl PartyV<Msg1Receiver> {
         stat_priv: StaticSecret,
         stat_pub: PublicKey,
         kid: Vec<u8>,
-    ) -> PartyV<Msg1Receiver> {
+    ) -> PartyR<Msg1Receiver> {
         // From the secret bytes, create the DH secret
         let secret = StaticSecret::from(ecdh_secret);
         // and from that build the corresponding public key
         let x_r = PublicKey::from(&secret);
         // Combine the authentication key pair for convenience
 
-        PartyV(Msg1Receiver {
+        PartyR(Msg1Receiver {
             secret,
             x_r,
             stat_priv,
@@ -430,7 +430,7 @@ impl PartyV<Msg1Receiver> {
     pub fn handle_message_1(
         self,
         msg_1: Vec<u8>,
-    ) -> Result<PartyV<Msg2Sender>, OwnError> {
+    ) -> Result<PartyR<Msg2Sender>, OwnError> {
         // Alias this
         let msg_1_seq = msg_1;
         // Decode the first message
@@ -455,7 +455,7 @@ impl PartyV<Msg1Receiver> {
         
         let shared_secret_1 = self.0.stat_priv.diffie_hellman(&i_public_copy);
 
-        Ok(PartyV(Msg2Sender {
+        Ok(PartyR(Msg2Sender {
             c_r: c_r,
             shared_secret_0,
             shared_secret_1,
@@ -486,11 +486,11 @@ pub struct Msg2Sender {
     msg_1: Message1,
 }
 
-impl PartyV<Msg2Sender> {
+impl PartyR<Msg2Sender> {
     /// Returns the bytes of the second message.
     pub fn generate_message_2(
         self,
-    ) -> Result<(Vec<u8>, PartyV<Msg3Receiver>),OwnOrPeerError> {
+    ) -> Result<(Vec<u8>, PartyR<Msg3Receiver>),OwnOrPeerError> {
 
             // first we need to build the id_cred_r from the kid
             let id_cred_r = cose::build_id_cred_x(&self.0.R_kid)?;
@@ -531,7 +531,7 @@ impl PartyV<Msg2Sender> {
             let msg2_seq = util::serialize_message_2(&msg2)?;
 
             Ok((msg2_seq, 
-                PartyV(Msg3Receiver {
+                PartyR(Msg3Receiver {
                     shared_secret_0: self.0.shared_secret_0,
                     shared_secret_1: self.0.shared_secret_1,
                     msg_2 : msg2,
@@ -551,12 +551,12 @@ pub struct Msg3Receiver {
     th_2: Vec<u8>,
 }
 /*
-impl PartyV<Msg3Receiver> {
+impl PartyR<Msg3Receiver> {
     /// Returns the key ID of the other party's public authentication key.
     pub fn extract_peer_kid(
         self,
         msg_3: Vec<u8>,
-    ) -> Result<(Vec<u8>, PartyV<Msg3Verifier>), OwnOrPeerError> {
+    ) -> Result<(Vec<u8>, PartyR<Msg3Verifier>), OwnOrPeerError> {
         // Check if we don't have an error message
         util::fail_on_error_message(&msg_3)?;
         // Decode the third message
@@ -595,7 +595,7 @@ impl PartyV<Msg3Receiver> {
 
         Ok((
             u_kid_cpy,
-            PartyV(Msg3Verifier {
+            PartyR(Msg3Verifier {
                 shared_secret: self.0.shared_secret,
                 msg_3,
                 th_3,
@@ -615,7 +615,7 @@ pub struct Msg3Verifier {
     u_sig: Vec<u8>,
 }
 
-impl PartyV<Msg3Verifier> {
+impl PartyR<Msg3Verifier> {
     /// Checks the authenticity of the third message with the other party's
     /// public authentication key and returns the OSCORE master secret and the
     /// OSCORE master Salt.
@@ -674,7 +674,7 @@ mod tests {
 
     fn successful_run(r#type: isize) -> (Vec<u8>, Vec<u8>) {
         // Party U ------------------------------------------------------------
-        let msg1_sender = PartyU::new(
+        let msg1_sender = PartyI::new(
             C_U.to_vec(),
             EPH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -686,7 +686,7 @@ mod tests {
 
         // Party V ------------------------------------------------------------
 
-        let msg1_receiver = PartyV::new(
+        let msg1_receiver = PartyR::new(
             C_V.to_vec(),
             EPH_V_PRIVATE,
             &AUTH_V_PRIVATE,
@@ -735,7 +735,7 @@ mod tests {
     fn unsupported_suite() {
         // Party U ------------------------------------------------------------
 
-        let msg1_sender = PartyU::new(
+        let msg1_sender = PartyI::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -747,7 +747,7 @@ mod tests {
         msg1_bytes[1] = 0x01;
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver = PartyV::new(
+        let msg1_receiver = PartyR::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
             &AUTH_V_PRIVATE,
@@ -763,7 +763,7 @@ mod tests {
     #[test]
     fn only_own_error() {
         // Party U ------------------------------------------------------------
-        let msg1_sender = PartyU::new(
+        let msg1_sender = PartyI::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -775,7 +775,7 @@ mod tests {
         msg1_bytes[0] = 0xFF;
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver = PartyV::new(
+        let msg1_receiver = PartyR::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
             &AUTH_V_PRIVATE,
@@ -791,7 +791,7 @@ mod tests {
     #[test]
     fn both_own_error() {
         // Party U ------------------------------------------------------------
-        let msg1_sender = PartyU::new(
+        let msg1_sender = PartyI::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -802,7 +802,7 @@ mod tests {
             msg1_sender.generate_message_1(1).unwrap();
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver = PartyV::new(
+        let msg1_receiver = PartyR::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
             &AUTH_V_PRIVATE,
@@ -824,7 +824,7 @@ mod tests {
     #[test]
     fn both_peer_error() {
         // Party U ------------------------------------------------------------
-        let msg1_sender = PartyU::new(
+        let msg1_sender = PartyI::new(
             C_U.to_vec(),
             AUTH_U_PRIVATE,
             &AUTH_U_PRIVATE,
@@ -837,7 +837,7 @@ mod tests {
         msg1_bytes[0] = 0xFF;
 
         // Party V ------------------------------------------------------------
-        let msg1_receiver = PartyV::new(
+        let msg1_receiver = PartyR::new(
             C_V.to_vec(),
             AUTH_V_PRIVATE,
             &AUTH_V_PRIVATE,
