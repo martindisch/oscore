@@ -7,7 +7,7 @@ use eui::{Eui64};
 use super::{
     cose,
     error::{EarlyError, Error, OwnError, OwnOrPeerError},
-    util::{self, Message1, Message2, Message3},
+    util::{self, Message1, Message2, Message3,Message4},
 };
 
 
@@ -24,6 +24,10 @@ impl PartyIState for Msg1Sender {}
 impl PartyIState for Msg2Receiver {}
 impl PartyIState for Msg2Verifier {}
 impl PartyIState for Msg3Sender {}
+impl PartyIState for Msg4ReceiveVerify {}
+
+
+
 pub struct Msg1Sender {
     c_i: Vec<u8>,
     pub secret: StaticSecret,
@@ -226,9 +230,9 @@ impl PartyI<Msg2Verifier> {
 
 
         // Generating static public key of initiator
-        let mut statkey_i_bytes = [0; 32];
-        statkey_i_bytes.copy_from_slice(&r_public_static_bytes[..32]);
-        let r_public_static = x25519_dalek::PublicKey::from(statkey_i_bytes);
+        let mut statkey_r_bytes = [0; 32];
+        statkey_r_bytes.copy_from_slice(&r_public_static_bytes[..32]);
+        let r_public_static = x25519_dalek::PublicKey::from(statkey_r_bytes);
 
         // Generating shared secret 1 for initiator
 
@@ -260,6 +264,7 @@ impl PartyI<Msg2Verifier> {
             i_stat_pub : self.0.stat_pub,
             i_ecdh_ephemeralsecret : self.0.i_ecdh_ephemeralsecret,
             r_stat_pub : r_public_static,
+            r_ephemeral_pk: self.0.r_ephemeral_PK,
             i_kid : self.0.kid,
             msg_1 : self.0.msg_1,
             msg_2 : self.0.msg_2,
@@ -276,6 +281,7 @@ pub struct Msg3Sender {
     i_stat_pub : PublicKey,
     i_ecdh_ephemeralsecret : StaticSecret,
     r_stat_pub : PublicKey,
+    r_ephemeral_pk : PublicKey, 
     i_kid: Vec<u8>,
     msg_1: Message1,
     msg_2: Message2,
@@ -288,7 +294,6 @@ pub struct Msg3Sender {
 impl PartyI<Msg3Sender> {
     /// Returns the bytes of the third message, as well as the OSCORE master
     /// secret and the OSCORE master salt.
-    #[allow(clippy::type_complexity)]
     pub fn generate_message_3(
         self,
     ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), OwnError> {
@@ -302,15 +307,16 @@ impl PartyI<Msg3Sender> {
         // Build the COSE_Key containing our public authentication key
         let cred_i = cose::serialize_cred_x(&self.0.i_stat_pub.to_bytes(), &self.0.i_kid)?;
 
-
-        let shared_secret_2 = self.0.i_ecdh_ephemeralsecret.diffie_hellman(&self.0.i_stat_pub);
+        let shared_secret_2 = self.0.i_stat_priv.diffie_hellman(&self.0.r_ephemeral_pk);
+        
+        
         // transcript hash 3
 
         let th_3 = util::compute_th_3(
             &self.0.th_2, 
             &self.0.msg_2.ciphertext2)?;
 
-
+            
         let (prk_4x3m,_) = util::derivePRK(
             Some(&self.0.prk_3e2m),
              shared_secret_2.as_bytes())?;
@@ -330,14 +336,13 @@ impl PartyI<Msg3Sender> {
             util::CCM_KEY_LEN,
             "K_3",
             true)?;
-                
+            
         let iv_3 = util::genericExpand(
             prk_3e2m_hkdf_cpy2, 
             &th_3, 
             util::CCM_NONCE_LEN,
             "IV_3",
              true)?;
-
         let p = util::build_plaintext(&self.0.i_kid, &mac_3)?;
 
         let ad = cose::build_ad(&th_3)?;
@@ -354,26 +359,45 @@ impl PartyI<Msg3Sender> {
         // now computing the values needed for sck and rck
         let th_4 = util::compute_th_4(&th_3, &ciphertext_3_cpy)?;
 
-        let rck = util::edhoc_exporter(
-            "RCK",
-            util::CCM_KEY_LEN,
+
+        let master_secret = util::edhoc_exporter(
+            "OSCORE_Master_Secret",
+            util::CCM_KEY_LEN / 8, //going from bits to bytes
             &th_4,
             &prk_4x3m,
         )?;
 
-
-        let sck = util::edhoc_exporter(
-            "SCK",
-            util::CCM_KEY_LEN,
+        let master_salt = util::edhoc_exporter(
+            "OSCORE_Master_Salt",
+            util::SALT_LENGTH / 8,//going from bits to bytes
             &th_4,
             &prk_4x3m,
         )?;
 
-
-        Ok((msg_3_seq, sck, rck))
+        Ok((msg_3_seq, master_secret, master_salt))
     }
 }
 
+
+
+pub struct Msg4ReceiveVerify {
+    secret: StaticSecret,
+    x_r: PublicKey,
+    stat_priv: StaticSecret,
+    stat_pub: PublicKey,
+    kid: Vec<u8>,
+}
+
+impl PartyI<Msg4ReceiveVerify> {
+    pub fn receive_message_4(
+        self,
+    ) -> Result<u8, OwnError> {
+
+
+        Ok(18)
+    }
+
+}
 // Party V constructs ---------------------------------------------------------
 
 /// The structure providing all operations for Party V.
@@ -383,7 +407,7 @@ pub trait PartyRState {}
 impl PartyRState for Msg1Receiver {}
 impl PartyRState for Msg2Sender {}
 impl PartyRState for Msg3Receiver {}
-//impl PartyRState for Msg3Verifier {}
+impl PartyRState for Msg4Sender {}
 
 /// Contains the state to receive the first message.
 /// 
@@ -451,12 +475,15 @@ impl PartyR<Msg1Receiver> {
         // generating shared secret at responder
         let shared_secret_0 = self.0.secret.diffie_hellman(&i_public);
 
-        let i_public_copy = i_public.clone();
+        let i_public_cpy = i_public.clone();
         
-        let shared_secret_1 = self.0.stat_priv.diffie_hellman(&i_public_copy);
+        let shared_secret_1 = self.0.stat_priv.diffie_hellman(&i_public_cpy);
+
+
 
         Ok(PartyR(Msg2Sender {
             c_r: c_r,
+            ecdh_r_secret : self.0.secret,
             shared_secret_0,
             shared_secret_1,
             x_r: self.0.x_r,
@@ -476,6 +503,7 @@ impl PartyR<Msg1Receiver> {
 /// (this is from the side of I)
 pub struct Msg2Sender {
     c_r: Vec<u8>,
+    ecdh_r_secret: StaticSecret,
     shared_secret_0: SharedSecret,
     shared_secret_1: SharedSecret,
     x_r: PublicKey,
@@ -501,18 +529,18 @@ impl PartyR<Msg2Sender> {
             let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.c_r, self.0.x_r)?;
 
             
-            let (prk_2e,PRK_2e_hkdf) = util::derivePRK(None, self.0.shared_secret_0.as_bytes())?;
+            let (prk_2e,prk_2e_hkdf) = util::derivePRK(None, self.0.shared_secret_0.as_bytes())?;
 
-            let (_,PRK_3e2m_hkdf) = util::derivePRK(Some(&prk_2e),self.0.shared_secret_1.as_bytes())?;
+            let (prk_3e2m,prk_3e2m_hkdf) = util::derivePRK(Some(&prk_2e),self.0.shared_secret_1.as_bytes())?;
 
-
-            let MAC_2 = util::createMACWithExpand(PRK_3e2m_hkdf, util::HASHFUNC_OUTPUT_LEN_BITS, &th_2, "MAC_2", id_cred_r, cred_r)?;
+            let prk_3e2m_hkdf_cpy = prk_3e2m_hkdf.clone();
+            let MAC_2 = util::createMACWithExpand(prk_3e2m_hkdf, util::HASHFUNC_OUTPUT_LEN_BITS, &th_2, "MAC_2", id_cred_r, cred_r)?;
 
             let PlaintextEncoded = util::build_plaintext(&self.0.R_kid, &MAC_2)?;
 
 
             let Keystream2 = util::genericExpand(
-                PRK_2e_hkdf, 
+                prk_2e_hkdf, 
                 &th_2, 
                 PlaintextEncoded.len(), 
                 "KEYSTREAM_2",
@@ -532,8 +560,14 @@ impl PartyR<Msg2Sender> {
 
             Ok((msg2_seq, 
                 PartyR(Msg3Receiver {
+                    x_r: self.0.x_r,
+                    r_ecdh_secret: self.0.ecdh_r_secret,
+                    stat_priv: self.0.stat_priv,
+                    stat_pub : self.0.stat_pub,
                     shared_secret_0: self.0.shared_secret_0,
                     shared_secret_1: self.0.shared_secret_1,
+                    prk_3e2m_hkdf : prk_3e2m_hkdf_cpy,
+                    prk_3e2m : prk_3e2m,
                     msg_2 : msg2,
                     th_2 : th_2,
                 }),
@@ -545,117 +579,176 @@ impl PartyR<Msg2Sender> {
 
 /// Contains the state to receive the third message.
 pub struct Msg3Receiver {
+    x_r: PublicKey,
+    r_ecdh_secret : StaticSecret,
+    stat_priv: StaticSecret,
+    stat_pub : PublicKey,
     shared_secret_0: SharedSecret,
     shared_secret_1 : SharedSecret,
+    prk_3e2m_hkdf  : hkdf::Hkdf<sha2::Sha256>,
+    prk_3e2m : Vec<u8>,
     msg_2: Message2,
     th_2: Vec<u8>,
 }
-/*
+
 impl PartyR<Msg3Receiver> {
     /// Returns the key ID of the other party's public authentication key.
-    pub fn extract_peer_kid(
+    pub fn handle_message_3(
         self,
-        msg_3: Vec<u8>,
-    ) -> Result<(Vec<u8>, PartyR<Msg3Verifier>), OwnOrPeerError> {
+        msg_3_seq: Vec<u8>,
+        i_public_static_bytes: &[u8],
+    ) -> Result<(PartyR<Msg4Sender>, Vec<u8>, Vec<u8>), OwnOrPeerError> {
+
+        // first, relevant copies:
+        let prk_3e2m_hkdf_cpy1 = self.0.prk_3e2m_hkdf.clone();
+        let prk_3e2m_hkdf_cpy2 = self.0.prk_3e2m_hkdf.clone();
+
         // Check if we don't have an error message
-        util::fail_on_error_message(&msg_3)?;
+        util::fail_on_error_message(&msg_3_seq)?;
         // Decode the third message
-        let msg_3 = util::deserialize_message_3(&msg_3)?;
 
-        // Compute TH_3
+        let msg_3 = util::deserialize_message_3(&msg_3_seq)?;
+
+                // Generating static public key of initiator
+        let mut statkey_i_bytes = [0; 32];
+        statkey_i_bytes.copy_from_slice(&i_public_static_bytes[..32]);
+        let i_public_static = x25519_dalek::PublicKey::from(statkey_i_bytes);
+        
+        let shared_secret_2 = self.0.r_ecdh_secret.diffie_hellman(&i_public_static);
+
         let th_3 = util::compute_th_3(
-            &self.0.th_2,
-            &self.0.msg_2.ciphertext,
-            msg_3.c_v.as_deref(),
-        )?;
+            &self.0.th_2, 
+            &self.0.msg_2.ciphertext2)?;
 
-        // Derive K_3
-        let k_3 = util::edhoc_key_derivation(
-            "10",
-            util::CCM_KEY_LEN * 8,
-            &th_3,
-            self.0.shared_secret.as_bytes(),
-        )?;
-        // Derive IV_3
-        let iv_3 = util::edhoc_key_derivation(
-            "IV-GENERATION",
-            util::CCM_NONCE_LEN * 8,
-            &th_3,
-            self.0.shared_secret.as_bytes(),
-        )?;
 
-        // Compute the associated data
+        let k_3 = util::genericExpand(
+            self.0.prk_3e2m_hkdf, 
+            &th_3, 
+            util::CCM_KEY_LEN,
+            "K_3",
+            true)?;
+        let iv_3 = util::genericExpand(
+            prk_3e2m_hkdf_cpy1, 
+            &th_3, 
+            util::CCM_NONCE_LEN,
+            "IV_3",
+            true)?;
+        
         let ad = cose::build_ad(&th_3)?;
-        // Decrypt and verify the ciphertext
-        let plaintext = util::aead_open(&k_3, &iv_3, &msg_3.ciphertext, &ad)?;
-        // Fetch the contents of the plaintext
-        let (u_kid, u_sig) = util::extract_plaintext(plaintext)?;
-        // Copy this, since we need to return one and keep one
-        let u_kid_cpy = u_kid.clone();
 
-        Ok((
-            u_kid_cpy,
-            PartyR(Msg3Verifier {
-                shared_secret: self.0.shared_secret,
-                msg_3,
-                th_3,
-                u_kid,
-                u_sig,
-            }),
-        ))
+        let p = util::aead_open(
+            &k_3, 
+            &iv_3, 
+            &msg_3.ciphertext, 
+            &ad)?;
+
+        let (r_kid, mac3) = util::extract_plaintext(p)?;
+
+        let id_cred_i = cose::build_id_cred_x(&r_kid)?;
+
+        let cred_i = cose::serialize_cred_x(&i_public_static.to_bytes(), &r_kid)?;
+      
+      
+        let mac_3_initiator = util::createMACWithExpand(
+            prk_3e2m_hkdf_cpy2, 
+            util::HASHFUNC_OUTPUT_LEN_BITS, 
+            &th_3,  
+            "MAC_3",
+             id_cred_i, 
+             cred_i)?;
+
+
+        if (mac_3_initiator != mac3){
+            Err(Error::BadMac)?;
+            }
+        // now computing the values needed for sck and rck
+        let th_4 = util::compute_th_4(&th_3, &msg_3.ciphertext)?;
+
+        let (prk_4x3m,prk_4x3m_hkdf) = util::derivePRK(
+            Some(&self.0.prk_3e2m),
+             shared_secret_2.as_bytes())?;
+
+       
+
+        let master_secret = util::edhoc_exporter(
+            "OSCORE_Master_Secret",
+            util::CCM_KEY_LEN / 8, //going from bits to bytes
+            &th_4,
+            &prk_4x3m,
+        )?;
+
+        let master_salt = util::edhoc_exporter(
+            "OSCORE_Master_Salt",
+            util::SALT_LENGTH / 8,//going from bits to bytes
+            &th_4,
+            &prk_4x3m,
+        )?;
+
+        let sck = util::edhoc_exporter(
+            "SCK", 
+            32, 
+            &master_salt, 
+            &master_secret)?;
+
+        let rck = util::edhoc_exporter(
+            "RCK", 
+            32, 
+            &master_salt, 
+            &master_secret)?;
+
+        Ok((PartyR(Msg4Sender{
+            prk_4x3m_hkdf : prk_4x3m_hkdf,
+            prk_4x3m : prk_4x3m,
+            th_4 : th_4,
+        }),
+        sck,
+        rck))
     }
 }
 
 /// Contains the state to verify the third message.
-pub struct Msg3Verifier {
-    shared_secret: SharedSecret,
-    msg_3: Message3,
-    th_3: Vec<u8>,
-    u_kid: Vec<u8>,
-    u_sig: Vec<u8>,
+pub struct Msg4Sender {
+    prk_4x3m_hkdf : hkdf::Hkdf<sha2::Sha256>,
+    prk_4x3m : Vec<u8>,
+    th_4 : Vec<u8>,
 }
 
-impl PartyR<Msg3Verifier> {
-    /// Checks the authenticity of the third message with the other party's
-    /// public authentication key and returns the OSCORE master secret and the
-    /// OSCORE master Salt.
-    pub fn verify_message_3(
+
+impl PartyR<Msg4Sender> {
+    pub fn Generate_message_4(
         self,
-        u_public: &[u8],
-    ) -> Result<(Vec<u8>, Vec<u8>), OwnError> {
-        // Build the COSE header map identifying the public authentication key
-        // of U
-        let id_cred_u = cose::build_id_cred_x(&self.0.u_kid)?;
-        // Build the COSE_Key containing U's public authentication key
-        let cred_u = cose::serialize_cose_key(u_public)?;
-        // Verify the signed data from Party U
-        cose::verify(
-            &id_cred_u,
-            &self.0.th_3,
-            &cred_u,
-            u_public,
-            &self.0.u_sig,
+    ) -> Result< Vec<u8>, OwnOrPeerError> {
+
+
+        let k_4 = util::edhoc_exporter(
+            "EDHOC_K_4",
+            util::CCM_KEY_LEN , //going from bits to bytes
+            &self.0.th_4,
+            &self.0.prk_4x3m,
         )?;
 
-        // Derive values for the OSCORE context
-        let th_4 = util::compute_th_4(&self.0.th_3, &self.0.msg_3.ciphertext)?;
-        let master_secret = util::edhoc_exporter(
-            "OSCORE Master Secret",
-            util::CCM_KEY_LEN,
-            &th_4,
-            self.0.shared_secret.as_bytes(),
-        )?;
-        let master_salt = util::edhoc_exporter(
-            "OSCORE Master Salt",
-            8,
-            &th_4,
-            self.0.shared_secret.as_bytes(),
+        let iv_4 = util::edhoc_exporter(
+            "EDHOC_IV_4",
+            util::CCM_NONCE_LEN , //going from bits to bytes
+            &self.0.th_4,
+            &self.0.prk_4x3m,
         )?;
 
-        Ok((master_secret, master_salt))
+
+        let ad = cose::build_ad(&self.0.th_4)?;
+
+
+
+        let ciphertext_4 = util::aead_seal(&k_4, &iv_4, "".as_bytes(), &ad)?;
+        let msg4 = Message4 {
+            ciphertext : ciphertext_4,
+        };
+        let msg4_seq = util::serialize_message_4(&msg4)?;
+
+        Ok(msg4_seq)
     }
 }
-
+/*
 #[cfg(test)]
 mod tests {
     use super::super::test_vectors::*;

@@ -19,6 +19,7 @@ use crate::cbor;
 // length in bits
 pub const CCM_KEY_LEN: usize = 128;
 pub const CCM_NONCE_LEN: usize = 104;
+pub const SALT_LENGTH : usize = 64;
 pub const HASHFUNC_OUTPUT_LEN_BITS: usize = 256;
 pub const CONNECTION_IDENTIFIER_LENGTH: usize = 1;
 
@@ -145,10 +146,33 @@ pub fn deserialize_message_3(msg: &[u8]) -> Result<Message3> {
     
 }
 
+#[derive(Debug, PartialEq)]
+pub struct Message4 {
+    pub ciphertext: Vec<u8>,
+}
+
+/// Serializes EDHOC `message_3`.
+pub fn serialize_message_4(msg: &Message4) -> Result<Vec<u8>> {
+    Ok(cbor::encode(Bytes::new(&msg.ciphertext))?)
+
+}
+
+/// Deserializes EDHOC `message_3`.
+pub fn deserialize_message_4(msg: &[u8]) -> Result<Message4> {
+
+
+    let cpy = msg.to_vec();
+    let ciphertext = cbor::decode::<ByteBuf>(&cpy)?;
+    // If we managed this time, we can return the struct without c_v
+    Ok(Message4 {
+        ciphertext: ciphertext.into_vec(),
+        })
+    
+}
+
 /// Returns the bytes of an EDHOC error message with the given text.
 pub fn build_error_message(err_msg: &str) -> Vec<u8> {
 
-    println!("ERROR HANDLING");
     // Build a tuple for the sequence of items
     // (type, err_msg)
     let raw_msg = (-1, err_msg);
@@ -463,6 +487,8 @@ pub fn aead_seal(
 ) -> Result<Vec<u8>> {
     // Initialize CCM mode
     let ccm: Ccm<Aes128, U8, U13> = Ccm::new(GenericArray::from_slice(key));
+
+    
     // Encrypt and place ciphertext & tag in dst_out_ct
     let dst_out_ct = ccm.encrypt(
         GenericArray::from_slice(nonce),
@@ -471,7 +497,6 @@ pub fn aead_seal(
             msg: plaintext,
         },
     )?;
-
     Ok(dst_out_ct)
 }
 

@@ -123,16 +123,40 @@ fn main() {
         Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
         Ok(val) => val, };
 
-        let (msg3_bytes, sck, rck) =
+        let (msg3_bytes, master_secret_i, master_salt_i) =
         match msg3_sender.generate_message_3() {
             Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
             Ok(val) => val,
         };
 
     /*///////////////////////////////////////////////////////////////////////////
-    /// Initiator receiving and handling message 3, and generating message4 and sck rck
+    /// Responder receiving and handling message 3, and generating message4 and sck rck
     ///////////////////////////////////////////////////////////////////// */
     
+    let (msg4sender, sck,rck) =
+        match msg3_receiver.handle_message_3(msg3_bytes,&i_static_pub.as_bytes().to_vec()) {
+            Err(OwnOrPeerError::PeerError(s)) => {
+                panic!("Received error msg: {}", s)
+            }
+            Err(OwnOrPeerError::OwnError(b)) => {
+                panic!("Send these bytes: {}", hexstring(&b))
+            }
+            Ok(val) => val,
+        };
+
+
+
+
+    let ciphertext4 =
+    match msg4sender.Generate_message_4() {
+        Err(OwnOrPeerError::PeerError(s)) => {
+            panic!("Received error msg: {}", s)
+        }
+        Err(OwnOrPeerError::OwnError(b)) => {
+            panic!("Send these bytes: {}", hexstring(&b))
+        }
+        Ok(val) => val,
+    };
 
 /*
         let (_v_kid, msg2_verifier) =
