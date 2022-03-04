@@ -128,24 +128,7 @@ pub struct CoseKey {
     x: Vec<u8>,
 }
 
-/// Returns the CBOR encoded `COSE_Key` for the given data.
-///
-/// This is specific to our use case where we only have Ed25519 public keys,
-/// which are Octet Key Pairs (OKP) in COSE and represented as a single
-/// x-coordinate.
-pub fn serialize_cose_key(x: &[u8]) -> Result<Vec<u8>> {
-    // Pack the data into a structure that nicely serializes almost into
-    // what we want to have as the actual bytes for the COSE_Key.
-    // (kty key, kty value, crv key, crv value,
-    //  x-coordinate key, x-coordinate value)
-    let raw_key = (1, 1, -1, 6, -2, Bytes::new(x));
-    // Get the byte representation of it
-    let mut bytes = cbor::encode(raw_key)?;
-    // This is a CBOR array, but we want a map
-    cbor::array_to_map(&mut bytes)?;
 
-    Ok(bytes)
-}
 
 /// Returns the CBOR encoded `COSE_Key` for the given data.
 ///
@@ -281,7 +264,8 @@ mod tests {
             build_kdf_context("OSCORE Master Salt", 64, &TH_4).unwrap();
         assert_eq!(&INFO_MASTER_SALT[..], &context_bytes[..]);
     }
-
+/*
+should test cred_x serialisation instead
     #[test]
     fn key_encode() {
         assert_eq!(
@@ -293,7 +277,7 @@ mod tests {
             &serialize_cose_key(&AUTH_V_PUBLIC).unwrap()[..]
         );
     }
-
+*/
     #[test]
     fn encode_id_cred_x() {
         let bytes = build_id_cred_x(&KID_U).unwrap();

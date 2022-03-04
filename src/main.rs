@@ -1,28 +1,27 @@
+
+//#![no_std]
+
 use oscore::edhoc::{
     error::{OwnError, OwnOrPeerError},
     PartyI, PartyR,
-    util::{self, deserialize_message_1, Message1, serialize_message_1},
 };
-use std::convert::TryInto;
 use rand::{rngs::StdRng, Rng,SeedableRng};
 
 use x25519_dalek::{PublicKey,StaticSecret};
-use eui::{Eui64};
 
-use rand_core::{RngCore, OsRng, CryptoRng,};
+use rand_core::{OsRng,};
 
 
-const suite_I: isize = 3;
-const methodType_I : isize = 0;
-
+const SUITE_I: isize = 3;
+const METHOD_TYPE_I : isize = 0;
 fn main() {
+
 
 
     /*
     Parti I generate message 1
     */
 
-    let APPEUI : Eui64 =  Eui64::from(85204980412143); // completely random mac adress (should be on device)
 
     let i_static_priv : StaticSecret  = StaticSecret::new(OsRng);
     let i_static_pub = PublicKey::from(&i_static_priv);
@@ -37,18 +36,17 @@ fn main() {
     // Choose a connection identifier
     let i_c_i = [0x1].to_vec();
 
-    let clone = i_c_i.clone();
 
     let i_kid = [0xA2].to_vec();
     let msg1_sender =
-        PartyI::new(i_c_i, i_priv, i_static_priv, i_static_pub,APPEUI, i_kid);
+        PartyI::new(i_c_i, i_priv, i_static_priv, i_static_pub, i_kid);
 
     // type = 1 would be the case in CoAP, where party U can correlate
     // message_1 and message_2 with the token
     let (msg1_bytes, msg2_receiver) =
         // If an error happens here, we just abort. No need to send a message,
         // since the protocol hasn't started yet.
-        msg1_sender.generate_message_1(methodType_I, suite_I).unwrap();
+        msg1_sender.generate_message_1(METHOD_TYPE_I, SUITE_I).unwrap();
 
 
 
@@ -62,8 +60,6 @@ fn main() {
     let r_static_priv : StaticSecret  = StaticSecret::new(OsRng);
     let r_static_pub = PublicKey::from(&r_static_priv);
 
-    // Choose a connection identifier and kid
-    let r_c_i = [0x2].to_vec();
 
     let r_kid = [0xA3].to_vec();
 
@@ -117,7 +113,7 @@ fn main() {
         Ok(val) => val,
     };
 
-
+    println!("initiator unpacked responders kid: {:?}", r_kid);
 
     let msg3_sender = match msg2_verifier.verify_message_2(&r_static_pub.as_bytes().to_vec()) {
         Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
@@ -146,7 +142,7 @@ fn main() {
 
 
         let msg4_bytes =
-        match msg4sender.Generate_message_4() {
+        match msg4sender.generate_message_4() {
             Err(OwnOrPeerError::PeerError(s)) => {
                 panic!("Received error msg: {}", s)
             }

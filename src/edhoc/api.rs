@@ -11,8 +11,6 @@ use super::{
 };
 
 
-// Constants given by cipher suite 3:
-static HASH_OUTPUT_LENGTH : usize = 32;
 // Party U constructs ---------------------------------------------------------
 
 /// The structure providing all operations for Party U.
@@ -34,7 +32,6 @@ pub struct Msg1Sender {
     pub x_i: PublicKey,
     static_secret: StaticSecret,
     static_public: PublicKey,
-    pub APPEUI : Eui64,
     kid: Vec<u8>,
 }
 
@@ -44,17 +41,15 @@ impl PartyI<Msg1Sender> {
     /// # Arguments
     /// * `c_u` - The chosen connection identifier.
     /// * `ecdh_secret` - The ECDH secret to use for this protocol run. Ephemeral
-    /// * `stat_priv` - The private ed25519 authentication key.
-    /// * `stat_public` - The public ed25519 authentication key.
+    /// * `stat_priv` - The private ed25519derivePRKauthentication key.
     /// * `APPEUI` - MAC adress of server
     /// * `kid` - The key ID by which the other party is able to retrieve
-    ///   `stat_public`, which is called 'ID_cred_x in edho 14 .
+    ///   `stat_public`, which is called 'id_cred_x in edho 14 .
     pub fn new(
         c_i: Vec<u8>,
         ecdh_secret: [u8; 32],
         stat_priv: StaticSecret,
         stat_pub: PublicKey,
-        APPEUI : Eui64,
         kid: Vec<u8>,
     ) -> PartyI<Msg1Sender> {
 
@@ -69,7 +64,6 @@ impl PartyI<Msg1Sender> {
             x_i,
             static_secret:stat_priv,
             static_public:stat_pub,
-            APPEUI,
             kid,
         })
     }
@@ -111,7 +105,6 @@ impl PartyI<Msg1Sender> {
       //          auth: self.0.auth,
                 kid: self.0.kid,
                 msg_1_seq,
-                msg_1,
             }),
         ))
     }
@@ -123,7 +116,6 @@ pub struct Msg2Receiver {
     stat_pub : PublicKey,
     kid: Vec<u8>,
     msg_1_seq: Vec<u8>,
-    msg_1: Message1,
 }
 
 
@@ -153,13 +145,12 @@ impl PartyI<Msg2Receiver> {
  
         let msg_1_seq_cpy = self.0.msg_1_seq.clone();
 
-        // reconstructing Keystream2
+        // reconstructing keystream2
         let th_2 = util::compute_th_2(self.0.msg_1_seq, &msg_2.c_r, r_public)?;
-        let (prk_2e,prk_2e_hkdf) = util::derivePRK(None, shared_secret_0.as_bytes())?;
+        let (prk_2e,prk_2e_hkdf) = util::derive_prk(None, shared_secret_0.as_bytes())?;
 
 
-        let prk_2e_hkdf_cpy = prk_2e_hkdf.clone();
-        let keystream2 = util::genericExpand(prk_2e_hkdf, 
+        let keystream2 = util::generic_expand(prk_2e_hkdf, 
                                                         &th_2, msg_2.ciphertext2.len(), 
                                                         "KEYSTREAM_2"
                                                         ,false)?;
@@ -173,19 +164,16 @@ impl PartyI<Msg2Receiver> {
             r_kid,
             PartyI(Msg2Verifier {
                 i_ecdh_ephemeralsecret : self.0.i_ecdh_ephemeralsecret,
-                shared_secret_0 : shared_secret_0,
                 stat_priv: self.0.stat_priv,
                 stat_pub : self.0.stat_pub,
                 kid: self.0.kid,
-                msg_1: self.0.msg_1,
-                msg_1_seq: msg_1_seq_cpy,
+  
                 msg_2: msg_2,
                 mac_2: mac_2,
                 prk_2e: prk_2e,
-                prk_2e_hkdf: prk_2e_hkdf_cpy,
                 th_2: th_2,
                 r_kid :r_kid_cpy,
-                r_ephemeral_PK: r_public,
+                r_ephemeral_pk: r_public,
 
             
 
@@ -200,19 +188,16 @@ impl PartyI<Msg2Receiver> {
 /// Contains the state to verify the second message.
 pub struct Msg2Verifier {
     i_ecdh_ephemeralsecret : StaticSecret,
-    shared_secret_0: SharedSecret,
     stat_priv : StaticSecret,
     stat_pub : PublicKey,
     kid: Vec<u8>,
-    msg_1: Message1,
-    msg_1_seq : Vec<u8>,
+
     msg_2: Message2,
     mac_2: Vec<u8>,
     prk_2e : Vec<u8>,
-    prk_2e_hkdf : hkdf::Hkdf<sha2::Sha256>,
     th_2: Vec<u8>,
     r_kid: Vec<u8>,
-    r_ephemeral_PK : PublicKey,
+    r_ephemeral_pk : PublicKey,
 }
 
 
@@ -240,36 +225,33 @@ impl PartyI<Msg2Verifier> {
 
         // generating prk_3
 
-        let (prk_3em,PRK_3e2m_hkdf) = util::derivePRK(Some(&self.0.prk_2e)
+        let (prk_3em,prk_3e2m_hkdf) = util::derive_prk(Some(&self.0.prk_2e)
             ,shared_secret_1.as_bytes())?;
 
-        let PRK_3e2m_hkdf_cpy = PRK_3e2m_hkdf.clone();
+        let prk_3e2m_hkdf_cpy = prk_3e2m_hkdf.clone();
 
 
 
 
-        let MAC_2 = util::createMACWithExpand(PRK_3e2m_hkdf, 
+        let mac_2 = util::create_macwith_expand(prk_3e2m_hkdf, 
             util::HASHFUNC_OUTPUT_LEN_BITS, 
             &self.0.th_2, 
-            "MAC_2", 
+            "mac_2", 
             id_cred_r, 
             cred_r)?;
 
-        if (self.0.mac_2 != MAC_2){
+        if (self.0.mac_2 != mac_2){
             Err(Error::BadMac)?;
         }
 
         Ok(PartyI(Msg3Sender{
             i_stat_priv : self.0.stat_priv,
             i_stat_pub : self.0.stat_pub,
-            i_ecdh_ephemeralsecret : self.0.i_ecdh_ephemeralsecret,
-            r_stat_pub : r_public_static,
-            r_ephemeral_pk: self.0.r_ephemeral_PK,
+            r_ephemeral_pk: self.0.r_ephemeral_pk,
             i_kid : self.0.kid,
-            msg_1 : self.0.msg_1,
             msg_2 : self.0.msg_2,
             th_2 : self.0.th_2,
-            prk_3e2m_hkdf : PRK_3e2m_hkdf_cpy,
+            prk_3e2m_hkdf : prk_3e2m_hkdf_cpy,
             prk_3e2m : prk_3em
         }))
     }
@@ -279,11 +261,9 @@ impl PartyI<Msg2Verifier> {
 pub struct Msg3Sender {
     i_stat_priv : StaticSecret,
     i_stat_pub : PublicKey,
-    i_ecdh_ephemeralsecret : StaticSecret,
-    r_stat_pub : PublicKey,
+
     r_ephemeral_pk : PublicKey, 
     i_kid: Vec<u8>,
-    msg_1: Message1,
     msg_2: Message2,
     th_2: Vec<u8>,
     prk_3e2m_hkdf :  hkdf::Hkdf<sha2::Sha256>,
@@ -317,11 +297,11 @@ impl PartyI<Msg3Sender> {
             &self.0.msg_2.ciphertext2)?;
 
             
-        let (prk_4x3m,prk_4x3m_hkdf) = util::derivePRK(
+        let (prk_4x3m,prk_4x3m_hkdf) = util::derive_prk(
             Some(&self.0.prk_3e2m),
              shared_secret_2.as_bytes())?;
 
-        let mac_3 = util::createMACWithExpand(
+        let mac_3 = util::create_macwith_expand(
             self.0.prk_3e2m_hkdf, 
             util::HASHFUNC_OUTPUT_LEN_BITS, 
             &th_3,  
@@ -330,14 +310,14 @@ impl PartyI<Msg3Sender> {
              cred_i)?;
 
         
-        let k_3 = util::genericExpand(
+        let k_3 = util::generic_expand(
             prk_3e2m_hkdf_cpy1, 
             &th_3, 
             util::CCM_KEY_LEN,
             "K_3",
             true)?;
             
-        let iv_3 = util::genericExpand(
+        let iv_3 = util::generic_expand(
             prk_3e2m_hkdf_cpy2, 
             &th_3, 
             util::CCM_NONCE_LEN,
@@ -375,7 +355,6 @@ impl PartyI<Msg3Sender> {
         )?;
 
         Ok((PartyI(Msg4ReceiveVerify {
-            prk_4x3m_hkdf : prk_4x3m_hkdf,
             prk_4x3m : prk_4x3m,
             th_4 : th_4,
             master_salt : master_salt,
@@ -386,7 +365,6 @@ impl PartyI<Msg3Sender> {
 
 
 pub struct Msg4ReceiveVerify {
-    prk_4x3m_hkdf : hkdf::Hkdf<sha2::Sha256>,
     prk_4x3m : Vec<u8>,
     th_4 : Vec<u8>,
     master_secret : Vec<u8>,
@@ -531,11 +509,9 @@ impl PartyR<Msg1Receiver> {
             shared_secret_0,
             shared_secret_1,
             x_r: self.0.x_r,
-            stat_priv: self.0.stat_priv,
             stat_pub: self.0.stat_pub,
-            R_kid: self.0.kid,
+            r_kid: self.0.kid,
             msg_1_seq,
-            msg_1,
         }))
     }
 }
@@ -551,11 +527,9 @@ pub struct Msg2Sender {
     shared_secret_0: SharedSecret,
     shared_secret_1: SharedSecret,
     x_r: PublicKey,
-    stat_priv: StaticSecret,
     stat_pub : PublicKey,
-    R_kid: Vec<u8>,
+    r_kid: Vec<u8>,
     msg_1_seq: Vec<u8>,
-    msg_1: Message1,
 }
 
 impl PartyR<Msg2Sender> {
@@ -565,32 +539,32 @@ impl PartyR<Msg2Sender> {
     ) -> Result<(Vec<u8>, PartyR<Msg3Receiver>),OwnOrPeerError> {
 
             // first we need to build the id_cred_r from the kid
-            let id_cred_r = cose::build_id_cred_x(&self.0.R_kid)?;
+            let id_cred_r = cose::build_id_cred_x(&self.0.r_kid)?;
 
             // We now build the cred_x using the public key, and kid value
-            let cred_r = cose::serialize_cred_x(&self.0.stat_pub.to_bytes(),&self.0.R_kid )?; 
+            let cred_r = cose::serialize_cred_x(&self.0.stat_pub.to_bytes(),&self.0.r_kid )?; 
 
             let th_2 = util::compute_th_2(self.0.msg_1_seq, &self.0.c_r, self.0.x_r)?;
 
             
-            let (prk_2e,prk_2e_hkdf) = util::derivePRK(None, self.0.shared_secret_0.as_bytes())?;
+            let (prk_2e,prk_2e_hkdf) = util::derive_prk(None, self.0.shared_secret_0.as_bytes())?;
 
-            let (prk_3e2m,prk_3e2m_hkdf) = util::derivePRK(Some(&prk_2e),self.0.shared_secret_1.as_bytes())?;
+            let (prk_3e2m,prk_3e2m_hkdf) = util::derive_prk(Some(&prk_2e),self.0.shared_secret_1.as_bytes())?;
 
             let prk_3e2m_hkdf_cpy = prk_3e2m_hkdf.clone();
-            let MAC_2 = util::createMACWithExpand(prk_3e2m_hkdf, util::HASHFUNC_OUTPUT_LEN_BITS, &th_2, "MAC_2", id_cred_r, cred_r)?;
+            let mac_2 = util::create_macwith_expand(prk_3e2m_hkdf, util::HASHFUNC_OUTPUT_LEN_BITS, &th_2, "mac_2", id_cred_r, cred_r)?;
 
-            let PlaintextEncoded = util::build_plaintext(&self.0.R_kid, &MAC_2)?;
+            let plaintext_encoded = util::build_plaintext(&self.0.r_kid, &mac_2)?;
 
 
-            let Keystream2 = util::genericExpand(
+            let keystream2 = util::generic_expand(
                 prk_2e_hkdf, 
                 &th_2, 
-                PlaintextEncoded.len(), 
+                plaintext_encoded.len(), 
                 "KEYSTREAM_2",
                 false)?;
 
-            let ciphertext_2 = util::xor(&Keystream2, &PlaintextEncoded)?;
+            let ciphertext_2 = util::xor(&keystream2, &plaintext_encoded)?;
 
 
 
@@ -604,12 +578,7 @@ impl PartyR<Msg2Sender> {
 
             Ok((msg2_seq, 
                 PartyR(Msg3Receiver {
-                    x_r: self.0.x_r,
                     r_ecdh_secret: self.0.ecdh_r_secret,
-                    stat_priv: self.0.stat_priv,
-                    stat_pub : self.0.stat_pub,
-                    shared_secret_0: self.0.shared_secret_0,
-                    shared_secret_1: self.0.shared_secret_1,
                     prk_3e2m_hkdf : prk_3e2m_hkdf_cpy,
                     prk_3e2m : prk_3e2m,
                     msg_2 : msg2,
@@ -623,12 +592,7 @@ impl PartyR<Msg2Sender> {
 
 /// Contains the state to receive the third message.
 pub struct Msg3Receiver {
-    x_r: PublicKey,
     r_ecdh_secret : StaticSecret,
-    stat_priv: StaticSecret,
-    stat_pub : PublicKey,
-    shared_secret_0: SharedSecret,
-    shared_secret_1 : SharedSecret,
     prk_3e2m_hkdf  : hkdf::Hkdf<sha2::Sha256>,
     prk_3e2m : Vec<u8>,
     msg_2: Message2,
@@ -665,13 +629,13 @@ impl PartyR<Msg3Receiver> {
             &self.0.msg_2.ciphertext2)?;
 
 
-        let k_3 = util::genericExpand(
+        let k_3 = util::generic_expand(
             self.0.prk_3e2m_hkdf, 
             &th_3, 
             util::CCM_KEY_LEN,
             "K_3",
             true)?;
-        let iv_3 = util::genericExpand(
+        let iv_3 = util::generic_expand(
             prk_3e2m_hkdf_cpy1, 
             &th_3, 
             util::CCM_NONCE_LEN,
@@ -693,7 +657,7 @@ impl PartyR<Msg3Receiver> {
         let cred_i = cose::serialize_cred_x(&i_public_static.to_bytes(), &r_kid)?;
       
       
-        let mac_3_initiator = util::createMACWithExpand(
+        let mac_3_initiator = util::create_macwith_expand(
             prk_3e2m_hkdf_cpy2, 
             util::HASHFUNC_OUTPUT_LEN_BITS, 
             &th_3,  
@@ -708,7 +672,7 @@ impl PartyR<Msg3Receiver> {
         // now computing the values needed for sck and rck
         let th_4 = util::compute_th_4(&th_3, &msg_3.ciphertext)?;
 
-        let (prk_4x3m,prk_4x3m_hkdf) = util::derivePRK(
+        let (prk_4x3m,prk_4x3m_hkdf) = util::derive_prk(
             Some(&self.0.prk_3e2m),
              shared_secret_2.as_bytes())?;
 
@@ -741,7 +705,6 @@ impl PartyR<Msg3Receiver> {
             &master_secret)?;
 
         Ok((PartyR(Msg4Sender{
-            prk_4x3m_hkdf : prk_4x3m_hkdf,
             prk_4x3m : prk_4x3m,
             th_4 : th_4,
         }),
@@ -752,14 +715,13 @@ impl PartyR<Msg3Receiver> {
 
 /// Contains the state to verify the third message.
 pub struct Msg4Sender {
-    prk_4x3m_hkdf : hkdf::Hkdf<sha2::Sha256>,
     prk_4x3m : Vec<u8>,
     th_4 : Vec<u8>,
 }
 
 
 impl PartyR<Msg4Sender> {
-    pub fn Generate_message_4(
+    pub fn generate_message_4(
         self,
     ) -> Result< Vec<u8>, OwnOrPeerError> {
 

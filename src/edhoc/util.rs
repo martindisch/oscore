@@ -96,22 +96,22 @@ pub fn deserialize_message_2(msg: &[u8]) -> Result<Message2> { //Result<Message2
 
             
 
-    let ConnectionID = &c_r_and_cipher2[..CONNECTION_IDENTIFIER_LENGTH];
-    let Ciphertext2 = &c_r_and_cipher2[CONNECTION_IDENTIFIER_LENGTH..];
+    let connection_id = &c_r_and_cipher2[..CONNECTION_IDENTIFIER_LENGTH];
+    let ciphertext2 = &c_r_and_cipher2[CONNECTION_IDENTIFIER_LENGTH..];
 
     Ok(Message2 {
         ephemeral_key_r: x_r.to_vec(),
-        c_r: ConnectionID.to_vec(),
-        ciphertext2: Ciphertext2.to_vec(),
+        c_r: connection_id.to_vec(),
+        ciphertext2: ciphertext2.to_vec(),
         })
 
 
     
 }
 
-// derivePRK
+// derive_prk
 //deriving PRK's from some salt, and a key (shared key)
-pub fn derivePRK(
+pub fn derive_prk(
     salt: Option<&[u8]>, 
     ikm: &[u8]
 ) -> Result<(Vec<u8>,Hkdf<Sha256>)> {
@@ -264,32 +264,32 @@ pub fn edhoc_key_derivation(
 /// * `PRK` - the prk used to create tag
 /// * `maclength`  mac length given by cipher suite
 /// * `th` transcript hash
-/// * `ID_cred_x` 
+/// * `id_cred_x` 
 /// * `cred_x` 
 /// 
 
-pub fn createMACWithExpand(
-    PRK: Hkdf<Sha256>,
+pub fn create_macwith_expand(
+    prk: Hkdf<Sha256>,
     maclength: usize,
     th: &[u8],
-    macIdentifier : &str,
-    ID_cred_x : Vec<u8>,
+    mac_identifier : &str,
+    id_cred_x : Vec<u8>,
     cred_x : Vec<u8>,
 ) -> Result<Vec<u8>> {
 
     // For the Expand step, take the COSE_KDF_Context structure as info
     let info = (
         th,
-        macIdentifier,
-        ID_cred_x,
+        mac_identifier,
+        id_cred_x,
         cred_x,
     );
-   let infoEncoded =  cbor::encode_sequence(info)?;
+   let info_encoded =  cbor::encode_sequence(info)?;
 
     // Expand the PRK to the desired length output keying material (OKM)
     let mut okm = vec![0; maclength /8];
 
-    PRK.expand(&infoEncoded, &mut okm)?;
+    prk.expand(&info_encoded, &mut okm)?;
     Ok(okm)
 }
 
@@ -299,12 +299,12 @@ pub fn createMACWithExpand(
 /// # Arguments
 /// * `PRK` - the prk used to create tag
 /// * `maclength`  mac length given by cipher suite
-/// * `th` transcript hash (SAME th as in MAC_2)
+/// * `th` transcript hash (SAME th as in mac_2)
 /// * identifier: string that identifies the value
 /// 
 
-pub fn genericExpand(
-    PRK: Hkdf<Sha256>,
+pub fn generic_expand(
+    prk: Hkdf<Sha256>,
     th: &[u8],
     length : usize,
     identifier : &str,
@@ -328,13 +328,13 @@ pub fn genericExpand(
       };
     let mut okm = vec![0; length / k] ;
     
-    PRK.expand(&info_encoded, &mut okm)?;
+    prk.expand(&info_encoded, &mut okm)?;
     Ok(okm)
 }
 pub fn tryexpand(
-    PRK: Hkdf<Sha256>,
+    prk: Hkdf<Sha256>,
     info1: &[u8],
-    plainTextLength : usize,
+    plain_text_length : usize,
 ) -> Result<Vec<u8>> {
 
     // For the Expand step, take the COSE_KDF_Context structure as info
@@ -342,17 +342,17 @@ pub fn tryexpand(
         info1,
         "",
     );
-   let infoEncoded =  cbor::encode_sequence(info)?;
+   let info_encoded =  cbor::encode_sequence(info)?;
 
     // Expand the PRK to the desired length output keying material (OKM)
-    let mut okm = vec![0; plainTextLength / 8];
+    let mut okm = vec![0; plain_text_length / 8];
     println!("okm {:?}", okm.len());
 
-    PRK.expand(&infoEncoded, &mut okm)?;
+    prk.expand(&info_encoded, &mut okm)?;
     Ok(okm)
 }
 
-pub fn tmpEncode(
+pub fn tmp_encode(
     one : Vec<u8>,
     two : Vec<u8>,
 ) -> Result<Vec<u8>> {
@@ -362,9 +362,9 @@ pub fn tmpEncode(
         two
     );
 
-   let infoEncoded =  cbor::encode_sequence(info)?;
+   let info_encoded =  cbor::encode_sequence(info)?;
 
-    Ok(infoEncoded)
+    Ok(info_encoded)
 }
 
 // Xor function, for message 2
@@ -401,16 +401,16 @@ pub fn edhoc_exporter(
 pub fn compute_th_2(
     message_1: Vec<u8>,
     c_r: &[u8],
-    Responder_ephemeral_PK: PublicKey,
+    responder_ephemeral_pk: PublicKey,
 ) -> Result<Vec<u8>> {
 
-    
-    let PK_hash = h(&Responder_ephemeral_PK.to_bytes())?;
+    let msg_1_hash = h(&message_1)?;
+    let pk_bytes = &responder_ephemeral_pk.to_bytes();
 
     let hash_data = cbor::encode_sequence((
         c_r,
-        message_1,
-        PK_hash
+        msg_1_hash,
+        pk_bytes
     ))?;
     // Create a sequence of CBOR items from the data
 
