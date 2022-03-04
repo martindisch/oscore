@@ -11,7 +11,6 @@ use digest::{FixedOutput, Input};
 use hkdf::Hkdf;
 use serde_bytes::{ByteBuf, Bytes};
 use sha2::Sha256;
-use std::convert::TryInto;
 use super::{cose, error::Error, Result};
 use crate::cbor;
 
@@ -370,7 +369,7 @@ pub fn tmp_encode(
 // Xor function, for message 2
 pub fn xor(a : &Vec<u8>, b:&Vec<u8>) -> Result<Vec<u8>>{
 
-    if (a.len() != b.len()){
+    if a.len() != b.len(){
         panic!("Attempting to xor vec's of unequal length");
     }
 

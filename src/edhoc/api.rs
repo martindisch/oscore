@@ -2,8 +2,7 @@
 
 use alloc::vec::Vec;
 use core::result::Result;
-use x25519_dalek::{PublicKey, SharedSecret, StaticSecret, EphemeralSecret};
-use eui::{Eui64};
+use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};
 use super::{
     cose,
     error::{EarlyError, Error, OwnError, OwnOrPeerError},
@@ -143,7 +142,6 @@ impl PartyI<Msg2Receiver> {
 
        let shared_secret_0 = self.0.i_ecdh_ephemeralsecret.diffie_hellman(&r_public);
  
-        let msg_1_seq_cpy = self.0.msg_1_seq.clone();
 
         // reconstructing keystream2
         let th_2 = util::compute_th_2(self.0.msg_1_seq, &msg_2.c_r, r_public)?;
@@ -240,7 +238,7 @@ impl PartyI<Msg2Verifier> {
             id_cred_r, 
             cred_r)?;
 
-        if (self.0.mac_2 != mac_2){
+        if self.0.mac_2 != mac_2{
             Err(Error::BadMac)?;
         }
 
@@ -297,7 +295,7 @@ impl PartyI<Msg3Sender> {
             &self.0.msg_2.ciphertext2)?;
 
             
-        let (prk_4x3m,prk_4x3m_hkdf) = util::derive_prk(
+        let (prk_4x3m,_prk_4x3m_hkdf) = util::derive_prk(
             Some(&self.0.prk_3e2m),
              shared_secret_2.as_bytes())?;
 
@@ -666,13 +664,13 @@ impl PartyR<Msg3Receiver> {
              cred_i)?;
 
 
-        if (mac_3_initiator != mac3){
+        if mac_3_initiator != mac3{
             Err(Error::BadMac)?;
             }
         // now computing the values needed for sck and rck
         let th_4 = util::compute_th_4(&th_3, &msg_3.ciphertext)?;
 
-        let (prk_4x3m,prk_4x3m_hkdf) = util::derive_prk(
+        let (prk_4x3m,_prk_4x3m_hkdf) = util::derive_prk(
             Some(&self.0.prk_3e2m),
              shared_secret_2.as_bytes())?;
 
