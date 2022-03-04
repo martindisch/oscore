@@ -296,7 +296,7 @@ impl PartyI<Msg3Sender> {
     /// secret and the OSCORE master salt.
     pub fn generate_message_3(
         self,
-    ) -> Result<(Vec<u8>, Vec<u8>, Vec<u8>), OwnError> {
+    ) -> Result<(PartyI<Msg4ReceiveVerify>,Vec<u8>), OwnError> {
 
         //first making necessary copies:
 
@@ -317,7 +317,7 @@ impl PartyI<Msg3Sender> {
             &self.0.msg_2.ciphertext2)?;
 
             
-        let (prk_4x3m,_) = util::derivePRK(
+        let (prk_4x3m,prk_4x3m_hkdf) = util::derivePRK(
             Some(&self.0.prk_3e2m),
              shared_secret_2.as_bytes())?;
 
@@ -374,27 +374,71 @@ impl PartyI<Msg3Sender> {
             &prk_4x3m,
         )?;
 
-        Ok((msg_3_seq, master_secret, master_salt))
+        Ok((PartyI(Msg4ReceiveVerify {
+            prk_4x3m_hkdf : prk_4x3m_hkdf,
+            prk_4x3m : prk_4x3m,
+            th_4 : th_4,
+            master_salt : master_salt,
+            master_secret: master_secret
+        }),msg_3_seq))
     }
 }
 
 
-
 pub struct Msg4ReceiveVerify {
-    secret: StaticSecret,
-    x_r: PublicKey,
-    stat_priv: StaticSecret,
-    stat_pub: PublicKey,
-    kid: Vec<u8>,
+    prk_4x3m_hkdf : hkdf::Hkdf<sha2::Sha256>,
+    prk_4x3m : Vec<u8>,
+    th_4 : Vec<u8>,
+    master_secret : Vec<u8>,
+    master_salt : Vec<u8>,
 }
 
 impl PartyI<Msg4ReceiveVerify> {
     pub fn receive_message_4(
         self,
-    ) -> Result<u8, OwnError> {
+        msg4_seq : Vec<u8>,
+    ) -> Result<(Vec<u8>, Vec<u8>), OwnOrPeerError> {
 
 
-        Ok(18)
+        util::fail_on_error_message(&msg4_seq)?;
+        let msg4 = util::deserialize_message_4(&msg4_seq)?;
+
+
+        let k_4 = util::edhoc_exporter(
+            "EDHOC_K_4",
+            util::CCM_KEY_LEN , //going from bits to bytes
+            &self.0.th_4,
+            &self.0.prk_4x3m,
+        )?;
+
+        let iv_4 = util::edhoc_exporter(
+            "EDHOC_IV_4",
+            util::CCM_NONCE_LEN , //going from bits to bytes
+            &self.0.th_4,
+            &self.0.prk_4x3m,
+        )?;
+        let ad = cose::build_ad(&self.0.th_4)?;
+
+        let plaintext = util::aead_open(&k_4, &iv_4, &msg4.ciphertext, &ad)?;
+
+
+        let sck = util::edhoc_exporter(
+            "SCK", 
+            32, 
+            &self.0.master_salt, 
+            &self.0.master_secret)?;
+
+        let rck = util::edhoc_exporter(
+            "RCK", 
+            32, 
+            &self.0.master_salt, 
+            &self.0.master_secret)?;
+
+
+
+
+
+        Ok((sck,rck))
     }
 
 }
@@ -598,13 +642,13 @@ impl PartyR<Msg3Receiver> {
         msg_3_seq: Vec<u8>,
         i_public_static_bytes: &[u8],
     ) -> Result<(PartyR<Msg4Sender>, Vec<u8>, Vec<u8>), OwnOrPeerError> {
-
+        util::fail_on_error_message(&msg_3_seq)?;
         // first, relevant copies:
         let prk_3e2m_hkdf_cpy1 = self.0.prk_3e2m_hkdf.clone();
         let prk_3e2m_hkdf_cpy2 = self.0.prk_3e2m_hkdf.clone();
 
         // Check if we don't have an error message
-        util::fail_on_error_message(&msg_3_seq)?;
+        
         // Decode the third message
 
         let msg_3 = util::deserialize_message_3(&msg_3_seq)?;

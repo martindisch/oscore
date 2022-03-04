@@ -123,7 +123,7 @@ fn main() {
         Err(OwnError(b)) => panic!("Send these bytes: {:?}", &b),
         Ok(val) => val, };
 
-        let (msg3_bytes, master_secret_i, master_salt_i) =
+        let (msg4_receiver_verifier, msg3_bytes) =
         match msg3_sender.generate_message_3() {
             Err(OwnError(b)) => panic!("Send these bytes: {}", hexstring(&b)),
             Ok(val) => val,
@@ -133,7 +133,7 @@ fn main() {
     /// Responder receiving and handling message 3, and generating message4 and sck rck
     ///////////////////////////////////////////////////////////////////// */
     
-    let (msg4sender, sck,rck) =
+    let (msg4sender, r_sck,r_rck) =
         match msg3_receiver.handle_message_3(msg3_bytes,&i_static_pub.as_bytes().to_vec()) {
             Err(OwnOrPeerError::PeerError(s)) => {
                 panic!("Received error msg: {}", s)
@@ -145,10 +145,24 @@ fn main() {
         };
 
 
+        let msg4_bytes =
+        match msg4sender.Generate_message_4() {
+            Err(OwnOrPeerError::PeerError(s)) => {
+                panic!("Received error msg: {}", s)
+            }
+            Err(OwnOrPeerError::OwnError(b)) => {
+                panic!("Send these bytes: {}", hexstring(&b))
+            }
+            Ok(val) => val,
+        };
+    
 
+        /*///////////////////////////////////////////////////////////////////////////
+    /// Initiator receiving and handling message 4, and generati  sck and rck. Then all is done
+    ///////////////////////////////////////////////////////////////////// */
 
-    let ciphertext4 =
-    match msg4sender.Generate_message_4() {
+    let (i_sck, i_rck) =
+    match msg4_receiver_verifier.receive_message_4(msg4_bytes) {
         Err(OwnOrPeerError::PeerError(s)) => {
             panic!("Received error msg: {}", s)
         }
@@ -157,6 +171,15 @@ fn main() {
         }
         Ok(val) => val,
     };
+
+    println!("Initiator completed handshake and made chan keys");
+
+    println!("sck {:?}", i_sck);
+    println!("rck {:?}", i_rck);
+    println!("Responder completed handshake and made chan keys");
+
+    println!("sck {:?}", r_sck);
+    println!("rck {:?}", r_rck);
 
 /*
         let (_v_kid, msg2_verifier) =
