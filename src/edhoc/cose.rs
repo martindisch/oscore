@@ -8,75 +8,10 @@ use sha2::Sha512;
 use super::Result;
 use crate::cbor;
 
-/// Returns the signature from signing the `Sig_structure` of the given data.
-///
-/// # Arguments
-/// * `id_cred_x` - The CBOR encoded header map identifying a public
-///   authentication key, e.g. `{ 4 : h'1111' }`.
-/// * `th_i` - The bstr wrapped transcript hash.
-/// * `cred_x` - CBOR encoded `COSE_Key`.
-/// * `keypair_bytes` - The ed25519 authentication key pair. First 32 bytes are
-///   the secret key, the other 32 bytes the public key.
-pub fn sign(
-    id_cred_x: &[u8],
-    th_i: &[u8],
-    cred_x: &[u8],
-    keypair_bytes: &[u8],
-) -> Result<[u8; 64]> {
-    let to_be_signed = build_to_be_signed(id_cred_x, th_i, cred_x)?;
-    let keypair = Keypair::from_bytes(keypair_bytes)?;
-    let signature = keypair.sign::<Sha512>(&to_be_signed);
 
-    Ok(signature.to_bytes())
-}
 
-/// Checks if the signature was made on a `Sig_structure` of the given data,
-/// with the given key.
-///
-/// # Arguments
-/// * `id_cred_x` - The CBOR encoded header map identifying a public
-///   authentication key, e.g. `{ 4 : h'1111' }`.
-/// * `th_i` - The bstr wrapped transcript hash.
-/// * `cred_x` - CBOR encoded `COSE_Key`.
-/// * `public_key` - The ed25519 public key of the pair used for the signature.
-/// * `signature` - The ed25519 signature.
-pub fn verify(
-    id_cred_x: &[u8],
-    th_i: &[u8],
-    cred_x: &[u8],
-    public_key: &[u8],
-    signature: &[u8],
-) -> Result<()> {
-    let to_be_signed = build_to_be_signed(id_cred_x, th_i, cred_x)?;
-    let public_key = ed25519_dalek::PublicKey::from_bytes(public_key)?;
-    let signature = Signature::from_bytes(signature)?;
 
-    Ok(public_key.verify::<Sha512>(&to_be_signed, &signature)?)
-}
 
-/// Returns the COSE `Sig_structure` used as input to the signature algorithm.
-fn build_to_be_signed(
-    id_cred_x: &[u8],
-    th_i: &[u8],
-    cred_x: &[u8],
-) -> Result<Vec<u8>> {
-    // Create the Sig_structure
-    let sig_struct = (
-        "Signature1",
-        Bytes::new(id_cred_x), // protected
-        0,                     // placeholder 1 (external_aad)
-        0,                     // placeholder 2 (payload)
-    );
-    // Encode it to a CBOR array
-    let mut sig_arr = cbor::encode(&sig_struct)?;
-    // Remove the placeholder items
-    sig_arr.truncate(sig_arr.len() - 2);
-    // Insert the remaining two items that are already in their CBOR encoding
-    sig_arr.extend(th_i); // external_aad
-    sig_arr.extend(cbor::encode(Bytes::new(cred_x))?); // payload
-
-    Ok(sig_arr)
-}
 
 /// Returns a CBOR encoded `COSE_KDF_Context`.
 ///
@@ -181,67 +116,7 @@ mod tests {
     use super::super::test_vectors::*;
     use super::*;
 
-    #[test]
-    fn to_be_signed() {
-        let to_be_signed =
-            build_to_be_signed(&ID_CRED_V, &TH_2, &CRED_V).unwrap();
-        assert_eq!(&M_V[..], &to_be_signed[..]);
 
-        let to_be_signed =
-            build_to_be_signed(&ID_CRED_U, &TH_3, &CRED_U).unwrap();
-        assert_eq!(&M_U[..], &to_be_signed[..]);
-    }
-
-    #[test]
-    fn signature_same() {
-        let signature = sign(
-            &ID_CRED_V,
-            &TH_2,
-            &CRED_V,
-            &build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC),
-        )
-        .unwrap();
-        assert_eq!(&V_SIG[..], &signature[..]);
-
-        let signature = sign(
-            &ID_CRED_U,
-            &TH_3,
-            &CRED_U,
-            &build_keypair(&AUTH_U_PRIVATE, &AUTH_U_PUBLIC),
-        )
-        .unwrap();
-        assert_eq!(&U_SIG[..], &signature[..]);
-    }
-
-    #[test]
-    fn signature_verifies() {
-        let signature = sign(
-            &ID_CRED_V,
-            &TH_2,
-            &CRED_V,
-            &build_keypair(&AUTH_V_PRIVATE, &AUTH_V_PUBLIC),
-        )
-        .unwrap();
-        assert!(verify(
-            &ID_CRED_V,
-            &TH_2,
-            &CRED_V,
-            &AUTH_V_PUBLIC,
-            &signature
-        )
-        .is_ok());
-
-        let mut cred_x_changed = CRED_V.to_vec();
-        cred_x_changed[1] = 0x44;
-        assert!(verify(
-            &ID_CRED_V,
-            &TH_2,
-            &cred_x_changed,
-            &AUTH_V_PUBLIC,
-            &signature
-        )
-        .is_err());
-    }
 
     #[test]
     fn context_generation() {
