@@ -398,6 +398,11 @@ impl PartyI<Msg4ReceiveVerify> {
         let plaintext = util::aead_open(&k_4, &iv_4, &msg4.ciphertext, &ad)?;
 
 
+        if plaintext.len() != 0{
+            Err(Error::Aead)?;
+        }
+
+
         let sck = util::edhoc_exporter(
             "SCK", 
             32, 
