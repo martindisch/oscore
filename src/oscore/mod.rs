@@ -1,3 +1,4 @@
+
 //! OSCORE implementation deriving keys from a master secret and master salt.
 //!
 //! It's pretty simple to use. Both parties need to establish some information,
@@ -71,7 +72,8 @@
 //!     client_context.unprotect_response(&res_protected).unwrap();
 //! assert_eq!(&res_unprotected[..], &res_unprotected_local[..]);
 //! ```
-
+//! 
+//! #![no_st
 mod context;
 #[cfg_attr(tarpaulin, skip)]
 mod error;

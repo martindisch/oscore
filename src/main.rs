@@ -1,4 +1,3 @@
-
 //#![no_std]
 
 use oscore::edhoc::{
@@ -73,8 +72,7 @@ fn main() {
        
     let msg2_sender = match msg1_receiver.handle_message_1(msg1_bytes) {
         Err(OwnError(b)) => {
-            let s = std::str::from_utf8(&b).unwrap().to_string();
-            panic!("{}", s)
+            panic!("{:?}", b)
         },
         Ok(val) => val,
     };
@@ -129,17 +127,12 @@ fn main() {
     /// Responder receiving and handling message 3, and generating message4 and sck rck
     ///////////////////////////////////////////////////////////////////// */
     
-    let (msg4sender, r_sck,r_rck) =
-        match msg3_receiver.handle_message_3(msg3_bytes,&i_static_pub.as_bytes().to_vec()) {
-            Err(OwnOrPeerError::PeerError(s)) => {
-                panic!("Received error msg: {}", s)
-            }
-            Err(OwnOrPeerError::OwnError(b)) => {
-                panic!("Send these bytes: {}", hexstring(&b))
-            }
-            Ok(val) => val,
-        };
+    let tup3 = msg3_receiver.handle_message_3(msg3_bytes,&i_static_pub.as_bytes().to_vec());
 
+    let (msg4sender, r_sck,r_rck) = match tup3 {
+            Ok(v) => v,
+            Err(e) =>panic!("panicking in handling message 3 {}", e),
+        };
 
         let msg4_bytes =
         match msg4sender.generate_message_4() {

@@ -636,7 +636,7 @@ impl PartyR<Msg3Receiver> {
             self.0.prk_3e2m_hkdf, 
             &th_3, 
             util::CCM_KEY_LEN,
-            "K_3",
+            "K_3_",
             true)?;
         let iv_3 = util::generic_expand(
             prk_3e2m_hkdf_cpy1, 

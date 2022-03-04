@@ -1,7 +1,5 @@
 use coap_lite::{error as coap, CoapOption};
 use core::fmt;
-#[cfg(feature = "std")]
-use std::error;
 
 use crate::cbor;
 
@@ -85,15 +83,4 @@ impl fmt::Display for Error {
     }
 }
 
-#[cfg(feature = "std")]
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            Error::Cbor(e) => Some(e),
-            Error::Hkdf(e) => Some(e),
-            Error::Coap(e) => Some(e),
-            // Other errors that don't implement the Error trait
-            _ => None,
-        }
-    }
-}
+

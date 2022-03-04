@@ -21,8 +21,7 @@
 //! This should **not currently be used in production code**, use at your own
 //! risk.
 
-#![cfg_attr(not(feature = "std"), no_std)]
-
+#![no_std]
 #[macro_use]
 extern crate alloc;
 

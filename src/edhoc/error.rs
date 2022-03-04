@@ -2,8 +2,7 @@
 
 use alloc::string::String;
 use core::fmt;
-#[cfg(feature = "std")]
-use std::error;
+
 
 use super::util;
 use crate::cbor;
@@ -70,12 +69,7 @@ impl fmt::Display for OwnOrPeerError {
     }
 }
 
-#[cfg(feature = "std")]
-impl error::Error for OwnOrPeerError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        None
-    }
-}
+
 
 /// The error type for operations that may fail and produce an EDHOC error
 /// message, which needs to be sent to the other party prior to aborting the
@@ -106,12 +100,7 @@ impl fmt::Display for OwnError {
         write!(f, "Generated EDHOC error møssage: {:?}", &self.0)
     }
 }
-#[cfg(feature = "std")]
-impl error::Error for OwnError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        None
-    }
-}
+
 
 /// The error type for operations that may fail before any messages have been
 /// sent, which means the protocol can be aborted without any further action.
@@ -130,12 +119,6 @@ impl fmt::Display for EarlyError {
     }
 }
 
-#[cfg(feature = "std")]
-impl error::Error for EarlyError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        Some(&self.0)
-    }
-}
 
 /// The catch-all error type for this module, mostly just wrapping errors from
 /// various libraries.
@@ -196,14 +179,3 @@ impl fmt::Display for Error {
     }
 }
 
-#[cfg(feature = "std")]
-impl error::Error for Error {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            Error::Cbor(e) => Some(e),
-            Error::Hkdf(e) => Some(e),
-            // Other errors that don't implement the Error trait
-            _ => None,
-        }
-    }
-}

@@ -345,7 +345,6 @@ pub fn tryexpand(
 
     // Expand the PRK to the desired length output keying material (OKM)
     let mut okm = vec![0; plain_text_length / 8];
-    println!("okm {:?}", okm.len());
 
     prk.expand(&info_encoded, &mut okm)?;
     Ok(okm)

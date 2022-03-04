@@ -1,3 +1,5 @@
+#![no_std]
+
 use aes::Aes128;
 use alloc::{collections::LinkedList, vec::Vec};
 use ccm::{

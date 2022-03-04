@@ -1,6 +1,5 @@
 use core::fmt;
 #[cfg(feature = "std")]
-use std::error;
 
 /// The error type for the `cbor` module.
 #[derive(Debug)]
@@ -40,38 +39,5 @@ impl fmt::Display for CborError {
     }
 }
 
-#[cfg(feature = "std")]
-impl error::Error for CborError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            CborError::TooManyItems => None,
-            CborError::SerdeCbor(e) => Some(e),
-        }
-    }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde::ser::Error;
-    #[cfg(feature = "std")]
-    use std::io::ErrorKind;
 
-    #[test]
-    fn partial_eq() {
-        let own_error = CborError::TooManyItems;
-        let serde_error_1 =
-            CborError::SerdeCbor(serde_cbor::Error::custom("nope!"));
-        #[cfg(feature = "std")]
-        let serde_error_2 = CborError::SerdeCbor(serde_cbor::Error::from(
-            std::io::Error::new(ErrorKind::Other, "oh no!"),
-        ));
-        assert!(own_error != serde_error_1);
-        #[cfg(feature = "std")]
-        assert!(serde_error_1 != serde_error_2);
-        assert_eq!(own_error, own_error);
-        assert_eq!(serde_error_1, serde_error_1);
-        #[cfg(feature = "std")]
-        assert_eq!(serde_error_2, serde_error_2);
-    }
-}
