@@ -8,7 +8,6 @@ use super::util;
 use crate::cbor;
 
 static ERR_CBOR: &str = "Error processing CBOR";
-static ERR_ED25519: &str = "Error processing signature";
 static ERR_HKDF: &str = "Error using HKDF";
 static ERR_AEAD: &str = "Error using AEAD";
 static ERR_SUITE: &str = "Cipher suite unsupported";
@@ -39,9 +38,7 @@ impl From<Error> for OwnOrPeerError {
             Error::Cbor(_) => {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_CBOR))
             }
-            Error::Ed25519(_) => OwnOrPeerError::OwnError(
-                util::build_error_message(ERR_ED25519),
-            ),
+
             Error::Hkdf(_) => {
                 OwnOrPeerError::OwnError(util::build_error_message(ERR_HKDF))
             }
@@ -84,9 +81,7 @@ impl From<Error> for OwnError {
                 OwnError(util::build_error_message(ERR_SUITE))
             }
             Error::Cbor(_) => OwnError(util::build_error_message(ERR_CBOR)),
-            Error::Ed25519(_) => {
-                OwnError(util::build_error_message(ERR_ED25519))
-            }
+
             Error::BadMac => OwnError(util::build_error_message(ERR_BADMAC)),
             Error::Hkdf(_) => OwnError(util::build_error_message(ERR_HKDF)),
             Error::Aead => OwnError(util::build_error_message(ERR_AEAD)),
@@ -131,7 +126,6 @@ pub enum Error {
     /// Wraps errors from the `cbor` module.
     Cbor(cbor::CborError),
     /// Wraps errors from `ed25519_dalek`.
-    Ed25519(ed25519_dalek::SignatureError),
     /// Wraps errors from `hkdf`.
     Hkdf(hkdf::InvalidLength),
     /// Error in `aes_ccm`.
@@ -147,11 +141,7 @@ impl From<cbor::CborError> for Error {
     }
 }
 
-impl From<ed25519_dalek::SignatureError> for Error {
-    fn from(e: ed25519_dalek::SignatureError) -> Error {
-        Error::Ed25519(e)
-    }
-}
+
 
 impl From<hkdf::InvalidLength> for Error {
     fn from(e: hkdf::InvalidLength) -> Error {
@@ -171,7 +161,6 @@ impl fmt::Display for Error {
             Error::UnsupportedSuite => write!(f, "Cipher suite unsupported"),
             Error::BadMac => write!(f, "Mac tag was wrong"),
             Error::Cbor(e) => e.fmt(f),
-            Error::Ed25519(e) => e.fmt(f),
             Error::Hkdf(e) => e.fmt(f),
             Error::Aead => write!(f, "{}", ERR_AEAD),
             Error::Edhoc(e) => e.fmt(f),

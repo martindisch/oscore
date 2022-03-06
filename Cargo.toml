@@ -15,7 +15,6 @@ serde = { version = "1.0.97", default-features = false, features = ["derive", "a
 serde_cbor = { version = "0.11.2", default-features = false, features = ["alloc"] }
 serde_bytes = { version = "0.11.1", default-features = false, features = ["alloc"] }
 x25519-dalek = "1"
-ed25519-dalek = { version = "0.9.1", default-features = false, features = ["u32_backend"] }
 rand_core = "0.5.1"
 eui-no-std = "0.3"
 
